@@ -1,5 +1,6 @@
 #Combine simulations
 load("results_combined_N_C0_n1000_geefix.rds")
+#load("results_combined_N_C0_n1000_geefix_reverse.rds")
 
 require(ggplot2)
 require(ggpubr)
@@ -13,16 +14,16 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
 #01 DATA SETUP (DON'T EDIT)
   
   #write.csv(cbind(parameters,tau,marginal_skew_1,marginal_skew_2, t1intercepts, t2intercepts,t1error,t2error),file="SimulationResults.csv")
-  marginal_skew_1=(2/sqrt(results[[1]][8,1]))/((results[[1]][8,1]*(results[[1]][8,3]^2))^(3/2))
-  for (i in 2:length(results)) {marginal_skew_1=rbind(marginal_skew_1,(2/sqrt(results[[i]][8,1]))/((results[[i]][8,1]*(results[[i]][8,3]^2))^(3/2))) }
-  marginal_skew_2=(2/sqrt(results[[1]][8,1]))/((results[[1]][8,1]*(results[[1]][8,4]^2))^(3/2))
-  for (i in 2:length(results)) {marginal_skew_2=rbind(marginal_skew_2,(2/sqrt(results[[i]][8,1]))/((results[[i]][8,1]*(results[[i]][8,4]^2))^(3/2))) }
-  
+
   tau=results[[1]][7,3]
   for (i in 2:length(results)) {tau=rbind(tau,results[[i]][7,3]) }
   
   parameters=results[[1]][8,1:4]
   for (i in 2:length(results)) {parameters=rbind(parameters,results[[i]][8,1:4]) }
+  
+  mu1=parameters[,1]/parameters[,4]
+  mu2=parameters[,1]/parameters[,3]
+  
   
   t1error=results[[1]][1:6,3]
   for (i in 2:length(results)) {t1error=rbind(t1error,results[[i]][1:6,3]) }
@@ -94,41 +95,31 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     e<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=summary_cop/actuals-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (C)")
     f<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=summary_cop_n/actuals-1))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (N)")
     ggarrange(a,b,c,d,e,f)
-    #ggsave(file="bias_time_1.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="bias_time_1_par.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     #Bias time 1 (MEAN)
-    a<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_glm)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLM")
-    b<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_gee)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GEE")
-    c<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_re_nosig)/exp(actuals))-1))  + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (4)")
-    d<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_re)/exp(actuals))-1))        + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (5)")
-    e<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_cop)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (C)")
-    f<-ggplot(data=as.data.frame(cbind(t1intercepts,tau)), aes(x=tau, y=(exp(summary_cop_n)/exp(actuals))-1))     + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (N)")
+    data_input<-as.data.frame(cbind(t1intercepts[,1:6],mu2,tau))
+    colnames(data_input)[7:8] <- c("actuals","tau")
+    a<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_glm)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLM")
+    b<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_gee)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GEE")
+    c<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_re_nosig)/(actuals))-1))  + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (4)")
+    d<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1))        + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (5)")
+    e<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (C)")
+    f<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1))     + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
-    #ggsave(file="bias_time_1_MEAN_FGM_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
-    #ggsave(file="bias_time_1_MEAN_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
-    
-    #annotate_figure(fig, top=text_grob("Bias of intercept estimate at time 1", face = "bold", size = 14))
-    
-    #Bias time 2
-    a<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_glm/actuals-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="glm")
-    b<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_gee/actuals-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gee")
-    c<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_re_nosig/actuals-1))  + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="glmm (4)")
-    d<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_re/actuals-1))        + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="glmm (5)")
-    e<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_cop/actuals-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (C)")
-    f<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=summary_cop_n/actuals-1))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (N)")
-    ggarrange(a,b,c,d,e,f)
-    #ggsave(file="bias_time_2.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="bias_time_1_mean.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     #Bias time 2 (MEAN)
-    a<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_glm)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GLM")
-    b<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_gee)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GEE")
-    c<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_re_nosig)/exp(actuals))-1))  + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (4)")
-    d<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_re)/exp(actuals))-1))        + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (5)")
-    e<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_cop)/exp(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (C)")
-    f<-ggplot(data=as.data.frame(cbind(t2intercepts,tau)), aes(x=tau, y=(exp(summary_cop_n)/exp(actuals))-1))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (N)")
+    data_input<-as.data.frame(cbind(t2intercepts[,1:6]+t1intercepts[,1:6],mu1,tau))
+    colnames(data_input)[7:8] <- c("actuals","tau")
+    a<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_glm)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLM")
+    b<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_gee)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GEE")
+    c<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_re_nosig)/(actuals))-1))  + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (4)")
+    d<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1))        + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GLMM (5)")
+    e<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1))       + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (C)")
+    f<-ggplot(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1))     + geom_point(size=0.5,color="gray") + geom_smooth(level=0.99) + ylim(-1,1) + labs(x = "tau", y="bias", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
-    #ggsave(file="bias_time_2_MEAN_FGM_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
-    #ggsave(file="bias_time_2_MEAN_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="bias_time_2_mean.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     #Error time 1
     a<-ggplot(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_glm))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GLM")
@@ -138,7 +129,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     e<-ggplot(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (C)")
     f<-ggplot(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
-    #ggsave(file="error_time_1_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="error_time_1.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     #Error time 2
     a<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GLM")
@@ -148,11 +139,8 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     e<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (C)")
     f<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
-    #ggsave(file="error_time_2_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="error_time_2.jpeg",last_plot(),width=10,height=6,dpi=300)
     
-    
-        
-  
 ########## REFERENCE
   #     
   #   plot(t1intercepts[,1]/t1intercepts[,7]-1~tau,main="Bias GLM",ylim=c(-4,4),xlab="Tau", ylab="Bias")
