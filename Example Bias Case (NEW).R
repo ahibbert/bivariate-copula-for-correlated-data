@@ -21,10 +21,9 @@ w<-rbeta(n,a,b) #Mean .5
 gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1) #Mean 6 * .5 = 3
 gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2) #Mean 12 * .5 = 6
 
-
 ##########is this an RE?
-gamma_c_mu1<-rgamma(n,shape=3,scale=2) #Mean 6 * .5 = 3
-gamma_c_mu2<-gamma_c_mu1 + rgamma(n,shape=4,scale=5) #Mean 12 * .5 = 6
+#gamma_c_mu1<-rgamma(n,shape=3,scale=2) #Mean 6 * .5 = 3
+#gamma_c_mu2<-gamma_c_mu1 + rgamma(n,shape=4,scale=5) #Mean 12 * .5 = 6
 
 
 #cor(gamma_c_mu1,gamma_c_mu2,method="kendall")
@@ -212,7 +211,7 @@ require(mgcv)
 library(geepack)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log",corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
+model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", cor.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
 #model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
 model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=RS())
