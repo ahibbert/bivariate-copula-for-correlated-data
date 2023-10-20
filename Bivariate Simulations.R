@@ -47,7 +47,8 @@ simulateCorrelatedVarNOGJRM <- function(n,a,b,mu1,mu2)  {
                  , id=patient
                  , data=dataset
                  , family=Gamma(link = "log")
-                 , maxiter=25)
+                 , maxiter=25
+                 , corstr = "exchangeable")
   
   #Extracting coefficient estimates from each of the models
   summary_glm<-c( summary(model_glm)$coeff[1]
