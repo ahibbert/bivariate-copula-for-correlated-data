@@ -1,10 +1,5 @@
 #Combine simulations
-#load("results_combined.rds")
-#load("results_combined_AMH.rds")
-#load("results_combined_FGM.rds")
-#load("results_GJRM_C180.rds")
-#load("results_combined_C0_FGM.rds")
-load("results_combined_N_C0_n1000.rds")
+load("results_combined_N_C0_n1000_geefix.rds")
 
 require(ggplot2)
 require(ggpubr)
@@ -85,9 +80,9 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   
   summaryresultstable <- rbind(time1biastable,time1errortable,time2biastable,time2errortable)
   colnames(summaryresultstable) <- c("model","0-0.2","0.2-0.4","0.4-0.6","0.6-0.8","0.8-1.0","n")
-  #write.csv(summaryresultstable,file="simulation_full_results_table_n1000.csv")
   
-  write.csv(cbind(t1intercepts,tau,marginal_skew_1,marginal_skew_2),file="simulation_skewness_tables_n1000.csv")
+  #write.csv(summaryresultstable,file="simulation_full_results_table_n1000_geefix.csv")
+  #write.csv(cbind(t1intercepts,tau,marginal_skew_1,marginal_skew_2),file="simulation_skewness_tables_n1000_geefix.csv")
   
 #########Time 1 BIAS AND ERROR AGAINST TAU
     
@@ -153,7 +148,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     e<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (C)")
     f<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
-    ggsave(file="error_time_2_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="error_time_2_C0_N_n1000.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     
         
