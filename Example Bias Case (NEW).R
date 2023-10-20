@@ -211,40 +211,44 @@ require(mgcv)
 library(geepack)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", cor.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
+
+model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
 #model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
-model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
+#model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=RS())
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
                    , method=CG(10000))
+
+summary(model_re_nosig)
+
 summary_glm<-c( summary(model_glm)$coeff[1]
-                ,summary(model_glm)$coeff[2]
+                ,summary(model_glm)$coeff[2] + summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[3]
                 ,summary(model_glm)$coeff[4]
 )
 summary_gee<-c( summary(model_gee)$mean[1,1]
-                ,summary(model_gee)$mean[2,1]
+                ,summary(model_gee)$mean[2,1] + summary(model_gee)$mean[1,1]
                 ,summary(model_gee)$mean[1,2] #Robust SE - look into this
                 ,summary(model_gee)$mean[2,2] #Robust SE - look into this
 )
 
 invisible(capture.output(
   summary_re_nosig<-c( summary(model_re_nosig)[1]
-                       ,summary(model_re_nosig)[2]
+                         ,summary(model_re_nosig)[2] + summary(model_re_nosig)[1]
                        ,summary(model_re_nosig)[4]
                        ,summary(model_re_nosig)[5]
   )
 ))
 invisible(capture.output(
   summary_re<-c( summary(model_re)[1]
-                 ,summary(model_re)[2]
+                 ,summary(model_re)[2] + summary(model_re)[1]
                  ,summary(model_re)[5]
                  ,summary(model_re)[6]
   )
 ))
 actuals<-c( log(a*(1/mu1))
-            , -log(a*(1/mu1))+log(a*(1/mu2))
+            , log(a*(1/mu2))
             , 0#model_copula$tau
             , 0
 )
@@ -261,19 +265,29 @@ model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame
 #plot(time)
 
 summary_cop<-c( model_copula$coefficients[1]
-                , model_copula$coefficients[2] - model_copula$coefficients[1]
+                , model_copula$coefficients[2]
                 , summary(model_copula)$tableP1[2] #SE for time 0
                 , summary(model_copula)$tableP2[2] #SE for time 1
 )
 summary_cop_n<-c( model_copula_n$coefficients[1]
-                  , model_copula_n$coefficients[2] - model_copula_n$coefficients[1]
+                  , model_copula_n$coefficients[2] 
                   , summary(model_copula_n)$tableP1[2] #SE for time 0
                   , summary(model_copula_n)$tableP2[2] #SE for time 1
                   
 )
+
 rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
+exp(rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals))
 
-
+#Results for bias case (EXP)
+#(Intercept) (Intercept)                  
+#summary_glm       0.27790949 0.133037154 1.045690 1.065221
+#summary_gee       0.27790948 0.133037154 1.046683 1.065204
+#summary_re_nosig  0.01844942 0.008929757 1.011789 1.016713
+#summary_re        0.01619289 0.014708712 1.000906 1.023602
+#summary_cop       0.28406920 0.135318812 1.042085 1.041990
+#summary_cop_n     0.41422316 0.197520118 1.054372 1.054211
+#actuals           0.25000000 0.125000000 1.000000 1.000000
 
 
 #Results for RE model
