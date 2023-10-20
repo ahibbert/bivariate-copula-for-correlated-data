@@ -116,8 +116,6 @@ simulateCorrelatedVarGJRM <- function(n,a,b,mu1,mu2)  {
   gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1)
   gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2)
   
-  
-  
   ####TEMP
   #u<-pgamma(gamma_c_mu1,shape=a,scale=1/mu1)
   #v<-pgamma(gamma_c_mu2,shape=a,scale=1/mu2)
@@ -207,7 +205,7 @@ for (i in 1:length(a)) {
 }
 
 results_re <- results
-#save(results_re,file="results_NOGJRM_n1000.rds")
+save(results_re,file="results_NOGJRM_n1000_geefix.rds")
 
 ##############Run simulations for GJRM models
 results<-list()
@@ -237,33 +235,19 @@ for (i in 1:length(a)) {
   }
 }
 results_gjrm<-results
-#save(results_gjrm,file="results_GJRM.rds")
-#save(results_gjrm,file="results_GJRM_AMH.rds")
-#save(results_gjrm,file="results_GJRM_FGM.rds")
-#save(results_gjrm,file="results_GJRM_N_FGM.rds")
-#save(results_gjrm,file="results_GJRM_J0_FGM.rds")
-#save(results_gjrm,file="results_GJRM_C0_FGM.rds")
-#save(results_gjrm,file="results_GJRM_C0_FGM_n1000.rds")
-save(results_gjrm,file="results_GJRM_N_FGM_n1000.rds")
+save(results_gjrm,file="results_GJRM_C0_N_n1000.rds")
 
 
 #load(file="results_GJRM.rds")
 #load(file="results_GJRM_AMH.rds")
 
 #######Combine GJRM and non-GJRM results into one table for comparison
-load(file="results_NOGJRM_n1000.rds")
-#load(file="results_GJRM_C0_FGM.rds")
-#load(file="results_GJRM_N_FGM_n1000.rds")
+load(file="results_GJRM_C0_N_n1000.rds")
+load(file="results_NOGJRM_n1000_geefix.rds")
 
 results=results_gjrm
 for(i in 1:length(results_gjrm)) {
   results[[i]][1:7,]=results_gjrm[[i]][1:7,]+results_re[[i]][1:7,]
 }
 
-#save(results,file="results_combined.rds")
-#save(results,file="results_combined_AMH.rds")
-#save(results,file="results_combined_FGM.rds")
-#save(results,file="results_combined_C180.rds")
-#save(results,file="results_combined_J90_FGM.rds")
-#save(results,file="results_combined_C0_FGM.rds")
-#save(results,file="results_combined_N_C0_n1000.rds")
+save(results,file="results_combined_N_C0_n1000_geefix.rds")
