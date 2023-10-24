@@ -64,73 +64,62 @@ fl <- list(eq.mu.1, eq.mu.2)
 
 model_copula<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
 model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_j<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_g<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_f<-gjrm(fl, margins = c("GA" , "GA") , copula = "F",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_amh<-gjrm(fl, margins = c("GA" , "GA") , copula = "AMH",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_fgm<-gjrm(fl, margins = c("GA" , "GA") , copula = "FGM",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_pl<-gjrm(fl, margins = c("GA" , "GA") , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
-model_copula_h<-gjrm(fl, margins = c("GA" , "GA") , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_j<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_g<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_f<-gjrm(fl, margins = c("GA" , "GA") , copula = "F",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_amh<-gjrm(fl, margins = c("GA" , "GA") , copula = "AMH",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_fgm<-gjrm(fl, margins = c("GA" , "GA") , copula = "FGM",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_pl<-gjrm(fl, margins = c("GA" , "GA") , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+#model_copula_h<-gjrm(fl, margins = c("GA" , "GA") , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
 
-##8072 is benchmark for FGM
-
-help(gjrm)
-
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik ############7575.195
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik 
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik 
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik ############ 7575.195
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik ############7575.195
-
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL=90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 #model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 
 #Weird copulas
 #"C0C90", "C0C270", "C180C90", "C180C270", "GAL0GAL90", "GAL0GAL270", "GAL180GAL90", "GAL180GAL270", "G0G90", "G0G270", "G180G90", "G180G270", "J0J90", "J0J270", "J180J90" and "J180J270"
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0C90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0C270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180C90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180C270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0GAL90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0GAL270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180GAL90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180GAL270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0G270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180G270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0J90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0J270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180J90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
-model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180J270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0C90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0C270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180C90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "C180C270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0GAL90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL0GAL270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180GAL90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "GAL180GAL270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0G270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180G90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "G180G270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0J90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0J270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180J90",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
+#model_copula_c180<-gjrm(fl, margins = c("GA" , "GA") , copula = "J180J270",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B"); model_copula_c180$logLik
 
-
-
-aics=c(
-  model_copula$logLik
-  ,model_copula_n$logLik
-  ,model_copula_j$logLik
-  ,model_copula_g$logLik
-  ,model_copula_f$logLik
-  ,model_copula_amh$logLik
-  ,model_copula_fgm$logLik
-  ,model_copula_pl$logLik
-  ,model_copula_h$logLik)
+#aics=c(
+#  model_copula$logLik
+#  ,model_copula_n$logLik
+#  ,model_copula_j$logLik
+#  ,model_copula_g$logLik
+#  ,model_copula_f$logLik
+#  ,model_copula_amh$logLik
+#  ,model_copula_fgm$logLik
+#  ,model_copula_pl$logLik
+#  ,model_copula_h$logLik)
 
 
 ####UKNOWN FIT u,v
@@ -215,11 +204,10 @@ model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(li
 model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
 #model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
 #model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
-model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=RS())
+model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
                    , method=CG(10000))
-
 summary(model_re_nosig)
 
 summary_glm<-c( summary(model_glm)$coeff[1]
@@ -253,12 +241,63 @@ actuals<-c( log(a*(1/mu1))
             , 0
 )
 
+plot()
+summary(model_re)
+#Time 1
+plot(model_re_nosig$mu.fv[1:2000], model_re_nosig$y[1:2000],xlim=c(0,.5),ylim=c(0,.5))
+lines(c(0, 5), c(0, 5), type='l',col="red")
+plot(model_re$mu.fv[1:2000], model_re$y[1:2000],xlim=c(0,.5),ylim=c(0,.5))
+lines(c(0, 5), c(0, 5), type='l',col="red")
+#Time 2
+plot(model_re_nosig$mu.fv[2001:4000], model_re_nosig$y[2001:4000],xlim=c(0,.5),ylim=c(0,.5))
+lines(c(0, 5), c(0, 5), type='l',col="red")
+plot(model_re$mu.fv[2001:4000], model_re$y[2001:4000],xlim=c(0,.5),ylim=c(0,.5))
+lines(c(0, 5), c(0, 5), type='l',col="red")
+
+
+
+
+
+plot(model_re$mu.fv[1:2000]/model_re$mu.fv[2001:4000], model_re$y[1:2000]/model_re$y[2001:4000])
+
+plot(model_re$mu.fv[1:2000], model_re$y,xlim=c(0,.5),ylim=c(0,.5))
+lines(c(0, 5), c(0, 5), type='l',col="red")
+
+
+
+plot(model_glm$fitted.values,model_glm$data$random_variable)
+plot(model_glm$fitted.values,model_glm$data$random_variable)
+
+
+e<-ggplot(data=as.data.frame(cbind(model_re_nosig$mu.fv, model_re_nosig$y)),aes(x=V1,y=V2)) + 
+  #geom_point(size=0.25,color="black") + 
+  geom_density_2d(contour_var="density",bins=20,color="black") +
+  scale_fill_brewer() +
+  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
+
+f<-ggplot(data=as.data.frame(cbind(model_re$mu.fv, model_re$y)),aes(x=V1,y=V2)) + 
+  #geom_point(size=0.25,color="black") + 
+  geom_density_2d(contour_var="density",bins=20,color="black") +
+  scale_fill_brewer() +
+  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
+
+ggarrange(e,f)
+
 require(GJRM)
 eq.mu.1 <- gamma_c_mu1~1
 eq.mu.2 <- gamma_c_mu2~1
 fl <- list(eq.mu.1, eq.mu.2)
 model_copula<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
 model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+
+#AIC for copula
+
+model_glm$aic
+2*4-2*model_copula_n$logLik
+2*4-2*model_copula$logLik
+model_re_nosig$aic
+model_re$aic
+
 
 #time<-c(start_time[2:5]-start_time[1:4],start_time[7:8]-start_time[6:7])
 #time
