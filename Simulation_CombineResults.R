@@ -4,6 +4,7 @@ load("results_combined_N_C0_n1000_geefix.rds")
 
 require(ggplot2)
 require(ggpubr)
+library(RColorBrewer)
 set.seed(1000)
 options(scipen=999)
 
@@ -87,7 +88,74 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   #write.csv(cbind(t1intercepts,tau,marginal_skew_1,marginal_skew_2),file="simulation_skewness_tables_n1000_geefix.csv")
   
   
-#########Time 1 BIAS AND ERROR AGAINST TAU
+  
+###BIAS AND ERROR Superimposed into once chart (NEW)
+  
+  data_input<-as.data.frame(cbind(t1intercepts[,1:6],mu2,tau))
+  colnames(data_input)[7:8] <- c("actuals","tau")
+  bias_1_plot<-ggplot() + ylim(-1,1) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_glm)/(actuals))-1, color="GLM")) + 
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_gee)/(actuals))-1, color="GEE")) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re_nosig)/(actuals))-1, color="GLMM (4)")) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1, color="GLMM (5)")) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1, color="GJRM (C)")) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1, color="GJRM (N)")) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
+                        , values=brewer.pal(n = 6, name = "Dark2"))
+  
+  data_input<-as.data.frame(cbind(t2intercepts[,1:6]+t1intercepts[,1:6],mu1,tau))
+  colnames(data_input)[7:8] <- c("actuals","tau")
+  bias_2_plot<-ggplot() + ylim(-1,1) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_glm)/(actuals))-1, color="GLM"),level=.99) + 
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_gee)/(actuals))-1, color="GEE"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re_nosig)/(actuals))-1, color="GLMM (4)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1, color="GLMM (5)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1, color="GJRM (C)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1, color="GJRM (N)"),level=.99) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
+                        , values=brewer.pal(n = 6, name = "Dark2"))
+  
+  error_1_plot<-ggplot() + ylim(0,.1) +
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
+    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
+                        , values=brewer.pal(n = 6, name = "Dark2"))
+  #                    ) +
+  #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
+  #theme(legend.position = "right", legend.title=element_text(size=20),
+  #      legend.text=element_text(size=14))
+  
+  error_2_plot<-ggplot() + ylim(0,.1) +
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
+    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
+                        , values=brewer.pal(n = 6, name = "Dark2"))
+  
+  ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE)
+  
+  data_input<-as.data.frame(cbind(t2intercepts[,1:6],log(mu1)-log(mu2),tau))
+  colnames(data_input)[7:8] <- c("actuals","tau")
+  bias_1_par_plot <- ggplot() + ylim(-0.25,0.25) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_glm/actuals-1, color="GLM"),level=.99) + 
+    geom_smooth(data=data_input, aes(x=tau, y=summary_gee/actuals-1, color="GEE"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig/actuals-1, color="GLMM (4)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re/actuals-1, color="GLMM (5)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop/actuals-1, color="GJRM (C)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n/actuals-1, color="GJRM (N)"),level=.99) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
+                        , values=brewer.pal(n = 6, name = "Dark2"))
+  
+  bias_1_par_plot
+  
+#########Time 1 BIAS AND ERROR AGAINST TAU (OLD - separate plots)
     
     #Bias time 1 (paramater)
     data_input<-as.data.frame(cbind(t1intercepts[,1:6],log(mu2),tau))
@@ -111,7 +179,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     e<-ggplot(data=data_input, aes(x=tau, y=summary_cop/actuals-1))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (C)")
     f<-ggplot(data=data_input, aes(x=tau, y=summary_cop_n/actuals-1))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(-4,4) + labs(x = "tau", y="bias", title="gjrm (N)")
     ggarrange(a,b,c,d,e,f)
-    ggsave(file="bias_time_2_par.jpeg",last_plot(),width=10,height=6,dpi=300)
+    #ggsave(file="bias_time_2_par.jpeg",last_plot(),width=10,height=6,dpi=300)
     
     
     #Bias time 1 (MEAN)
@@ -162,28 +230,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     
     ###Combined Error time 1 / time 2
     
-    error_1_plot<-ggplot() +
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
-      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) #+
-    #scale_colour_manual(name="Model"
-    #                    , values=c('GLM'='red', 'GEE'='pink', 'GLMM (4)'='blue','GLMM (5)'='purple', 'GJRM (C)'='orange', 'GJRM (N)'='yellow')
-    #                    ) +
-    #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
-    #theme(legend.position = "right", legend.title=element_text(size=20),
-    #      legend.text=element_text(size=14))
-    
-    error_2_plot<-ggplot() +
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
-      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) #+
-      #scale_colour_manual(name="Model"
+   
       #                    , values=c('GLM'='red', 'GEE'='pink', 'GLMM (4)'='blue','GLMM (5)'='purple', 'GJRM (C)'='orange', 'GJRM (N)'='yellow')
       #                    ) +
       #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
