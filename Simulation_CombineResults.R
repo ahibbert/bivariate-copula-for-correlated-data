@@ -11,7 +11,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
 
 ######################CHARTS
 
-#01 DATA SETUP (DON'T EDIT)
+#01 DATA SETUP (DON'T EDIT) 
   
   #write.csv(cbind(parameters,tau,marginal_skew_1,marginal_skew_2, t1intercepts, t2intercepts,t1error,t2error),file="SimulationResults.csv")
 
@@ -21,6 +21,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   parameters=results[[1]][8,1:4]
   for (i in 2:length(results)) {parameters=rbind(parameters,results[[i]][8,1:4]) }
   
+  ###NOTE THESE ARE THE WRONG WAY AROUND because they are setup for reverse sim atm
   mu1=parameters[,1]/parameters[,4]
   mu2=parameters[,1]/parameters[,3]
   
@@ -86,8 +87,6 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   #write.csv(cbind(t1intercepts,tau,marginal_skew_1,marginal_skew_2),file="simulation_skewness_tables_n1000_geefix.csv")
   
   
-  exp(t2intercepts) / exp(t1intercepts+t2intercepts)
-  
 #########Time 1 BIAS AND ERROR AGAINST TAU
     
     #Bias time 1 (paramater)
@@ -149,6 +148,8 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     ggarrange(a,b,c,d,e,f)
     #ggsave(file="error_time_1.jpeg",last_plot(),width=10,height=6,dpi=300)
     
+
+                          
     #Error time 2
     a<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GLM")
     b<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_gee))       + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GEE")
@@ -158,6 +159,38 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     f<-ggplot(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n))     + geom_point(size=0.5,color="gray") + geom_smooth() + ylim(0,0.1) + labs(x = "tau", y="standard error", title="GJRM (N)")
     ggarrange(a,b,c,d,e,f)
     #ggsave(file="error_time_2.jpeg",last_plot(),width=10,height=6,dpi=300)
+    
+    ###Combined Error time 1 / time 2
+    
+    error_1_plot<-ggplot() +
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
+      geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) #+
+    #scale_colour_manual(name="Model"
+    #                    , values=c('GLM'='red', 'GEE'='pink', 'GLMM (4)'='blue','GLMM (5)'='purple', 'GJRM (C)'='orange', 'GJRM (N)'='yellow')
+    #                    ) +
+    #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
+    #theme(legend.position = "right", legend.title=element_text(size=20),
+    #      legend.text=element_text(size=14))
+    
+    error_2_plot<-ggplot() +
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm, color="GLM")) + 
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_gee, color="GEE")) +
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)")) +
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)")) +
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)")) +
+      geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)")) #+
+      #scale_colour_manual(name="Model"
+      #                    , values=c('GLM'='red', 'GEE'='pink', 'GLMM (4)'='blue','GLMM (5)'='purple', 'GJRM (C)'='orange', 'GJRM (N)'='yellow')
+      #                    ) +
+      #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
+      #theme(legend.position = "right", legend.title=element_text(size=20),
+      #      legend.text=element_text(size=14))
+      
+    ggarrange(error_1_plot,error_2_plot,common.legend = TRUE)
     
 ########## REFERENCE
   #     
