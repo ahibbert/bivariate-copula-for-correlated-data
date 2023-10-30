@@ -142,7 +142,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
                         , values=brewer.pal(n = 6, name = "Dark2"))
   
-  ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE,nrow=2, ncol=2, legend="right",color="black") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
+  ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE,nrow=2, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=8,height=5,dpi=900)
   
