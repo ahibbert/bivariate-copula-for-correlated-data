@@ -2,7 +2,6 @@
 load("results_combined_N_C0_n1000_geefix.rds")
 #load("results_combined_N_C0_n1000_geefix_reverse.rds")
 
-install.packages("latex2exp")
 require(latex2exp)
 require(ggplot2)
 require(ggpubr)
@@ -88,10 +87,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   
   #write.csv(summaryresultstable,file="simulation_full_results_table_n1000_geefix.csv")
   #write.csv(cbind(t1intercepts,tau,marginal_skew_1,marginal_skew_2),file="simulation_skewness_tables_n1000_geefix.csv")
-  
-  
-  help(expression)
-  
+
 ###BIAS AND ERROR Superimposed into once chart (NEW)
   
   data_input<-as.data.frame(cbind(t1intercepts[,1:6],mu2,tau))
@@ -148,7 +144,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   
   data_input<-as.data.frame(cbind(t2intercepts[,1:6],log(mu1)-log(mu2),tau))
   colnames(data_input)[7:8] <- c("actuals","tau")
-  bias_2_par_plot <- ggplot() + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$\\hat{\\beta_{\\mu_2}}-\\hat{\\beta_{\\mu_1}}$ | $\\hat{\\beta_{\\mu_t}}$")) +
+  bias_2_par_plot <- ggplot() + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\beta_{\\mu_2}}-\\hat{\\beta_{\\mu_1}}$ | $\\hat{\\beta_{\\mu_t}}) \div \\ln(\\mu_2/\\mu_1)$")) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm/actuals-1, color="GLM"),level=.99) + 
     geom_smooth(data=data_input, aes(x=tau, y=summary_gee/actuals-1, color="GEE"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig/actuals-1, color="GLMM (4)"),level=.99) +
