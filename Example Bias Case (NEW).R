@@ -198,17 +198,24 @@ require(gee)
 require(lme4)
 require(mgcv)
 library(geepack)
+library(gamm)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
 
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
-#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
-#model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
+model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
+model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
                    , method=CG(10000))
 summary(model_re_nosig)
+
+summary(model_gamm)
+
+help()
+
+2*model_gamm$lme$logLik
+model_glm$aic
 
 summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2] + summary(model_glm)$coeff[1]
@@ -293,9 +300,14 @@ model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame
 #AIC for copula
 
 model_glm$aic
+summary(model_glm)
 2*4-2*model_copula_n$logLik
-2*4-2*model_copula$logLik
+2*6-2*model_copula$logLik
+summary(model_copula)
 model_re_nosig$aic
+
+2*6-2*logLik(model_re_nosig)
+summary(model_re_nosig)
 model_re$aic
 
 

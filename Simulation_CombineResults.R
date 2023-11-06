@@ -144,7 +144,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   
   data_input<-as.data.frame(cbind(t2intercepts[,1:6],log(mu1)-log(mu2),tau))
   colnames(data_input)[7:8] <- c("actuals","tau")
-  bias_2_par_plot <- ggplot() + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\beta_{\\mu_2}}-\\hat{\\beta_{\\mu_1}}$ | $\\hat{\\beta_{\\mu_t}}) \div \\ln(\\mu_2/\\mu_1)$")) +
+  bias_2_par_plot <- ggplot() + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\beta_{\\mu_2}}-\\hat{\\beta_{\\mu_1}}$ | $\\hat{\\beta_{\\mu_t}}) \\div \\ln(\\mu_2/\\mu_1) - 1$")) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm/actuals-1, color="GLM"),level=.99) + 
     geom_smooth(data=data_input, aes(x=tau, y=summary_gee/actuals-1, color="GEE"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig/actuals-1, color="GLMM (4)"),level=.99) +
