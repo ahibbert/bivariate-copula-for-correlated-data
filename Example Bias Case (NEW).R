@@ -13,7 +13,8 @@ require(dglm)
 set.seed(1000)
 options(scipen=999)
 a=0.25; b=1.75 #.25, .75 the most extreme
-mu1=1; mu2=2; n=2000 #100,500,1000,5000,n=10000
+#a=0.75; b=1.25 #First MLE calc
+mu1=1; mu2=2; n=1000 #100,500,1000,5000,n=10000
 
 
 ##########NADARAJAH & GUPTA SIM
@@ -198,7 +199,6 @@ require(gee)
 require(lme4)
 require(mgcv)
 library(geepack)
-library(gamm)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
 
@@ -208,14 +208,6 @@ model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(pat
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
                    , method=CG(10000))
-summary(model_re_nosig)
-
-summary(model_gamm)
-
-help()
-
-2*model_gamm$lme$logLik
-model_glm$aic
 
 summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2] + summary(model_glm)$coeff[1]
