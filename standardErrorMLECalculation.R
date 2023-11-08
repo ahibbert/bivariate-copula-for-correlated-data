@@ -164,6 +164,8 @@ for (a in c(0.5,1,1.5)) {
   }
 }
 
+load(optim_results_output_combined)
+
 colnames(optim_results_output_combined)<-c("mu1_est","mu2_est","a_est","b_est","mu1_act","mu2_act","a_act","b_act")
 optim_results_output_combined
 
