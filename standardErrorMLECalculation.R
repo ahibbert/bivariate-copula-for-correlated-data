@@ -1,4 +1,4 @@
-############################################################FUNCTIONS############################################################
+###############################################BASE FUNCTIONS: PDF########################################################
 
 subWhittackerFunction <- function(t,l,m,p) {
   ((t^(m-l-0.5))*((1+t)^(m+l-0.5)))*exp(-p*t)
@@ -32,16 +32,30 @@ bivGammaPDF <- function(par,y1,y2,output) {
   
 }
 
-maximiserForPDF <- function(par, y1vector, y2vector) {
-  pdfEstimates <- vector()
-  for (i in 1:length(y1vector)) {
-    tryCatch(
-      {      
-        y1=y1vector[i]; y2=y2vector[i]; pdfEstimates[i] <- bivGammaPDF(par,y1,y2,output="ll");
-      },error=function(e){print("ERROR")})
+#REPARAMETISEDFull PDF with 4 parameters for the 2 covariates - returns PDF
+bivGammaPDFRE <- function(par,output) {
+  
+  mu1 = par[1]
+  mu2 = par[2]
+  a = par[3]
+  b = par[4]
+  y1= par[5]
+  y2= par[6]
+  
+  C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
+  #Returning lo
+  if(output=="pdf") {
+    C * gamma(b) * ((y1*y2)^(a+b-1)) * (((y1/mu1)+(y2/mu2))^(((a-1)/2)-(a+b))) * exp(-0.5*((y1/mu1)+(y2/mu2))) * tryCatch(
+      whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2)), 
+      error = function(e) return(NA))
+  } else {
+    log(C) + log(gamma(b)) + (a+b-1)*log(y1*y2) +(((a-1)/2)-(a+b))*log((y1/mu1)+(y2/mu2)) + (-0.5*((y1/mu1)+(y2/mu2))) + tryCatch(
+      log(whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))), 
+      error = function(e) return(NA))
   }
-  sum(-(pdfEstimates[is.na(pdfEstimates)==FALSE]))
+  
 }
+
 
 ##########################################################TESTS########################################################################
 
@@ -81,6 +95,19 @@ optim(par=c(1.5,1.5,1.5,1.5), fn=maximiserForPDF
 
 ##############################################################################MLE CALCULATIONS###########################################################
 
+#########Calculates log-likelihood for full sample
+maximiserForPDF <- function(par, y1vector, y2vector) {
+  pdfEstimates <- vector()
+  for (i in 1:length(y1vector)) {
+    tryCatch(
+      {      
+        y1=y1vector[i]; y2=y2vector[i]; pdfEstimates[i] <- bivGammaPDF(par,y1,y2,output="ll");
+      },error=function(e){print("ERROR")})
+  }
+  sum(-(pdfEstimates[is.na(pdfEstimates)==FALSE]))
+}
+
+#############Simulates bivariate gamma and estimates best parameters based on log likelihood
 mle_simulation <- function(par,n,sims) {
   
   #Make results blank
@@ -122,7 +149,7 @@ mle_simulation <- function(par,n,sims) {
   return(optim_results)
 }
 
-
+######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 optim_results_output_combined<-data.frame()
 n=100; mu1=1;mu2=2; a=NA; b=NA;
 
@@ -139,7 +166,6 @@ for (a in c(0.5,1,1.5)) {
 
 colnames(optim_results_output_combined)<-c("mu1_est","mu2_est","a_est","b_est","mu1_act","mu2_act","a_act","b_act")
 optim_results_output_combined
-
 
 #optim_results_output_075_125<-optim_results_output
 
@@ -159,14 +185,105 @@ mean(optim_results_output[c(1:7,9:100),4]); sd(optim_results_output[c(1:7,9:100)
 sd(optim_results_output[c(1:7,9:100),1]*optim_results_output[c(1:7,9:100),3])
 sd(optim_results_output[c(1:7,9:100),2]*optim_results_output[c(1:7,9:100),3])
 
-##################Numerical differentiation - try this next
+##################Numerical differentiation - try this next####################
 
-mu1=1;mu2=2; a=.5; b=1.25;
-bivGammaPDF(c(mu1,mu2,a,b),y1,y2,output="pdf")
+mu1=1;mu2=2; a=.5; b=1.25; y1=1;y2=1;
+par=c(mu1,mu2,a,b,y1,y2); h=c(0,0,0,0,0,0)
 
-pdfEx(par,y1,y2)
+##############FOR TEST FUNCTION######
+
+testFunction <- function(par) {
+  mu1=par[1];mu2=par[2];a=par[3];b=par[4];y1=par[5];y2=par[6];
+  1*mu1^1+2*mu2^2+3*a^3+4*b^4+5*y1^5+6*y2^6
+}
+
+hval=.00001; hpar=1
+diffFunction<-function(par,hval,hpar) {
+  hplus=c(0,0,0,0,0,0); hminus=c(0,0,0,0,0,0);
+  hplus[hpar]=hval;hminus[hpar]=-hval
+  (testFunction(par+hplus) - testFunction(par+hminus))/(2*hval)
+}
+
+for (i in 1:6) {
+  print(diffFunction(par,hval,hpar=i))
+}
+
+diff2Function<-function(par,hval,hpar) {
+  hplus=c(0,0,0,0,0,0); hminus=c(0,0,0,0,0,0);
+  hplus[hpar]=hval;hminus[hpar]=-hval
+  
+  (testFunction(par+hplus)+testFunction(par-hplus)-2*testFunction(par))/(hval^2)
+}
+
+for (i in 1:6) {
+  print(diff2Function(par,hval,hpar=i))
+}
 
 
+########FOR REAL FUNCTION###########
+
+diffFunction<-function(par,hval,hpar) {
+  hplus=c(0,0,0,0,0,0); hminus=c(0,0,0,0,0,0);
+  hplus[hpar]=hval;hminus[hpar]=-hval
+  
+  (bivGammaPDFRE(par+hplus,output="pdf")-bivGammaPDFRE(par-hplus,output="pdf"))/(2*hval)
+}
+
+diff2Function<-function(par,hval,hpar) {
+  hplus=c(0,0,0,0,0,0); hminus=c(0,0,0,0,0,0);
+  hplus[hpar]=hval;hminus[hpar]=-hval
+  
+  (bivGammaPDFRE(par+hplus,output="pdf")+bivGammaPDFRE(par-hplus,output="pdf")-2*bivGammaPDFRE(par,output="pdf"))/(hval^2)
+}
+
+derivatives<-data.frame(matrix(0,nrow=1,ncol=18))
+
+j=1
+for (a in c(0.5,1,1.5)) {
+  for (b in c(0.5,1,1.5)) {
+    for (y1 in c(0.5,1,1.5)) {
+      for (y2 in c(0.5,1,1.5)) {
+        par = c(1,2,a=a,b=b,y1=y1,y2=y2)  
+        derivatives[j,13]=par[1]
+        derivatives[j,14]=par[2]
+        derivatives[j,15]=par[3]
+        derivatives[j,16]=par[4]
+        derivatives[j,17]=par[5]
+        derivatives[j,18]=par[6]
+        for (i in 1:6) {
+          derivatives[j,i]=(diffFunction(par,hval,hpar=i))
+          derivatives[j,i+6]=(diff2Function(par,hval,hpar=i))
+        }
+        j=j+1
+      }
+    }
+  }
+}
+derivatives
+
+summary(derivatives)
+
+par(mfrow=c(2,3))
+hist(derivatives[,1])
+hist(derivatives[,2])
+hist(derivatives[,3])
+hist(derivatives[,4])
+hist(derivatives[,5])
+hist(derivatives[,6])
+
+par(mfrow=c(2,3))
+hist(derivatives[,7])
+hist(derivatives[,8])
+hist(derivatives[,9])
+hist(derivatives[,10])
+hist(derivatives[,11])
+hist(derivatives[,12])
+
+
+
+###Need to calculate these derivatives at a given point
+
+##########################################Reference: Whittaker function bounds#####################################
 ###INtegration is going to infinity
 y1=1; y2=1;
 integrate(subWhittackerFunction,l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2),lower=0,upper =Inf)$value
