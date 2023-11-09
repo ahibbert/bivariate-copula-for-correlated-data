@@ -121,8 +121,10 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
     geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
     geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
-                        , values=brewer.pal(n = 6, name = "Dark2"))
+    geom_smooth(data=as.data.frame(tauPlusResults), aes(x=V1, y=mu1_se, color="MLE"),level=.99) +
+    
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
+                        , values=brewer.pal(n = 7, name = "Dark2"))
   #                    ) +
   #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
   #theme(legend.position = "right", legend.title=element_text(size=20),
@@ -135,8 +137,9 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
     geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
     geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
-                        , values=brewer.pal(n = 6, name = "Dark2"))
+    geom_smooth(data=as.data.frame(tauPlusResults), aes(x=V1, y=mu2_se, color="MLE"),level=.99) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
+                        , values=brewer.pal(n = 7, name = "Dark2"))
   
   ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE,nrow=2, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")

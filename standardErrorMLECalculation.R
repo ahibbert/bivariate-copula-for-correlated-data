@@ -321,13 +321,11 @@ diff2Function<-function(par,hval,hpar) {
   return(d2)
 }
 
-###WORKING SECTION
-
 numericalDerivativeSE <- function(par) {
-  ses=matrix(ncol=8,nrow=100)
+  ses=matrix(ncol=8,nrow=2500)
   j=1
-  for (y1 in .1*1:10) {
-    for (y2 in .1*1:10) {
+  for (y1 in .1*1:50) {
+    for (y2 in .1*1:50) {
       par=c(mu1,mu2,a,b,y1,y2)
       d2matrix=matrix(nrow=6,ncol=6)
       for (i in 1:6) {
@@ -344,6 +342,8 @@ numericalDerivativeSE <- function(par) {
   
   return(c(mean(ses[!is.na(ses[,1]),1],trim=.1),mean(ses[!is.na(ses[,2]),2],trim=.1)))
 }
+
+###WORKING SECTION
 
 numDerivResults <- matrix(nrow=400,ncol=4)
 i = 1; y1=1;y2=1;n=1000; a=1;b=1;
