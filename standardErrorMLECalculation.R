@@ -35,8 +35,8 @@ bivGammaPDF <- function(par,y1,y2,output) {
 #REPARAMETISEDFull PDF with 4 parameters for the 2 covariates - returns PDF
 bivGammaPDFRE <- function(par,output) {
   
-  mu1 = par[1]
-  mu2 = par[2]
+  mu1 = (par[1])
+  mu2 = (par[2])
   a = par[3]
   b = par[4]
   y1= par[5]
@@ -159,7 +159,7 @@ mle_simulation(c(mu1,mu2,a,b),n=n,sims=2)
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 optim_results_output_combined<-data.frame()
-n=100; mu1=1;mu2=2; a=NA; b=NA;
+n=1000; mu1=1;mu2=2; a=NA; b=NA;
 
 for (a in c(0.5,1,1.5)) {
   for (b in c(0.5,1,1.5)) {
@@ -181,8 +181,6 @@ load(file="optim_results_output_combined_save231109.rds") ####
 optim_results_output<-optim_results_output_combined_save
 colnames(optim_results_output)<-c("mu1_est","mu2_est","a_est","b_est","mu1_act","mu2_act","a_act","b_act")
 
-par(mfrow=c(2,2))
-
 aval=1;bval=1;
 mu1_hat = optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE & optim_results_output$a_est < 5,1]
 mu2_hat = optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE & optim_results_output$a_est < 5,2]
@@ -190,17 +188,22 @@ a_hat =   optim_results_output[optim_results_output$a_act==aval & optim_results_
 b_hat =   optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE & optim_results_output$a_est < 5,4]
 
 ###Mean and variance
-mean(mu1_hat); sd(mu1_hat) 
-mean(mu2_hat); sd(mu2_hat) 
-mean(a_hat); sd(a_hat) 
-mean(b_hat); sd(b_hat) 
+
+mean(mu1_hat); sd(log(mu1_hat)); sd(log(a_hat/mu1_hat))
+mean(mu2_hat); sd(log(mu2_hat)); sd(log(a_hat/mu2_hat))
+#mean(a_hat); sd(a_hat)
+#mean(b_hat); sd(b_hat)
 
 
 ####Variance / sd for mean at time 1 and 2 are equivalent to alpha * mu1 and alpha * mu2
 
 sd(mu1_hat*a_hat) ###equivalent to manual calculation of Var(XY)= E(X^2 Y^2)- (E(XY))^2
 sd(mu2_hat*a_hat) ###SD for mu2 Var(XY)= E(X^2 Y^2)- (E(XY))^2???
+sd(a_hat/mu1_hat) ###equivalent to manual calculation of Var(XY)= E(X^2 Y^2)- (E(XY))^2
+sd(a_hat/mu2_hat) ###SD for mu2 Var(XY)= E(X^2 Y^2)- (E(XY))^2???
+
 sd(mu2_hat*a_hat - mu1_hat*a_hat) 
+sd(log((mu2_hat*a_hat)/(mu1_hat*a_hat))) 
 
 
 ################## 4. Numerical differentiation - try this next####################
@@ -250,9 +253,9 @@ diff2Function<-function(par,hval,hpar) {
     if (i == hpar) {
       hplus1[hpar]=hval
       d2[i]=
-        (2*testFunction(par,output="pdf") - 
-           testFunction(par+hplus1,output="pdf") - 
-           testFunction(par-hplus1,output="pdf"))/(hval^2)    
+        (-2*testFunction(par,output="ll") + 
+           testFunction(par+hplus1,output="ll") + 
+           testFunction(par-hplus1,output="ll"))/(hval^2)    
     }    
     else {
       #### Add an amount to parameter i and add an amount to hpar
@@ -260,15 +263,23 @@ diff2Function<-function(par,hval,hpar) {
       #hpar=2;i=3; hplus1=c(0,0,0,0,0,0); hplus2=c(0,0,0,0,0,0)
       
       hplus1[hpar]=hval; hplus2[i]=hval;
-      d2[i] <- (   testFunction(par+hplus1+hplus2,output="pdf") -
-                     testFunction(par+hplus1-hplus2,output="pdf") -
-                     testFunction(par-hplus1+hplus2,output="pdf") +
-                     testFunction(par-hplus1-hplus2,output="pdf") 
+      d2[i] <- (   testFunction(par+hplus1+hplus2,output="ll") -
+                     testFunction(par+hplus1-hplus2,output="ll") -
+                     testFunction(par-hplus1+hplus2,output="ll") +
+                     testFunction(par-hplus1-hplus2,output="ll") 
       ) / (4*hval^2)
     }
   }
   return(d2)
 }
+
+d2matrix=matrix(nrow=6,ncol=6)
+for (i in 1:6) {
+  d2matrix[i,]=diff2Function(par,hval=.00001,hpar=i)
+}
+solve(d2matrix)
+
+
 
 ##################### 4.2 FOR REAL FUNCTION###########
 
@@ -292,30 +303,40 @@ diff2Function<-function(par,hval,hpar) {
     if (i == hpar) {
       hplus1[hpar]=hval
       d2[i]=
-        (2*bivGammaPDFRE(par,output="pdf") - 
-           bivGammaPDFRE(par+hplus1,output="pdf") - 
-           bivGammaPDFRE(par-hplus1,output="pdf"))/(hval^2)    
+        (-2*bivGammaPDFRE(par,output="ll") +
+           bivGammaPDFRE(par+hplus1,output="ll") + 
+           bivGammaPDFRE(par-hplus1,output="ll"))/(hval^2)    
     }    
     else {
       #### Add an amount to parameter i and add an amount to hpar
       
       hplus1[hpar]=hval; hplus2[i]=hval;
-      d2[i] <- (   bivGammaPDFRE(par+hplus1+hplus2,output="pdf") -
-                     bivGammaPDFRE(par+hplus1-hplus2,output="pdf") -
-                     bivGammaPDFRE(par-hplus1+hplus2,output="pdf") +
-                     bivGammaPDFRE(par-hplus1-hplus2,output="pdf") 
+      d2[i] <- (   bivGammaPDFRE(par+hplus1+hplus2,output="ll") -
+                     bivGammaPDFRE(par+hplus1-hplus2,output="ll") -
+                     bivGammaPDFRE(par-hplus1+hplus2,output="ll") +
+                     bivGammaPDFRE(par-hplus1-hplus2,output="ll") 
       ) / (4*hval^2)
     }
   }
+  d2
   return(d2)
 }
 
-###TESTING TO DELETE
-mu1=1;mu2=2; a=.5; b=1.25; y1=1;y2=1;
-par=c(mu1,mu2,a,b,y1,y2); h=c(0,0,0,0,0,0)
-diff2Function(par,hval=.00001,hpar=1)
+###WORKING SECTION
+mu1=1;mu2=2; a=1; b=1; y1=.5;y2=.5;
+par=c(mu1,mu2,a,b,y1,y2)
 
+d2matrix=matrix(nrow=6,ncol=6)
+for (i in 1:6) {
+  d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
+}
+d2matrix
+solve(d2matrix)
+diag(sqrt(solve(d2matrix))/sqrt(1000))
+####This is the theoretical standard error of the MLE
+#######For mu1=1;mu2=2; a=1; b=1; y1=.5;y2=.5; ||||| SEs for n=1000 are: 0.05602495, 0.063401962, 0.02445227, 0.096551880, 0.015882117, 0.03482600
 
+#######OLD RETURN TO WITH FULL MATRIX
 derivatives<-data.frame(matrix(0,nrow=1,ncol=18))
 
 hval = .00001
@@ -360,12 +381,6 @@ colnames(derivatives) <- c("mu1_d1",
                            "y1_act",
                            "y2_act"
                            )
-
-
-
-
-
-
 
 par(mfrow=c(2,3))
 hist(derivatives[,1])

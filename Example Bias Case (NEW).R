@@ -12,7 +12,7 @@ require(dglm)
 
 set.seed(1000)
 options(scipen=999)
-a=0.25; b=1.75 #.25, .75 the most extreme
+a=1; b=1 #.25, .75 the most extreme
 #a=0.75; b=1.25 #First MLE calc
 mu1=1; mu2=2; n=1000 #100,500,1000,5000,n=10000
 
@@ -240,48 +240,6 @@ actuals<-c( log(a*(1/mu1))
             , 0
 )
 
-plot()
-summary(model_re)
-#Time 1
-plot(model_re_nosig$mu.fv[1:2000], model_re_nosig$y[1:2000],xlim=c(0,.5),ylim=c(0,.5))
-lines(c(0, 5), c(0, 5), type='l',col="red")
-plot(model_re$mu.fv[1:2000], model_re$y[1:2000],xlim=c(0,.5),ylim=c(0,.5))
-lines(c(0, 5), c(0, 5), type='l',col="red")
-#Time 2
-plot(model_re_nosig$mu.fv[2001:4000], model_re_nosig$y[2001:4000],xlim=c(0,.5),ylim=c(0,.5))
-lines(c(0, 5), c(0, 5), type='l',col="red")
-plot(model_re$mu.fv[2001:4000], model_re$y[2001:4000],xlim=c(0,.5),ylim=c(0,.5))
-lines(c(0, 5), c(0, 5), type='l',col="red")
-
-
-
-
-
-plot(model_re$mu.fv[1:2000]/model_re$mu.fv[2001:4000], model_re$y[1:2000]/model_re$y[2001:4000])
-
-plot(model_re$mu.fv[1:2000], model_re$y,xlim=c(0,.5),ylim=c(0,.5))
-lines(c(0, 5), c(0, 5), type='l',col="red")
-
-
-
-plot(model_glm$fitted.values,model_glm$data$random_variable)
-plot(model_glm$fitted.values,model_glm$data$random_variable)
-
-
-e<-ggplot(data=as.data.frame(cbind(model_re_nosig$mu.fv, model_re_nosig$y)),aes(x=V1,y=V2)) + 
-  #geom_point(size=0.25,color="black") + 
-  geom_density_2d(contour_var="density",bins=20,color="black") +
-  scale_fill_brewer() +
-  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
-
-f<-ggplot(data=as.data.frame(cbind(model_re$mu.fv, model_re$y)),aes(x=V1,y=V2)) + 
-  #geom_point(size=0.25,color="black") + 
-  geom_density_2d(contour_var="density",bins=20,color="black") +
-  scale_fill_brewer() +
-  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
-
-ggarrange(e,f)
-
 require(GJRM)
 eq.mu.1 <- gamma_c_mu1~1
 eq.mu.2 <- gamma_c_mu2~1
@@ -291,16 +249,16 @@ model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame
 
 #AIC for copula
 
-model_glm$aic
-summary(model_glm)
-2*4-2*model_copula_n$logLik
-2*6-2*model_copula$logLik
-summary(model_copula)
-model_re_nosig$aic
+#model_glm$aic
+#summary(model_glm)
+#2*4-2*model_copula_n$logLik
+#2*6-2*model_copula$logLik
+#summary(model_copula)
+#model_re_nosig$aic
 
-2*6-2*logLik(model_re_nosig)
-summary(model_re_nosig)
-model_re$aic
+#2*6-2*logLik(model_re_nosig)
+#summary(model_re_nosig)
+#model_re$aic
 
 
 #time<-c(start_time[2:5]-start_time[1:4],start_time[7:8]-start_time[6:7])
