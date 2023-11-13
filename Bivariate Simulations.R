@@ -179,7 +179,7 @@ simulateCorrelatedVarGJRM <- function(n,a,b,mu1,mu2)  {
 ##############Run simulations for non-GJRM models
 results<-list()
 #a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=100
-a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=20; n=1000
+a=.2+.1*1:20; b=.2+.1*1:20; mu1=10; mu2=12; n=1000
 
 #Code to iterate through various shapes of the bivariate distribution and fit the non-GJRM models
 i=1; j=1; k=1; l=1; z=1;
@@ -205,12 +205,12 @@ for (i in 1:length(a)) {
 }
 
 results_re <- results
-save(results_re,file="results_NOGJRM_n1000_geefix_mu1mu21020.rds")
+save(results_re,file="results_NOGJRM_n1000_geefix_mu1mu21012.rds")
 
 ##############Run simulations for GJRM models
 results<-list()
 #a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=100
-a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=20; n=1000
+a=.2+.1*1:20; b=.2+.1*1:20; mu1=10; mu2=12; n=1000
 
 #Code to iterate through various shapes of the bivariate distribution and fit the GJRM models
 i=1; j=1; k=1; l=1; z=1;
@@ -235,7 +235,7 @@ for (i in 1:length(a)) {
   }
 }
 results_gjrm<-results
-save(results_gjrm,file="results_GJRM_C0_N_n1000_geefix_mu1mu21020.rds")
+save(results_gjrm,file="results_GJRM_C0_N_n1000_geefix_mu1mu21012.rds")
 
 
 #load(file="results_GJRM.rds")

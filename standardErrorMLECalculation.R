@@ -11,28 +11,28 @@ whittackerFunction <- function(l,m,p) {
 }
 
 #Full PDF with 4 parameters for the 2 covariates - returns PDF
-bivGammaPDF <- function(par,output) {
-  
-  mu1 = par[1]
-  mu2 = par[2]
-  a = par[3]
-  b = par[4]
-  y1= par[5]
-  y2= par[6]
-  
-  C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
-  #Returning lo
-  if(output=="pdf") {
-    C * gamma(b) * ((y1*y2)^(a+b-1)) * (((y1/mu1)+(y2/mu2))^(((a-1)/2)-(a+b))) * exp(-0.5*((y1/mu1)+(y2/mu2))) * tryCatch(
-      whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2)), 
-      error = function(e) return(NA))
-  } else {
-    log(C) + log(gamma(b)) + (a+b-1)*log(y1*y2) +(((a-1)/2)-(a+b))*log((y1/mu1)+(y2/mu2)) + (-0.5*((y1/mu1)+(y2/mu2))) + tryCatch(
-      log(whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))), 
-      error = function(e) return(NA))
-  }
-  
-}
+#bivGammaPDF <- function(par,output) {
+#  
+#  mu1 = par[1]
+#  mu2 = par[2]
+#  a = par[3]
+#  b = par[4]
+#  y1= par[5]
+#  y2= par[6]
+#  
+#  C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
+#  #Returning lo
+#  if(output=="pdf") {
+#    C * gamma(b) * ((y1*y2)^(a+b-1)) * (((y1/mu1)+(y2/mu2))^(((a-1)/2)-(a+b))) * exp(-0.5*((y1/mu1)+(y2/mu2))) * tryCatch(
+#      whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2)), 
+#      error = function(e) return(NA))
+#  } else {
+#    log(C) + log(gamma(b)) + (a+b-1)*log(y1*y2) +(((a-1)/2)-(a+b))*log((y1/mu1)+(y2/mu2)) + (-0.5*((y1/mu1)+(y2/mu2))) + tryCatch(
+#      log(whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))), 
+#      error = function(e) return(NA))
+#  }
+#  
+#}
 
 #REPARAMETISEDFull PDF with 4 parameters for the 2 covariates - returns PDF
 bivGammaPDFRE <- function(par,output) {
@@ -41,8 +41,11 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
-  mu1 = a/exp(par[1])
-  mu2 = a/exp(par[2])
+  #mu1 = a/exp(par[1])
+  #mu2 = a/exp(par[2])
+  mu1=par[1]
+  mu2=par[2]
+  
   #mu2 = mu1/exp(par[2])
   
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
@@ -183,7 +186,7 @@ optim_results_output_combined_save<-optim_results_output_combined
 #save(optim_results_output_combined_save,file="optim_results_output_combined_save231109.rds")
 
 #########Load and analyse
-#load(file="optim_results_output_combined_save231109.rds") ####
+#load(file="optim_results_output_combined_save231109.rds")
 #optim_results_output<-optim_results_output_combined_save
 colnames(optim_results_output)<-c("mu1_est","mu2_est","a_est","b_est","mu1_act","mu2_act","a_act","b_act")
 
@@ -321,160 +324,51 @@ diff2Function<-function(par,hval,hpar) {
   return(d2)
 }
 
-numericalDerivativeSE <- function(par) {
-  ses=matrix(ncol=8,nrow=2500)
+numericalDerivativeSE_forMLE <- function(par) {
+  ses=matrix(ncol=8,nrow=1)
+  #par=c(mu1,mu2,a,b,y1,y2)
+  d2matrix=matrix(nrow=6,ncol=6)
   j=1
-  for (y1 in .1*1:50) {
-    for (y2 in .1*1:50) {
-      par=c(mu1,mu2,a,b,y1,y2)
-      d2matrix=matrix(nrow=6,ncol=6)
-      for (i in 1:6) {
-        d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
-      }
-      ses[j,1:6]=sqrt(diag(solve(d2matrix)))/sqrt(1000)
-      ses[j,7]=y1
-      ses[j,8]=y2
-      j=j+1
-    }
-  } #SHould we do this for the actual dataset...?
-  colnames(ses) <- c("mu1_se","mu2_se","a_se","b_se","y1_se","y2_se","y1","y2")
-  ses
-  
-  return(c(mean(ses[!is.na(ses[,1]),1],trim=.1),mean(ses[!is.na(ses[,2]),2],trim=.1)))
+  for (i in 1:6) {
+    d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
+  }
+  ses[j,1:6]=sqrt(diag(solve(d2matrix)))/sqrt(1000)
+  ses[j,7]=y1
+  ses[j,8]=y2
+  return(ses[,c(1,2)])
 }
 
 ###WORKING SECTION
 
 numDerivResults <- matrix(nrow=400,ncol=4)
-i = 1; y1=1;y2=1;n=1000; a=1;b=1;
+i = 1;
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=log(a/1);mu2=log(a/2);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,y1,y2)
     
-    numDerivResults[i,1:2] <- numericalDerivativeSE(par)
+    ###Change to estimate of amu??
+    #mu1=log(a/10);mu2=log(a/12);  ###Changes a lot based on y1/y2
+    #par=c(mu1,mu2,a,b,a/10,(a/12))
+    
+    mu1=10;mu2=12;
+    par=c(mu1,mu2,a,b,a/mu1,a/mu2)
+    
+    numDerivResults[i,1:2] <- numericalDerivativeSE_forMLE(par)
+    
     numDerivResults[i,3] <- a
     numDerivResults[i,4] <- b
     i = i+1
   }
 }
+
 colnames(numDerivResults) <- c("mu1_se","mu2_se","a","b")
+numDerivResults
 
 par(mfrow=c(1,2))
-tauPlusResults<-merge(cbind(tau,parameters), numDerivResults, by.x=c('Time 1 Intercept', 'Time 2 Intercept'), by.y=c('a', 'b'))
-plot(tauPlusResults$V1,tauPlusResults$mu1_se)
-plot(tauPlusResults$V1,tauPlusResults$mu2_se)
-
-
-cbind(t1error,tau,parameters)
-cbind(t2error,tau,parameters)
-
-# a = par[3]
-# b = par[4]
-# #mu1 = par[1]
-# #mu2 = par[2]
-# mu1 = a/exp(par[1])
-# mu2 = a/exp(par[2])
-# 
-# w<-rbeta(n,a,b)
-# gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1)
-# gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2)
-# 
-# a=1; b=1; mu1=log(a/1);mu2=log(a/2); y1=1;y2=1;n=1000; ###Changes a lot based on y1/y2
-# par=c(mu1,mu2,a,b,y1,y2)
-# 
-# ses=matrix(ncol=8,nrow=1000)
-# for (j in 1:length(gamma_c_mu1)) {
-#     par=c(mu1,mu2,a,b,gamma_c_mu1[j],gamma_c_mu2[j])
-#     d2matrix=matrix(nrow=6,ncol=6)
-#     for (i in 1:6) {
-#       d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
-#     }
-#     ses[j,1:6]=sqrt(diag(solve(d2matrix)))/sqrt(1000)
-#     ses[j,7]=gamma_c_mu1[j]
-#     ses[j,8]=gamma_c_mu2[j]
-#   }
-# colnames(ses) <- c("mu1_se","mu2_se","a_se","b_se","y1_se","y2_se","y1","y2")
-# ses
-
-
-par(mfrow=c(2,2))
-plot(ses[,7],ses[,1]); abline(lm(ses[,1] ~ ses[,7]))
-plot(ses[,7],ses[,2]); abline(lm(ses[,2] ~ ses[,7]))
-plot(ses[,8],ses[,1]); abline(lm(ses[,1] ~ ses[,8]))
-plot(ses[,8],ses[,2]); abline(lm(ses[,2] ~ ses[,8]))
-mean(ses[!is.na(ses[,1]),1],trim=.1)
-mean(ses[!is.na(ses[,2]),2],trim=.1)
-
-trim
-
-####This is the theoretical standard error of the MLE
-#######For mu1=1;mu2=2; a=1; b=1; y1=.5;y2=.5; ||||| SEs for n=1000 are: 0.05602495, 0.063401962, 0.02445227, 0.096551880, 0.015882117, 0.03482600
-
-#######OLD RETURN TO WITH FULL MATRIX
-derivatives<-data.frame(matrix(0,nrow=1,ncol=18))
-
-hval = .00001
-j=1;
-for (a in c(0.5,1,1.5)) {
-  for (b in c(0.5,1,1.5)) {
-    for (y1 in c(0.5,1,1.5)) {
-      for (y2 in c(0.5,1,1.5)) {
-        par = c(1,2,a=a,b=b,y1=y1,y2=y2)  
-        derivatives[j,13]=par[1]
-        derivatives[j,14]=par[2]
-        derivatives[j,15]=par[3]
-        derivatives[j,16]=par[4]
-        derivatives[j,17]=par[5]
-        derivatives[j,18]=par[6]
-        for (i in 1:6) {
-          derivatives[j,i]=(diffFunction(par,hval,hpar=i))
-          derivatives[j,i+6]=(diff2Function(par,hval,hpar=i))
-        }
-        j=j+1
-      }
-    }
-  }
-}
-derivatives
-colnames(derivatives) <- c("mu1_d1",
-                           "mu2_d1",
-                           "a_d1",
-                           "b_d1",
-                           "y1_d1",
-                           "y2_d1",
-                           "mu1_d2",
-                           "mu2_d2",
-                           "a_d2",
-                           "b_d2",
-                           "y1_d2",
-                           "y2_d2",
-                           "mu1_act",
-                           "mu2_act",
-                           "a_act",
-                           "b_act",
-                           "y1_act",
-                           "y2_act"
-                           )
-
-par(mfrow=c(2,3))
-hist(derivatives[,1])
-hist(derivatives[,2])
-hist(derivatives[,3])
-hist(derivatives[,4])
-hist(derivatives[,5])
-hist(derivatives[,6])
-
-par(mfrow=c(2,3))
-hist(derivatives[,7])
-hist(derivatives[,8])
-hist(derivatives[,9])
-hist(derivatives[,10])
-hist(derivatives[,11])
-hist(derivatives[,12])
-
-
+tauPlusNumDivResults<-as.data.frame(cbind(tau,parameters, numDerivResults))
+colnames(tauPlusNumDivResults)[1]<-c("tau")
+plot(tauPlusNumDivResults$tau,tauPlusNumDivResults$mu1_se)
+plot(tauPlusNumDivResults$tau,tauPlusNumDivResults$mu2_se)
 
 ###Need to calculate these derivatives at a given point
 

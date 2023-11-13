@@ -12,9 +12,9 @@ require(dglm)
 
 set.seed(1000)
 options(scipen=999)
-a=1; b=1 #.25, .75 the most extreme
+a=.3; b=1.75 #.25, .75 the most extreme
 #a=0.75; b=1.25 #First MLE calc
-mu1=1; mu2=2; n=1000 #100,500,1000,5000,n=10000
+mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
 
 
 ##########NADARAJAH & GUPTA SIM
