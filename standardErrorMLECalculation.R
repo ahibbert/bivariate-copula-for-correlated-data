@@ -41,10 +41,10 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
-  #mu1 = a/exp(par[1])
-  #mu2 = a/exp(par[2])
-  mu1=par[1]
-  mu2=par[2]
+  mu1 = a/exp(par[1])
+  mu2 = a/exp(par[2])
+  #mu1=par[1]
+  #mu2=par[2]
   
   #mu2 = mu1/exp(par[2])
   
@@ -126,23 +126,24 @@ mle_simulation <- function(par,n,sims) {
     
     a = par[3]
     b = par[4]
-    #mu1 = par[1]
-    #mu2 = par[2]
-    mu1 = a/exp(par[1])
-    mu2 = a/exp(par[2])
+    mu1 = par[1]
+    mu2 = par[2]
+    #mu1 = a/exp(par[1])
+    #mu2 = a/exp(par[2])
     #mu2 = mu1/exp(par[2])
     
     #1. Generate
     w<-rbeta(n,a,b)
-    gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1)
-    gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2)
+    gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/(a/exp(par[1])))
+    gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/(a/exp(par[2])))
     
     #2.Calculate full likelihood
     #maximiserForPDF(par)
   
     #3. Get parameter estimates  
-    optim_result<-optim(par=c(log(1.5),log(1.5),1.5,1.5), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
-          , control = c(maxit=10000,trace=1), lower=c(NA,NA,0.1,0.1))$par
+    optim_result<-tryCatch(
+      {      optim(par=c(log(a/((a/exp(par[1])))),log(a/((a/exp(par[2])))),a+.1,b+.1), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
+          , control = c(maxit=10000,trace=1), lower=c(-Inf,-Inf,0.05,0.05))$par },error=function(e){NA})
     
     optim_results[i,1] <- optim_result[1]
     optim_results[i,2] <- optim_result[2]
@@ -159,11 +160,13 @@ mle_simulation <- function(par,n,sims) {
 ########################################################## 3.2 MLE RUN #############################################
 
 ###Quick test of MLE simulation
-set.seed(100)
+set.seed(99)
 a=1;b=1;
-par=c(log(a/1),log(a/2),a,b,1,1)
+par=c(log(a/10),log(a/12),a,b,a/10,a/12)
 optim_results_output<-mle_simulation(par[1:4],n=1000,sims=100)
 
+sd(optim_results_output[!is.na(optim_results_output[,1]),1])
+sd(optim_results_output[!is.na(optim_results_output[,2]),2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 optim_results_output_combined<-data.frame()
@@ -320,55 +323,67 @@ diff2Function<-function(par,hval,hpar) {
       ) / (4*hval^2)
     }
   }
-  d2
+  d2[,2:3]
   return(d2)
 }
 
 numericalDerivativeSE_forMLE <- function(par) {
+  
   ses=matrix(ncol=8,nrow=1)
   #par=c(mu1,mu2,a,b,y1,y2)
+  #par=c(10,12,1,1,1/10,1/12)
   d2matrix=matrix(nrow=6,ncol=6)
   j=1
   for (i in 1:6) {
     d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
   }
-  ses[j,1:6]=sqrt(diag(solve(d2matrix)))/sqrt(1000)
-  ses[j,7]=y1
-  ses[j,8]=y2
-  return(ses[,c(1,2)])
+  
+  ses[j,1:6]=diag(solve(d2matrix))
+  ses[j,7]=d2matrix[3,1]
+  ses[j,8]=d2matrix[1,3]
+  return(ses)
 }
 
 ###WORKING SECTION
-
-numDerivResults <- matrix(nrow=400,ncol=4)
+numDerivResults <- matrix(nrow=400,ncol=10)
 i = 1;
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
+    
     print(i)
     
     ###Change to estimate of amu??
-    #mu1=log(a/10);mu2=log(a/12);  ###Changes a lot based on y1/y2
-    #par=c(mu1,mu2,a,b,a/10,(a/12))
+    mu1=log(a/10);mu2=log(a/12);  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,a/10,(a/12))
     
-    mu1=10;mu2=12;
-    par=c(mu1,mu2,a,b,a/mu1,a/mu2)
+    #mu1=10;mu2=12;
+    #par=c(mu1,mu2,a,b,a/mu1,a/mu2)
     
-    numDerivResults[i,1:2] <- numericalDerivativeSE_forMLE(par)
+    #mu1=1/10;mu2=1/12;
+    #par=c(mu1,mu2,a,b,a*mu1,a*mu2)
     
-    numDerivResults[i,3] <- a
-    numDerivResults[i,4] <- b
+    numDerivResults[i,1:8] <- numericalDerivativeSE_forMLE(par)
+    
+    numDerivResults[i,9] <- a
+    numDerivResults[i,10] <- b
     i = i+1
   }
 }
+sqrt(numDerivResults[190:210,])
+sqrt(3.3/1000)
+nrow(numDerivResults[is.na(numDerivResults[,1])|is.na(numDerivResults[,2]),])
 
-colnames(numDerivResults) <- c("mu1_se","mu2_se","a","b")
-numDerivResults
 
+#(numDerivResults[,1]/(10^2)) #Estimate for variance of log(1/X)
+#(numDerivResults[,1]/(10^2))/(1000) #Variance of log(1/X) MLE for 1000 obs
+#sqrt((numDerivResults[,1]/(10^2))/1000) #Variance of log(1/X)
+#tauPlusNumDivResults<-as.data.frame(cbind(tau,sqrt((numDerivResults[,1]/(10^2))/1000),sqrt((numDerivResults[,2]/(12^2))/1000)))
+tauPlusNumDivResults<-as.data.frame(cbind(tau,sqrt(numDerivResults[,1]/1000),sqrt(numDerivResults[,2]/1000)))
+
+colnames(tauPlusNumDivResults) <- c("tau","mu1_se","mu2_se")
 par(mfrow=c(1,2))
-tauPlusNumDivResults<-as.data.frame(cbind(tau,parameters, numDerivResults))
-colnames(tauPlusNumDivResults)[1]<-c("tau")
-plot(tauPlusNumDivResults$tau,tauPlusNumDivResults$mu1_se)
-plot(tauPlusNumDivResults$tau,tauPlusNumDivResults$mu2_se)
+plot(tau,sqrt(numDerivResults[,1]/1000))
+plot(tau,sqrt(numDerivResults[,2]/1000))
 
 ###Need to calculate these derivatives at a given point
 
