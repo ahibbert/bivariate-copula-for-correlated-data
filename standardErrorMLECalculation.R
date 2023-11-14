@@ -41,12 +41,14 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
-  mu1 = a/exp(par[1])
-  mu2 = a/exp(par[2])
   #mu1=par[1]
   #mu2=par[2]
+  mu1 = a/exp(par[1])
+  mu2 = a/exp(par[2])
   
-  #mu2 = mu1/exp(par[2])
+  #mu2=a/(exp(par[1])*exp(par[2]))
+  #mu1=1/par[1]
+  #mu2=1/par[2]
   
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
   #Returning lo
@@ -353,8 +355,11 @@ for (a in .1+.1*1:20) {
     print(i)
     
     ###Change to estimate of amu??
+    #mu1=log(a/10);mu2=log(10/12);  ###Changes a lot based on y1/y2
+    #par=c(mu1,mu2,a,b,a/10,a/12)
+    
     mu1=log(a/10);mu2=log(a/12);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,a/10,(a/12))
+    par=c(mu1,mu2,a,b,a/10,a/12)
     
     #mu1=10;mu2=12;
     #par=c(mu1,mu2,a,b,a/mu1,a/mu2)
@@ -369,8 +374,8 @@ for (a in .1+.1*1:20) {
     i = i+1
   }
 }
-sqrt(numDerivResults[190:210,])
-sqrt(3.3/1000)
+numDerivResults
+sqrt(numDerivResults)
 nrow(numDerivResults[is.na(numDerivResults[,1])|is.na(numDerivResults[,2]),])
 
 
@@ -379,8 +384,8 @@ nrow(numDerivResults[is.na(numDerivResults[,1])|is.na(numDerivResults[,2]),])
 #sqrt((numDerivResults[,1]/(10^2))/1000) #Variance of log(1/X)
 #tauPlusNumDivResults<-as.data.frame(cbind(tau,sqrt((numDerivResults[,1]/(10^2))/1000),sqrt((numDerivResults[,2]/(12^2))/1000)))
 tauPlusNumDivResults<-as.data.frame(cbind(tau,sqrt(numDerivResults[,1]/1000),sqrt(numDerivResults[,2]/1000)))
-
 colnames(tauPlusNumDivResults) <- c("tau","mu1_se","mu2_se")
+
 par(mfrow=c(1,2))
 plot(tau,sqrt(numDerivResults[,1]/1000))
 plot(tau,sqrt(numDerivResults[,2]/1000))

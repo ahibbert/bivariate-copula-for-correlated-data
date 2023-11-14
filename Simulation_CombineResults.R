@@ -144,6 +144,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
     
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
                         , values=brewer.pal(n = 7, name = "Dark2"))
+
   
   ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE,nrow=2, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
