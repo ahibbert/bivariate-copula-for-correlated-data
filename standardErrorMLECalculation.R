@@ -41,9 +41,14 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
+  #mu1=par[1]
+  #mu2=par[2]
   mu1 = a/exp(par[1])
   mu2 = a/exp(par[2])
-  #mu2 = mu1/exp(par[2])
+  
+  #mu2=a/(exp(par[1])*exp(par[2]))
+  #mu1=1/par[1]
+  #mu2=1/par[2]
   
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
   #Returning lo
@@ -324,7 +329,7 @@ diff2Function<-function(par,hval,hpar) {
 numericalDerivativeSE <- function(par) {
   ses=matrix(ncol=8,nrow=2500)
   j=1
-  for (y1 in .1*1:50) { ###Maybe change to dataset...?
+  for (y1 in .1*1:50) {
     for (y2 in .1*1:50) {
       par=c(mu1,mu2,a,b,y1,y2)
       d2matrix=matrix(nrow=6,ncol=6)
@@ -343,21 +348,6 @@ numericalDerivativeSE <- function(par) {
   return(c(mean(ses[!is.na(ses[,1]),1],trim=.1),mean(ses[!is.na(ses[,2]),2],trim=.1)))
 }
 
-
-numericalDerivativeSE_forMLE <- function(par) {
-  ses=matrix(ncol=8,nrow=1)
-  par=c(mu1,mu2,a,b,y1,y2)
-  d2matrix=matrix(nrow=6,ncol=6)
-  j=1
-  for (i in 1:6) {
-    d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
-  }
-  ses[j,1:6]=sqrt(diag(solve(d2matrix)))/sqrt(1000)
-  ses[j,7]=y1
-  ses[j,8]=y2
-  return(ses[,c(1,2)])
-}
-
 ###WORKING SECTION
 
 numDerivResults <- matrix(nrow=400,ncol=4)
@@ -365,17 +355,16 @@ i = 1; y1=1;y2=1;n=1000; a=1;b=1;
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=log(a/10);mu2=log(a/20);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,a/10,a/20)
+    mu1=log(a/1);mu2=log(a/2);  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,y1,y2)
     
-    numDerivResults[i,1:2] <- numericalDerivativeSE_forMLE(par)
+    numDerivResults[i,1:2] <- numericalDerivativeSE(par)
     numDerivResults[i,3] <- a
     numDerivResults[i,4] <- b
     i = i+1
   }
 }
 colnames(numDerivResults) <- c("mu1_se","mu2_se","a","b")
-numDerivResults
 
 par(mfrow=c(1,2))
 tauPlusResults<-merge(cbind(tau,parameters), numDerivResults, by.x=c('Time 1 Intercept', 'Time 2 Intercept'), by.y=c('a', 'b'))

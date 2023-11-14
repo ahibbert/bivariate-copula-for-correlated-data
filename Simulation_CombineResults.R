@@ -1,5 +1,5 @@
 #Combine simulations
-load("results_combined_N_C0_n1000_geefix.rds")
+load("results_combined_N_C0_n1000_geefix_mu1mu21012.rds")
 #load("results_combined_N_C0_n1000_geefix_reverse.rds")
 
 require(latex2exp)
@@ -9,7 +9,7 @@ library(RColorBrewer)
 set.seed(1000)
 options(scipen=999)
 
-a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
+a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
 
 ######################CHARTS
 
@@ -24,8 +24,8 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   for (i in 2:length(results)) {parameters=rbind(parameters,results[[i]][8,1:4]) }
   
   ###NOTE THESE ARE THE WRONG WAY AROUND because they are setup for reverse sim atm
-  mu1=parameters[,1]/parameters[,4]
-  mu2=parameters[,1]/parameters[,3]
+  mu1=parameters[,1]/parameters[,3]
+  mu2=parameters[,1]/parameters[,4]
   
   
   t1error=results[[1]][1:6,3]
@@ -114,14 +114,15 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
                         , values=brewer.pal(n = 6, name = "Dark2"))
   
-  error_1_plot<-ggplot() + ylim(0,.1) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{\\mu_1}})$")) +
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t1error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
-    geom_smooth(data=as.data.frame(tauPlusResults), aes(x=V1, y=mu1_se, color="MLE"),level=.99) +
+  data_input<-as.data.frame(cbind(t1error,tau,tauPlusNumDivResults[,2:3]))
+  error_1_plot<-ggplot() + ylim(0,.1) + xlim(0,.7) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{\\mu_1}})$")) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
+    geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=mu1_se, color="MLE"),level=.99) +
     
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
                         , values=brewer.pal(n = 7, name = "Dark2"))
@@ -130,20 +131,24 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=1000
   #theme(legend.position = "right", legend.title=element_text(size=20),
   #      legend.text=element_text(size=14))
   
-  error_2_plot<-ggplot() + ylim(0,.1) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{\\mu_2}})$ | $SE(\\hat{\\beta_{\\mu_t}})$")) +
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
-    geom_smooth(data=as.data.frame(cbind(t2error,tau)), aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
-    geom_smooth(data=as.data.frame(tauPlusResults), aes(x=V1, y=mu2_se, color="MLE"),level=.99) +
+  data_input<-as.data.frame(cbind(t2error,tau,tauPlusNumDivResults[,2:3]))
+  error_2_plot<-
+    ggplot() + ylim(0,.1) + xlim(0,.7) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{\\mu_2}})$ | $SE(\\hat{\\beta_{\\mu_t}})$")) +
+    geom_smooth(data=data_input, aes(x=tau, y=mu2_se, color="MLE"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
+    geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
+    geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
+    
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
                         , values=brewer.pal(n = 7, name = "Dark2"))
+
   
   ggarrange(bias_1_plot,bias_2_plot, error_1_plot,error_2_plot ,common.legend=TRUE,nrow=2, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
-  ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=8,height=5,dpi=900)
+  #ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=8,height=5,dpi=900)
   
   data_input<-as.data.frame(cbind(t2intercepts[,1:6],log(mu1)-log(mu2),tau))
   colnames(data_input)[7:8] <- c("actuals","tau")
