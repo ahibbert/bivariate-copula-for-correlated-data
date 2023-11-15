@@ -1,3 +1,26 @@
+############# Overview of file
+#############
+#############
+
+########### 0. DATA SETUP ##############
+
+# a. Simulation parameters
+set.seed(1000)
+options(scipen=999)
+a=1; b=1; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
+
+# b. Simualating Nadarajah and Gupta bivariate Gamma
+w<-rbeta(n,a,b) #Mean .5
+gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1) #Mean 6 * .5 = 3
+gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2) #Mean 12 * .5 = 6
+
+# c.Setting up as longitiduinal structured data
+patient<-as.factor(seq(1:n))
+dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
+colnames(dataset)<-c("patient","random_variable","time")
+
+################# 1. Investigating the dependence structure and best copula fit #############
+require(GJRM)
 library(MASS)
 library(psych)
 library(copula)
@@ -7,49 +30,6 @@ library(moments)
 require(ggpubr)
 require(ggplot2)
 require(dglm)
-
-#####Try and fit copula to the most extreme case
-
-set.seed(1000)
-options(scipen=999)
-a=1; b=1 #.25, .75 the most extreme
-#a=0.75; b=1.25 #First MLE calc
-mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
-
-
-##########NADARAJAH & GUPTA SIM
-w<-rbeta(n,a,b) #Mean .5
-gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1) #Mean 6 * .5 = 3
-gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2) #Mean 12 * .5 = 6
-
-##########is this an RE?
-#gamma_c_mu1<-rgamma(n,shape=3,scale=2) #Mean 6 * .5 = 3
-#gamma_c_mu2<-gamma_c_mu1 + rgamma(n,shape=4,scale=5) #Mean 12 * .5 = 6
-
-
-#cor(gamma_c_mu1,gamma_c_mu2,method="kendall")
-#skewness(gamma_c_mu1)
-#skewness(gamma_c_mu2)
-
-patient<-as.factor(seq(1:n))
-dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
-colnames(dataset)<-c("patient","random_variable","time")
-
-u<-0
-v<-0
-
-u<-pgamma(gamma_c_mu1,shape=a,scale=1/mu1)
-v<-pgamma(gamma_c_mu2,shape=a,scale=1/mu2)
-
-#u<-pgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])
-#v<-pgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])
-
-#u<-pgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])
-#v<-pgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])
-
-
-#################BEST COPULA FIT
-require(GJRM)
 
 #Setting up GJRM equations
 eq.mu.1 <- gamma_c_mu1~1
@@ -122,7 +102,6 @@ model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame
 #  ,model_copula_pl$logLik
 #  ,model_copula_h$logLik)
 
-
 ####UKNOWN FIT u,v
 
 u<-0
@@ -194,6 +173,11 @@ ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
 #persp(kde2d(fittedClayton[,1],fittedClayton[,2],h=.4,n=65),main="Simulated fitted copula",zlim=c(0,4))
 #persp(kde2d(fittedTDist[,1],fittedTDist[,2],h=.4,n=65),main="Simulated fitted normal",zlim=c(0,4))
 
+
+################# 2. GLM, GEE, GLMM fits to the data #########
+
+
+### Running all models
 require(gamlss)
 require(gee)
 require(lme4)
@@ -240,12 +224,20 @@ actuals<-c( log(a*(1/mu1))
             , 0
 )
 
+### Investigating
+
+
+
+########### 3. GJRM fits #########
+
 require(GJRM)
 eq.mu.1 <- gamma_c_mu1~1
 eq.mu.2 <- gamma_c_mu2~1
 fl <- list(eq.mu.1, eq.mu.2)
 model_copula<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
 model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+
+
 
 #AIC for copula
 
@@ -277,6 +269,8 @@ summary_cop_n<-c( model_copula_n$coefficients[1]
                   
 )
 
+########### 4. Combining results #########
+
 rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
 exp(rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals))
 
@@ -301,111 +295,143 @@ exp(rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summa
 #summary_cop_n       1.802569   1.4611255 0.012861624 0.009052048
 #actuals            -1.386294  -0.6931472 0.000000000 0.000000000
 
-# 
-# #############
-# 
-# require(lme4)
-# help(lme4)
-# 
-# summary(model_copula)
-# 
-# #########RE is the conditional model
-# 
-# model_re_nosig$mu.coefSmo
-# 
-# summary(model_lme4)$varcor
-# summary(model_lme4)$coefficients
-# 
-# plot(model_lme4)
-# 
-# s=3.94481
-# l=0.0944163 
-# n=100
-# 
-# base=rnorm(n,0,3.32218^2)
-# 
-# mean=exp(-1.31)
-# var=0.619
-# shape=((mean)^2)/var
-# scale=var/mean
-# t1=base+rgamma(n,shape=shape,scale=scale)
-# mean=exp(-1.31-0.7070887)
-# var=0.619
-# shape=((mean)^2)/var
-# scale=var/mean
-# t2=base+rgamma(n,shape=shape,scale=scale)
-# 
-# hist(base,main="Distribution of Estimated Random Effect")
-# hist(t1); hist(t2)
-# 
-# 
-# rbind (c(var(gamma_c_mu1),cov(gamma_c_mu1,gamma_c_mu2)),
-#        c(cov(gamma_c_mu1,gamma_c_mu2),var(gamma_c_mu2)))
 
-#########################################
-# 
-# set.seed(100)
-# 
-# mu1=1; mu2=2; n=100;a=10;s=3
-# base=rnorm(n,mean=0,sd=s)
-# 
-# gamma_c_mu1<-base+rgamma(n,shape=a,scale=1/mu1) #Mean 6 * .5 = 3
-# gamma_c_mu2<-base+rgamma(n,shape=a,scale=1/mu2) #Mean 12 * .5 = 6
-# 
-# cor(gamma_c_mu1,gamma_c_mu2,method="kendall")
-# 
-# patient<-as.factor(seq(1:n))
-# dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
-# colnames(dataset)<-c("patient","random_variable","time")
-# 
-# par(mfrow=c(2,2))
-# #u<-pgamma(gamma_c_mu1,shape=a,scale=1/mu1)
-# #v<-pgamma(gamma_c_mu2,shape=a,scale=1/mu2)
-# u<-pgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])
-# v<-pgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])
-# his<-kde2d(u,v,h=.4)
-# plot(u,v)
-# persp(his,axes=T,scale=T,ticktype="detailed",theta=15)
-# 
-# require(gamlss); require(gee)
-# 
-# model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-# model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=RS(1000))
-# model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
-#                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
-#                    , start.from	= model_re_nosig, method=CG(1000))
-# 
-# model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"),maxiter=10000,silent=TRUE)
-# 
-# 
-# 
-# 
-# #####OLD
-# 
-# 
-# head(as.data.frame(gamma_c_mu1))
-# 
-# ggplot(as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1)) + geom_histogram()
-# 
-# plot.new()
-# par(mfrow=c(1,3))
-# histDist(gamma_c_mu1, family=GA(),main="Time 1 Marginal Gamma (mu=0.25, sd=0.5)"
-#          ,xlab="x",ylab="Density",nbins=200,xlim=c(0,.5)
-#          ,col.main = "black"
-#          ,col.lab = "black",
-#          ,col.axis = "black"
-#          ,line.col="blue"
-#          ,col.hist="gray"
-#          , border.hist	="black"
-#          ,fg.hist="black")
-# histDist(gamma_c_mu2, family=GA(),main="TIme 2 Marginal Gamma (mu=0.125, sd=0.25)"
-#          ,xlab="x",ylab="Density",nbins=200,xlim=c(0,.25)
-#          ,col.main = "black"
-#          ,col.lab = "black",
-#          ,col.axis = "black"
-#          ,line.col="blue"
-#          ,col.hist="gray"
-#          , border.hist	="black"
-#          ,fg.hist="black")
-# plot(gamma_c_mu1,gamma_c_mu2,xlab="Time 1 Marginal Gamma",ylab="Time 2 Marginal Gamma",main="Time 2 v Time 1 Marginal Gamma")
-# 
+########## 5. Investigating GLMM fits
+
+library(gamlss)
+library(mgcv)
+set.seed(1000)
+
+####Benchmark Gamma GLM
+gamlss_fit_0<-gamlss(formula=random_variable~as.factor(time==1)
+       , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
+       , method=CG(10000))
+plot(gamlss_fit_0)
+
+####Gamma + Random Effect
+gamlss_fit_GA<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                      , data=dataset, family=GA()
+                      #, method=CG(10000)
+                      )
+plot(gamlss_fit_GA)
+####Gamma + Random Effect
+#gamlss_fit_GA_s<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+#                      , sigma.formula=~as.factor(time==1)
+#                      , data=dataset, family=GA(),method=CG(1000))
+#plot(gamlss_fit_GA)
+
+#####Look at the fitted random effect
+#So - 1. the arndom effect doesn't look normal, 2. 
+par(mfrow=c(2,2))
+hist(log(gamma_c_mu1),xlim=c(-8,0),main="Margin 1 (log)",breaks =20)
+hist(log(gamma_c_mu2),xlim=c(-8,0),main="Margin 2 (log)",breaks =20)
+hist(gamlss_fit_GA$mu.coefSmo[[1]]$coef,xlim=c(-4,4),main="Random effect",breaks =20)
+hist(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef,xlim=c(-8,0),main="Margin 2 minus Random effect",breaks =20)
+
+####Looking at the 
+plot.new()
+par(mfrow=c(2,2))
+histDist(gamma_c_mu1,main = "Original margin 1 (gamma)",family=GA(),ylim=c(0,14),nbins=100,xlim=c(0,.5))
+histDist(gamma_c_mu2,main = "Original margin 2 (gamma)",family=GA(),ylim=c(0,14),nbins=50,xlim=c(0,.5))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GA(),ylim=c(0,14),nbins=400,xlim=c(0,.5),main="Margin 1 minus random effect")
+histDist(exp(log(gamma_c_mu2)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GA(),ylim=c(0,14),nbins=600,xlim=c(0,.5),main="Margin 2 minus random effect")
+###So adding RE makes it MORE skewed
+
+#Not a substantial improvement
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GA(),nbins=300,xlim=c(0,.5),main="GA",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GB2(),nbins=300,xlim=c(0,.5),main="GB2",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=BCTo(),nbins=300,xlim=c(0,.5),main="BCTo",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GP(),nbins=300,xlim=c(0,.5),main="GP",ylim=c(0,14))
+
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GA(),nbins=300,xlim=c(0,.5),main="GA",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GB2(),nbins=300,xlim=c(0,.5),main="LOGNO",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=BCTo(),nbins=300,xlim=c(0,.5),main="LOGNO2",ylim=c(0,14))
+histDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),family=GP(),nbins=300,xlim=c(0,.5),main="GP",ylim=c(0,14))
+
+
+fitDist(exp(log(gamma_c_mu2)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),type="realplus")$fits
+#GB2      BCTo        GP   PARETO2  PARETO2o     BCPEo     BCCGo        GG    LOGNO2     LOGNO      WEI3      WEI2       WEI 
+#-2555.342 -2554.560 -2553.936 -2553.936 -2553.936 -2553.029 -2550.251 -2549.281 -2528.517 -2528.517 -2457.936 -2457.936 -2457.936 
+#GIG        GA       EXP        IG    IGAMMA 
+#-2439.929 -2382.074 -2285.360 -2054.721 -1926.681 
+
+fitDist(exp(log(gamma_c_mu1)-gamlss_fit_GA$mu.coefSmo[[1]]$coef),type="realplus")$fits
+#BCTo      BCPEo    PARETO2         GP   PARETO2o        GB2      BCCGo         GG     LOGNO2      LOGNO       WEI2       WEI3 
+#-2244.0461 -2244.0391 -2243.6023 -2243.6023 -2243.6023 -2243.0053 -2238.9137 -2237.5020 -2215.2062 -2215.2062 -2150.5406 -2150.5406 
+#WEI        GIG         GA        EXP     IGAMMA         IG 
+#-2150.5406 -2076.3217 -2067.8069 -1910.3904  -967.5800  -790.0647 
+
+
+#Won't coverge
+#gamlss_fit_GB2<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+#                      , data=dataset, family=GB2()
+#                      , method=CG(1000)
+#                      )
+#
+plot(gamlss_fit_GB2)
+
+#Plots look ridiculous but global deviance is better 
+gamlss_fit_BCTo<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                      , data=dataset, family=BCTo()
+                      , method=RS(100)
+                      )
+
+plot(gamlss_fit_BCTo)
+
+##This is the only 2-parameter distribution with a better AIC fit
+gamlss_fit_GP<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                        , data=dataset, family=GP()
+                        #,method=RS(1000)
+                        , method = CG(10000)
+                        #, method=mixed(10,1000)
+)
+
+plot(gamlss_fit_GP) ###Fit looks ridiculous
+
+gamlss_fit_PARETO2<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                      , data=dataset, family=PARETO2()
+                      #,method=RS(1000)
+                      #, method = CG(10000)
+                      #, method=mixed(10,1000)
+)
+
+plot(gamlss_fit_PARETO2) ###Fit looks ridiculous
+
+gamlss_fit_LOGNO2<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                           , data=dataset, family=LOGNO2()
+                           #,method=RS(1000)
+                           #, method = CG(10000)
+                           #, method=mixed(10,1000)
+)
+
+plot(gamlss_fit_LOGNO2) ###Fit looks ridiculous
+
+gamlss_fit_LOGNO<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                          , data=dataset, family=LOGNO()
+                          #,method=RS(1000)
+                          #, method = CG(10000)
+                          #, method=mixed(10,1000)
+)
+
+plot(gamlss_fit_LOGNO) ###Fit looks ridiculous
+
+gamlss_fit_WEI<-gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                         , data=dataset, family=WEI2()
+                         #,method=RS(1000)
+                         #, method = CG(10000)
+                         #, method=mixed(10,1000)
+)
+
+plot(gamlss_fit_WEI) ###Fit looks ridiculous
+summary(gamlss_fit_WEI)
+
+
+gamlss_fit_GA$aic
+gamlss_fit_BCTo$aic
+gamlss_fit_GP$aic
+gamlss_fit_PARETO2$aic
+gamlss_fit_LOGNO2$aic
+gamlss_fit_LOGNO$aic
+gamlss_fit_WEI$aic
+
+
