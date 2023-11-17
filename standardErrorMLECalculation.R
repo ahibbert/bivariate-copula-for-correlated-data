@@ -426,8 +426,8 @@ numDerivResults
 #library(ExtDist)
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
-save(numDerivResults,file="numDerivResults.rds")
 colnames(numDerivResults) <- c("mu1_se","mu2_se","a_se","b_se","a","b")
+save(numDerivResults,file="numDerivResults.rds")
 
 par(mfrow=c(1,2))
 plot(tau,numDerivResults[,1])

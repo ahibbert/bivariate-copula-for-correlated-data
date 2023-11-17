@@ -193,6 +193,8 @@ model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(p
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
                    , method=CG(10000))
 
+model_re_nosig_np<-gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000),mixture="np")
+help(gamlss.random)
 summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2] + summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[3]
