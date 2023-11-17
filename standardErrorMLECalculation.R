@@ -43,14 +43,10 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
-  mu1=par[1]
-  mu2=par[2]
-  #mu1 = a*exp(par[1])
-  #mu2 = a*exp(par[2])
-  
-  #mu2=a/(exp(par[2]))
-  #mu1=1/par[1]
-  #mu2=1/par[2]
+  #mu1=par[1]
+  #mu2=par[2]
+  mu1=exp(par[1])/a
+  mu2=exp(par[2])/a
   
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
   #Returning lo
@@ -417,8 +413,8 @@ i = 1
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=1/10; mu2=1/12;  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,a*mu1,a*mu2)
+    mu1=log(a*1/10); mu2=log(a*1/12);  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
     
     numDerivResults[i,1:4] <- sqrt(numericalDerivativeSE(par)/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
     numDerivResults[i,5] <- a
