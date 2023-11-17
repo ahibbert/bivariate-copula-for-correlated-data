@@ -1,5 +1,7 @@
 ####################################################### 1. BASE FUNCTIONS: PDF########################################################
 
+options(scipen=999)
+
 subWhittackerFunction <- function(t,l,m,p) {
   ((t^(m-l-0.5))*((1+t)^(m+l-0.5)))*exp(-p*t)
 }
@@ -41,12 +43,12 @@ bivGammaPDFRE <- function(par,output) {
   b = par[4]
   y1= par[5]
   y2= par[6]
-  #mu1=par[1]
-  #mu2=par[2]
-  mu1 = a/exp(par[1])
-  #mu2 = a/exp(par[2])
+  mu1=par[1]
+  mu2=par[2]
+  #mu1 = a*exp(par[1])
+  #mu2 = a*exp(par[2])
   
-  mu2=a/(exp(par[2]))
+  #mu2=a/(exp(par[2]))
   #mu1=1/par[1]
   #mu2=1/par[2]
   
@@ -57,12 +59,44 @@ bivGammaPDFRE <- function(par,output) {
       whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2)), 
       error = function(e) return(NA))
   } else {
-    log(C) + log(gamma(b)) + (a+b-1)*log(y1*y2) +(((a-1)/2)-(a+b))*log((y1/mu1)+(y2/mu2)) + (-0.5*((y1/mu1)+(y2/mu2))) + tryCatch(
-      log(whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))), 
-      error = function(e) return(NA))
+    #log(C) + log(gamma(b)) + (a+b-1)*log(y1*y2) +(((a-1)/2)-(a+b))*log((y1/mu1)+(y2/mu2)) + (-0.5*((y1/mu1)+(y2/mu2))) + tryCatch(
+    #  log(whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))), 
+    #  error = function(e) return(NA))
+    
+    log(C * gamma(b) * ((y1*y2)^(a+b-1)) * (((y1/mu1)+(y2/mu2))^(((a-1)/2)-(a+b))) * exp(-0.5*((y1/mu1)+(y2/mu2))) * tryCatch(
+      whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2)), 
+      error = function(e) return(NA)))
   }
   
 }
+
+bivGammaPDFRE_TEST <- function(par,output) {
+  
+  a = par[3]
+  b = par[4]
+  y1= par[5]
+  y2= par[6]
+  mu1=par[1]
+  mu2=par[2]
+  #mu1 = a/exp(par[1])
+  #mu2 = a/exp(par[2])
+
+  k=a
+  theta=mu1
+  
+  #Returning lo
+  if(output=="pdf") {
+    (1/(gamma(k)*(theta^k)))*(y1^(k-1))*exp(-y1/theta)
+  } else {
+    log((1/(gamma(k)*(theta^k)))*(y1^(k-1))*exp(-y1/theta))
+  }
+}
+
+
+######TEST
+#par=c(10,12,1,1,1/10,1/12)
+#bivGammaPDFRE(par,output="ll")
+#bivGammaPDFRE_TEST(par,output="ll")
 
 ####################################################### 2. TESTS########################################################################
 
@@ -287,14 +321,22 @@ solve(d2matrix)
 
 ##################### 4.2 FOR REAL FUNCTION###########
 
-diffFunction<-function(par,hval,hpar) {
+diffFunction<-function(par,hval,hpar,test=FALSE) {
+  
+  if (test==TRUE) {pdfFunction<-bivGammaPDFRE_TEST} else {pdfFunction<-bivGammaPDFRE}
+
   hplus=c(0,0,0,0,0,0);
   hplus[hpar]=hval;
   
-  (bivGammaPDFRE(par+hplus,output="pdf")-bivGammaPDFRE(par-hplus,output="pdf"))/(2*hval)
+  (pdfFunction(par+hplus,output="pdf")-pdfFunction(par-hplus,output="pdf"))/(2*hval)
 }
 
-diff2Function<-function(par,hval,hpar) {
+diff2Function<-function(par,hval,hpar,test=FALSE) {
+  
+  #par;test=TRUE;npar=c(3,1);hval=.00001;hpar=2
+  #test=FALSE; npar=c(4,4); hval=.001; par=c(10,12,1,1,1/10,1/12)
+  
+  if (test==TRUE) {pdfFunction<-bivGammaPDFRE_TEST} else {pdfFunction<-bivGammaPDFRE}
   
   d2 <- vector(length = 6)
   
@@ -307,22 +349,21 @@ diff2Function<-function(par,hval,hpar) {
     if (i == hpar) {
       hplus1[hpar]=hval
       d2[i]=
-        (-2*bivGammaPDFRE(par,output="ll") +
-           bivGammaPDFRE(par+hplus1,output="ll") + 
-           bivGammaPDFRE(par-hplus1,output="ll"))/(hval^2)    
+          (2*pdfFunction(par,output="ll") -
+           pdfFunction(par+hplus1,output="ll") - 
+           pdfFunction(par-hplus1,output="ll"))/(hval^2)    
     }    
     else {
       #### Add an amount to parameter i and add an amount to hpar
       
       hplus1[hpar]=hval; hplus2[i]=hval;
-      d2[i] <- (   bivGammaPDFRE(par+hplus1+hplus2,output="ll") -
-                     bivGammaPDFRE(par+hplus1-hplus2,output="ll") -
-                     bivGammaPDFRE(par-hplus1+hplus2,output="ll") +
-                     bivGammaPDFRE(par-hplus1-hplus2,output="ll") 
-      ) / (4*hval^2)
+      d2[i] = (    pdfFunction(par+hplus1-hplus2,output="ll") +
+                    pdfFunction(par-hplus1+hplus2,output="ll") -
+                    pdfFunction(par-hplus1-hplus2,output="ll") -
+                    pdfFunction(par+hplus1+hplus2,output="ll")
+      ) / (4*hval*hval)
     }
   }
-  d2
   return(d2)
 }
 
@@ -349,33 +390,47 @@ numericalDerivativeSE_SAMPLE <- function(par,n) {
   return(sqrt(diag(solve(avg_ses_n[1:4,1:4]))))
 }
 
-numericalDerivativeSE <- function(par) {
+numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01) {
   
-  #par=c(log(1/10),log(1/12),1,1,1/10,1/12)
+  #test=FALSE; npar=c(1:4); hval=.001; par=c(10,12,1,1,1*10,1*12)
+  #test=TRUE; npar=c(3,1); hval=.001; par=c(10,12,2,1,2*10,.1*12)
   
   d2matrix=matrix(nrow=6,ncol=6)
   for (i in 1:6) {
-    d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
+    d2matrix[i,]=diff2Function(par,hval=hval,hpar=i,test=test)
   }
-  return(sqrt(diag(solve(d2matrix[1:4,1:4]))))
+  d2matrix[npar,npar]
+  ###For test function
+  #sqrt(diag(solve(d2matrix[npar,npar]))/1000)
+  #eGamma(rgamma(n=1000,shape=par[3],scale=par[1]), method="numerical.MLE")
+  return(diag(solve(d2matrix[npar,npar])))
 }
+
+#For test function this should be psigamma(a,deriv=1), 1/(mu1^2), and 1/mu1 for other diagnals
+# numDerivResults
 
 ###WORKING SECTION
 
 numDerivResults <- matrix(nrow=400,ncol=6)
-i = 1; y1=1;y2=1;n=1000; a=1;b=1;
+n=1000;
+i = 1
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=log(a/10);mu2=log(a/12);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,a/10,a/12)
+    mu1=1/10; mu2=1/12;  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,a*mu1,a*mu2)
     
-    numDerivResults[i,1:4] <- numericalDerivativeSE_SAMPLE(par,n=1000)/sqrt(1000)
+    numDerivResults[i,1:4] <- sqrt(numericalDerivativeSE(par)/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
     numDerivResults[i,5] <- a
     numDerivResults[i,6] <- b
     i = i+1
   }
 }
+numDerivResults
+#library(ExtDist)
+#eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
+
+#save(numDerivResults,file="numDerivResults.rds")
 colnames(numDerivResults) <- c("mu1_se","mu2_se","a_se","b_se","a","b")
 
 par(mfrow=c(1,2))
@@ -418,8 +473,6 @@ whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))
 
 y=.0001;y2=.0001
 whittackerFunction(l=a+((1-a)/2),m=a+b-(a/2),p=(y1/mu1)+(y2/mu2))
-
-
 
 
 

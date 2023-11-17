@@ -11,8 +11,8 @@ a=1; b=1; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
 
 # b. Simualating Nadarajah and Gupta bivariate Gamma
 w<-rbeta(n,a,b) #Mean .5
-gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1) #Mean 6 * .5 = 3
-gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2) #Mean 12 * .5 = 6
+gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=mu1) #Mean 6 * .5 = 3
+gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=mu2) #Mean 12 * .5 = 6
 
 # c.Setting up as longitiduinal structured data
 patient<-as.factor(seq(1:n))
