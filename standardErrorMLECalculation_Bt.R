@@ -46,7 +46,7 @@ bivGammaPDFRE <- function(par,output) {
   #mu1=par[1]
   #mu2=par[2]
   mu1=exp(par[1])/a
-  mu2=exp(par[2])/a
+  mu2=exp(par[2]+par[1])/a
   
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
   #Returning lo
@@ -413,8 +413,8 @@ i = 1
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=log(a*1/10); mu2=log(a*1/12);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+    mu1=log(a*1/10); mu2=log((1/12)/(1/10));  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
     
     numDerivResults[i,1:4] <- sqrt(numericalDerivativeSE(par)/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
     numDerivResults[i,5] <- a
@@ -426,7 +426,7 @@ numDerivResults
 #library(ExtDist)
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
-save(numDerivResults,file="numDerivResults.rds")
+save(numDerivResults,file="numDerivResults_Bt.rds")
 colnames(numDerivResults) <- c("mu1_se","mu2_se","a_se","b_se","a","b")
 
 par(mfrow=c(1,2))
