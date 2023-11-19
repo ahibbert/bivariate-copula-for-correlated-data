@@ -418,10 +418,10 @@ for (i in 1:(n/10)) {
 
 par(mfrow=c(1,2))
 referenceNumDev=numericalDerivativeSE(par)
-plot(1:(n/10),sqrt(z[,1]/n))
-abline(h=sqrt(referenceNumDev[1]/n),col="red",xlab="n",ylab="mu1_se",main="Choose Y1 at MLE versus simulation")
-plot(1:(n/10),sqrt(z[,2]/n))
-abline(h=sqrt(referenceNumDev[2]/n),col="red",xlab="n",ylab="mu2_se",main="Choose Y2 at MLE versus simulation")
+plot(1:(n/10),sqrt(z[,1]/n),xlab="n",ylab="mu1_se",main="Choose Y1 at MLE versus simulation")
+abline(h=sqrt(referenceNumDev[1]/n),col="red")
+plot(1:(n/10),sqrt(z[,2]/n),xlab="n",ylab="mu2_se",main="Choose Y2 at MLE versus simulation")
+abline(h=sqrt(referenceNumDev[2]/n),col="red")
 
 #For test function this should be psigamma(a,deriv=1), 1/(mu1^2), and 1/mu1 for other diagnals
 # numDerivResults
