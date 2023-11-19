@@ -367,11 +367,11 @@ diff2Function<-function(par,hval,hpar,test=FALSE,parameterisation="B2") {
   return(d2)
 }
 
-numericalDerivativeSE_SAMPLE <- function(par,n) {
+numericalDerivativeSE_SAMPLE <- function(par,n,test=FALSE,npar=c(1:4),hval=.01,parameterisation="B2") {
   
   w<-rbeta(n=n,par[3],par[4])
-  gamma_c_mu1<-w*rgamma(n,shape=par[3]+par[4],scale=1/(par[3]/exp(par[1])))
-  gamma_c_mu2<-w*rgamma(n,shape=par[3]+par[4],scale=1/(par[3]/exp(par[2])))
+  gamma_c_mu1<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[1])/par[3])
+  gamma_c_mu2<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[2])/par[3])
   
   ses <- replicate(n, diag(6), simplify=F)
   
@@ -379,7 +379,7 @@ numericalDerivativeSE_SAMPLE <- function(par,n) {
     par[5:6]<-c(gamma_c_mu1[j],gamma_c_mu1[j])
     d2matrix=matrix(nrow=6,ncol=6)
     for (i in 1:6) {
-      d2matrix[i,]=diff2Function(par,hval=.0001,hpar=i)
+      d2matrix[i,]=diff2Function(par,hval=hval,hpar=i,test=test,parameterisation)
     }
     #ses[j,1:6]=sqrt(diag(solve(d2matrix)))
     ses[[j]]=d2matrix
@@ -387,7 +387,7 @@ numericalDerivativeSE_SAMPLE <- function(par,n) {
   
   avg_ses_n<-apply(simplify2array(ses), 1:2, mean,na.rm=TRUE)
   
-  return(sqrt(diag(solve(avg_ses_n[1:4,1:4]))))
+  return(sqrt(diag(solve(avg_ses_n[npar,npar]))))
 }
 
 numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01,parameterisation="B2") {
@@ -406,6 +406,23 @@ numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01,parameteri
   return(diag(solve(d2matrix[npar,npar])))
 }
 
+
+#Prove sample is equivalent to choosing MLE value
+n=1000
+z=matrix(nrow=n/10,ncol=2)
+for (i in 1:(n/10)) {
+  print(i)
+  z[i,1] = numericalDerivativeSE_SAMPLE(par,i*10)[1]
+  z[i,2] = numericalDerivativeSE_SAMPLE(par,i*10)[2]
+}
+
+par(mfrow=c(1,2))
+referenceNumDev=numericalDerivativeSE(par)
+plot(1:(n/10),sqrt(z[,1]/n))
+abline(h=sqrt(referenceNumDev[1]/n),col="red",xlab="n",ylab="mu1_se",main="Choose Y1 at MLE versus simulation")
+plot(1:(n/10),sqrt(z[,2]/n))
+abline(h=sqrt(referenceNumDev[2]/n),col="red",xlab="n",ylab="mu2_se",main="Choose Y2 at MLE versus simulation")
+
 #For test function this should be psigamma(a,deriv=1), 1/(mu1^2), and 1/mu1 for other diagnals
 # numDerivResults
 
@@ -414,8 +431,7 @@ numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01,parameteri
 numDerivResults <- matrix(nrow=400,ncol=7)
 n=1000;
 i = 1
-origmu1=10
-origmu2=12
+origmu1=10; origmu2=12; a=1; b=1
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)

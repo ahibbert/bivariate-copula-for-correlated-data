@@ -1,7 +1,8 @@
 ########01 DATA SETUP (DON'T EDIT) ###############
-  
+
 #Combine simulations
 load("results_combined_N_C0_n1000_geefix_mu1mu21012.rds")
+#load("results_combined_N_C0_n1000_geefix.rds")
 #load("results_combined_N_C0_n1000_geefix_reverse.rds")
 
 require(latex2exp)
@@ -115,7 +116,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   ggarrange(bias_1_plot,bias_2_plot,common.legend=TRUE,nrow=1, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-  ggsave(file="simulation__bias_charts_all_in_one.png",last_plot(),width=8,height=2.5,dpi=900)
+  #ggsave(file="simulation__bias_charts_all_in_one.png",last_plot(),width=8,height=2.5,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
