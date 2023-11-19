@@ -6,7 +6,6 @@ subWhittackerFunction <- function(t,l,m,p) {
   ((t^(m-l-0.5))*((1+t)^(m+l-0.5)))*exp(-p*t)
 }
 
-
 whittackerFunction <- function(l,m,p) {
   (((p^(m+.5))*exp(-p/2))/(gamma(m-l+0.5))) * 
     integrate(subWhittackerFunction,l=l,m=m,p=p,lower=0,upper=Inf)$value
@@ -37,17 +36,22 @@ bivGammaPDF <- function(par,output) {
 }
 
 #REPARAMETISEDFull PDF with 4 parameters for the 2 covariates - returns PDF
-bivGammaPDFRE <- function(par,output) {
+bivGammaPDFRE <- function(par,output,parameterisation="B2") {
   
   a = par[3]
   b = par[4]
   y1= par[5]
   y2= par[6]
-  #mu1=par[1]
-  #mu2=par[2]
   mu1=exp(par[1])/a
-  mu2=exp(par[2])/a
   
+  if (parameterisation=="B2") {
+    #B_2 Parameterisation for GJRM
+    mu2=exp(par[2])/a
+  } else {
+    #B_t Parameterisation for GJRM
+    mu2=exp(par[2]+par[1])/a 
+  }
+
   C = 1 / ( ((mu1*mu2)^(a+b)) * gamma(a+b) * gamma(a) * gamma(b) )
   #Returning lo
   if(output=="pdf") {
@@ -243,7 +247,7 @@ sd(mu2_hat*a_hat) ###SD for mu2 Var(XY)= E(X^2 Y^2)- (E(XY))^2???
 
 sd(mu2_hat-mu1_hat)
 
-################## 4. Numerical differentiation - try this next####################
+################## 4. Numerical differentiation####################
 
 ##################### 4.1 FOR TEST FUNCTION######
 
@@ -327,7 +331,7 @@ diffFunction<-function(par,hval,hpar,test=FALSE) {
   (pdfFunction(par+hplus,output="pdf")-pdfFunction(par-hplus,output="pdf"))/(2*hval)
 }
 
-diff2Function<-function(par,hval,hpar,test=FALSE) {
+diff2Function<-function(par,hval,hpar,test=FALSE,parameterisation="B2") {
   
   #par;test=TRUE;npar=c(3,1);hval=.00001;hpar=2
   #test=FALSE; npar=c(4,4); hval=.001; par=c(10,12,1,1,1/10,1/12)
@@ -345,18 +349,18 @@ diff2Function<-function(par,hval,hpar,test=FALSE) {
     if (i == hpar) {
       hplus1[hpar]=hval
       d2[i]=
-          (2*pdfFunction(par,output="ll") -
-           pdfFunction(par+hplus1,output="ll") - 
-           pdfFunction(par-hplus1,output="ll"))/(hval^2)    
+          (2*pdfFunction(par,output="ll",parameterisation) -
+           pdfFunction(par+hplus1,output="ll",parameterisation) - 
+           pdfFunction(par-hplus1,output="ll",parameterisation))/(hval^2)    
     }    
     else {
       #### Add an amount to parameter i and add an amount to hpar
       
       hplus1[hpar]=hval; hplus2[i]=hval;
-      d2[i] = (    pdfFunction(par+hplus1-hplus2,output="ll") +
-                    pdfFunction(par-hplus1+hplus2,output="ll") -
-                    pdfFunction(par-hplus1-hplus2,output="ll") -
-                    pdfFunction(par+hplus1+hplus2,output="ll")
+      d2[i] = (    pdfFunction(par+hplus1-hplus2,parameterisation,output="ll") +
+                    pdfFunction(par-hplus1+hplus2,parameterisation,output="ll") -
+                    pdfFunction(par-hplus1-hplus2,parameterisation,output="ll") -
+                    pdfFunction(par+hplus1+hplus2,parameterisation,output="ll")
       ) / (4*hval*hval)
     }
   }
@@ -386,14 +390,14 @@ numericalDerivativeSE_SAMPLE <- function(par,n) {
   return(sqrt(diag(solve(avg_ses_n[1:4,1:4]))))
 }
 
-numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01) {
+numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01,parameterisation="B2") {
   
   #test=FALSE; npar=c(1:4); hval=.001; par=c(10,12,1,1,1*10,1*12)
   #test=TRUE; npar=c(3,1); hval=.001; par=c(10,12,2,1,2*10,.1*12)
   
   d2matrix=matrix(nrow=6,ncol=6)
   for (i in 1:6) {
-    d2matrix[i,]=diff2Function(par,hval=hval,hpar=i,test=test)
+    d2matrix[i,]=diff2Function(par,hval=hval,hpar=i,test=test,parameterisation)
   }
   d2matrix[npar,npar]
   ###For test function
@@ -407,18 +411,27 @@ numericalDerivativeSE <- function(par,test=FALSE,npar=c(1:4),hval=.01) {
 
 ###WORKING SECTION
 
-numDerivResults <- matrix(nrow=400,ncol=6)
+numDerivResults <- matrix(nrow=400,ncol=7)
 n=1000;
 i = 1
+origmu1=10
+origmu2=12
 for (a in .1+.1*1:20) {
   for (b in .1+.1*1:20) {
     print(i)
-    mu1=log(a*1/10); mu2=log(a*1/12);  ###Changes a lot based on y1/y2
-    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
     
-    numDerivResults[i,1:4] <- sqrt(numericalDerivativeSE(par)/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
-    numDerivResults[i,5] <- a
-    numDerivResults[i,6] <- b
+    #B_2 parameterisation
+    mu1=log(a*1/origmu1); mu2=log(a*1/origmu2);  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+    numDerivResults[i,1:4] <- sqrt(numericalDerivativeSE(par,parameterisation="B2")/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
+    
+    #B_t parameterisation
+    mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1));  ###Changes a lot based on y1/y2
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
+    numDerivResults[i,5] <- sqrt(numericalDerivativeSE(par,parameterisation="Bt")/n)[2] #sqrt(numericalDerivativeSE(par))/sqrt(n)
+    
+    numDerivResults[i,6] <- a
+    numDerivResults[i,7] <- b
     i = i+1
   }
 }
@@ -426,12 +439,13 @@ numDerivResults
 #library(ExtDist)
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
-colnames(numDerivResults) <- c("mu1_se","mu2_se","a_se","b_se","a","b")
-save(numDerivResults,file="numDerivResults.rds")
+colnames(numDerivResults) <- c("mu1_se","mu2_se_B2","a_se","b_se","mu2_se_Bt","a","b")
+#save(numDerivResults,file="numDerivResults.rds")
 
-par(mfrow=c(1,2))
+par(mfrow=c(1,3))
 plot(tau,numDerivResults[,1])
 plot(tau,numDerivResults[,2])
+plot(tau,numDerivResults[,5])
 
 
 ###Need to calculate these derivatives at a given point

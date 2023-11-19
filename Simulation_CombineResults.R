@@ -118,7 +118,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   ggsave(file="simulation__bias_charts_all_in_one.png",last_plot(),width=8,height=2.5,dpi=900)
   
 ###################### ERROR CHARTS #####################
-  load("numDerivResults.rds")
+
   data_input<-as.data.frame(cbind(t1error,tau,numDerivResults[,c(1,2)]))
   error_1_plot<-ggplot() + ylim(0,.08) + xlim(0,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{1}})$")) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),linetype="dotted",se=FALSE) + 
@@ -136,12 +136,10 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   #theme(legend.position = "right", legend.title=element_text(size=20),
   #      legend.text=element_text(size=14))
   
-  
-  load("numDerivResults.rds")
   data_input<-as.data.frame(cbind(t2error,tau,numDerivResults[,c(1,2)]))
   error_2_plot<-
     ggplot() + ylim(0,.08) + xlim(0,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{2}})$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=mu2_se, color="MLE"),linetype = "dashed",level=.95,se=FALSE) +
+    geom_smooth(data=data_input, aes(x=tau, y=mu2_se_B2, color="MLE"),linetype = "dashed",level=.95,se=FALSE) +
     #geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
     #geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
     #geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
@@ -152,11 +150,10 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
     scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","MLE")
                         , values=brewer.pal(n = 7, name = "Dark2"))
 
-  load("numDerivResults_Bt.rds")
-  data_input<-as.data.frame(cbind(t2error,tau,numDerivResults[,c(1,2)]))
+  data_input<-as.data.frame(cbind(t2error,tau,numDerivResults[,c(1,5)]))
   error_2_plot_bt<-
     ggplot() + ylim(0,.08) + xlim(0,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{t}})$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=mu2_se, color="MLE"),linetype = "dashed",level=.95,se=FALSE) +
+    geom_smooth(data=data_input, aes(x=tau, y=mu2_se_Bt, color="MLE"),linetype = "dashed",level=.95,se=FALSE) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.95,,linetype="dotted",se=FALSE) + 
     geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.95,linetype="dotdash",se=FALSE) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.95,se=FALSE) +
@@ -170,10 +167,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-  ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
-  
-  
-  
+  #ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
   
   
 #########Time 1 BIAS AND ERROR AGAINST TAU (OLD - separate plots) ##############
