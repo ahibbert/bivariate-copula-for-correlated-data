@@ -139,53 +139,49 @@ optim(par=c(1.5,1.5,1.5,1.5), fn=maximiserForPDF
 ########################################################## 3.1 MLE CALCULATION FUNCTIONS #############################################
 
 #########Calculates log-likelihood for full sample
-maximiserForPDF <- function(par, y1vector, y2vector) {
+maximiserForPDF <- function(par, y1vector, y2vector,parameterisation="B2") {
   pdfEstimates <- vector()
   for (i in 1:length(y1vector)) {
     tryCatch(
       {      
-        y1=y1vector[i]; y2=y2vector[i]; pdfEstimates[i] <- bivGammaPDFRE(c(par[1:4],y1,y2),output="ll");
+        y1=y1vector[i]; y2=y2vector[i]; pdfEstimates[i] <- bivGammaPDFRE(c(par[1:4],y1,y2),parameterisation,output="ll");
       },error=function(e){print("ERROR")})
   }
   sum(-(pdfEstimates[is.na(pdfEstimates)==FALSE]))
 }
 
 #############Simulates bivariate gamma and estimates best parameters based on log likelihood
-mle_simulation <- function(par,n,sims) {
+mle_simulation <- function(par,n,sims,parameterisation) {
   
   #Make results blank
   optim_results <- data.frame()
   
   for (i in 1:sims) {
-    print(i)
+    print(paste(i," | ", par[3], " | ", par[4]))
     set.seed(i)
     
-    a = par[3]
-    b = par[4]
-    #mu1 = par[1]
-    #mu2 = par[2]
-    mu1 = a/exp(par[1])
-    mu2 = a/exp(par[2])
-    #mu2 = mu1/exp(par[2])
-    
     #1. Generate
-    w<-rbeta(n,a,b)
-    gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1)
-    gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2)
+    w<-rbeta(n=n,par[3],par[4])
+    gamma_c_mu1<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[1])/par[3])
+    gamma_c_mu2<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[2])/par[3])
     
     #2.Calculate full likelihood
     #maximiserForPDF(par)
   
     #3. Get parameter estimates  
-    optim_result<-optim(par=c(log(1.5),log(1.5),1.5,1.5), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
-          , control = c(maxit=10000,trace=1), lower=c(NA,NA,0.1,0.1))$par
+    if (parameterisation=="Bt") {startingVal=log(11/13)} else {startingVal=log(1/11)}
+    
+    optim_result<-tryCatch(
+      {      optim(par=c(log(1/11),startingVal,1.5,1.5), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
+                        ,parameterisation=parameterisation
+                        , control = c(maxit=10000,trace=1), lower=c(NA,NA,0.1,0.1))$par},error=function(e){c(NA,NA,NA,NA)})
     
     optim_results[i,1] <- optim_result[1]
     optim_results[i,2] <- optim_result[2]
     optim_results[i,3] <- optim_result[3]
     optim_results[i,4] <- optim_result[4]
-    optim_results[i,5] <- log(a/exp(par[1]))
-    optim_results[i,6] <- log(a/exp(par[2]))
+    optim_results[i,5] <- exp(par[1])/a
+    optim_results[i,6] <- exp(par[2])/a
     optim_results[i,7] <- a
     optim_results[i,8] <- b
   }
@@ -196,56 +192,76 @@ mle_simulation <- function(par,n,sims) {
 
 ###Quick test of MLE simulation
 set.seed(100)
-a=1;b=1;
-par=c(log(a/1),log(a/2),a,b,1,1)
-optim_results_output<-mle_simulation(par[1:4],n=1000,sims=100)
-
+origmu1=10; origmu2=12; a=1; b=1
+#For B_2
+mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
+par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "B2")
+sd(optim_results_output[,1])
+sd(optim_results_output[,2])
+#For B_t
+mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1));
+par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
+optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "Bt")
+sd(optim_results_output[,1])
+sd(optim_results_output[,2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
-optim_results_output_combined<-data.frame()
-n=1000;
-
-for (a in c(0.5,1,1.5)) {
-  for (b in c(0.5,1,1.5)) {
-    mu1=log(a/1);mu2=log(a/2);y1=1;y2=1;
-    optim_results_output<-mle_simulation(c(mu1,mu2,a,b),n=n,sims=sims)
-    if (nrow(optim_results_output_combined)==0) {
-      optim_results_output_combined = optim_results_output
-    } else {
-      optim_results_output_combined<-rbind(optim_results_output_combined,optim_results_output)  
-    }
+set.seed(100)
+n=100; sims=20;
+origmu1=10; origmu2=12; a=1; b=1
+se_mles <- matrix(ncol=7,nrow=9)
+i=1
+for (a in c(.25,1,1.75)) {
+  for (b in c(.25,1,1.75)) {
+    
+    #For B_2
+    mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+    optim_results_output_B2<-mle_simulation(par[1:4],n=n,sims=sims,parameterisation = "B2")
+    
+    mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1)); 
+    par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
+    optim_results_output_Bt<-mle_simulation(par[1:4],n=n,sims=sims,parameterisation = "Bt")
+    
+    se_mles[i,1]=sd(optim_results_output_B2[,1][!is.na(optim_results_output_B2[,1])])
+    se_mles[i,2]=sd(optim_results_output_B2[,2][!is.na(optim_results_output_B2[,2])])
+    se_mles[i,3]=sd(optim_results_output_Bt[,2][!is.na(optim_results_output_Bt[,2])])
+    se_mles[i,4]=a
+    se_mles[i,5]=b
+    se_mles[i,6]=origmu1
+    se_mles[i,7]=origmu2
+    
+    i=i+1
   }
 }
 
-optim_results_output_combined_save<-optim_results_output_combined
+colnames(se_mles) <- c("mu1_se","mu2_se_b2","mu2_se_bt","a","b","mu1","mu2")
+#save(se_mles,file="se_mles_20231121.rds")
+#load(file="se_mles_20231121.rds")
 
-#save(optim_results_output_combined_save,file="optim_results_output_combined_save231109.rds")
+se_mles<-cbind(se_mles,c(NA,NA,NA,NA,NA,NA,NA,NA,NA))
+
+origmu1=10; origmu2=12; n=1000
+for (i in 1:nrow(se_mles)) {
+  a=se_mles[i,"a"]
+  b=se_mles[i,"b"]
+  mu1=log(a*1/origmu1); mu2=log(a*1/origmu2);
+  par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+  w<-rbeta(n=n,par[3],par[4])
+  gamma_c_mu1<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[1])/par[3])
+  gamma_c_mu2<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[2])/par[3])
+  se_mles[i,8]=cor(gamma_c_mu1,gamma_c_mu2,method="kendall") 
+}
+
+par(mfrow=c(1,3))
+plot(se_mles[,8],se_mles[,1],ylim=c(0,.1))
+plot(se_mles[,8],se_mles[,2],ylim=c(0,.1))
+plot(se_mles[,8],se_mles[,3],ylim=c(0,.1))
 
 #########Load and analyse
-#load(file="optim_results_output_combined_save231109.rds")
-#optim_results_output<-optim_results_output_combined_save
-colnames(optim_results_output)<-c("mu1_est","mu2_est","a_est","b_est","mu1_act","mu2_act","a_act","b_act")
+#load(file="se_mles_20231121.rds")
 
-aval=1;bval=1;
-mu1_hat = optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE,1]
-mu2_hat = optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE,2]
-a_hat =   optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE,3]
-b_hat =   optim_results_output[optim_results_output$a_act==aval & optim_results_output$b_act==bval & is.na(optim_results_output$mu1_est)==FALSE,4]
-
-###Mean and variance
-
-mean(mu1_hat); sd((mu1_hat)); 
-mean(mu2_hat); sd((mu2_hat)); 
-#mean(a_hat); sd(a_hat)
-#mean(b_hat); sd(b_hat)
-
-
-####Variance / sd for mean at time 1 and 2 are equivalent to alpha * mu1 and alpha * mu2
-
-sd(mu1_hat*a_hat) ###equivalent to manual calculation of Var(XY)= E(X^2 Y^2)- (E(XY))^2
-sd(mu2_hat*a_hat) ###SD for mu2 Var(XY)= E(X^2 Y^2)- (E(XY))^2???
-
-sd(mu2_hat-mu1_hat)
 
 ################## 4. Numerical differentiation####################
 
@@ -456,7 +472,7 @@ numDerivResults
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
 colnames(numDerivResults) <- c("mu1_se","mu2_se_B2","a_se","b_se","mu2_se_Bt","a","b")
-#save(numDerivResults,file="numDerivResults.rds")
+save(numDerivResults,file="numDerivResults_20231121.rds")
 
 par(mfrow=c(1,3))
 plot(tau,numDerivResults[,1])

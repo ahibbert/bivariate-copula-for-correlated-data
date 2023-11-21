@@ -12,6 +12,8 @@ library(RColorBrewer)
 set.seed(1000)
 options(scipen=999)
 
+cbind(tau,parameters)
+
 a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
 
   #write.csv(cbind(parameters,tau,marginal_skew_1,marginal_skew_2, t1intercepts, t2intercepts,t1error,t2error),file="SimulationResults.csv")
