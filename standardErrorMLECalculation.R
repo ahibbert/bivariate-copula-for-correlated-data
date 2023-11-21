@@ -174,7 +174,7 @@ mle_simulation <- function(par,n,sims,parameterisation) {
     optim_result<-tryCatch(
       {      optim(par=c(log(1/11),startingVal,1.5,1.5), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
                         ,parameterisation=parameterisation
-                        , control = c(maxit=10000,trace=1), lower=c(NA,NA,0.1,0.1))$par},error=function(e){c(NA,NA,NA,NA)})
+                        , control = c(maxit=10000,trace=0), lower=c(NA,NA,0.1,0.1))$par},error=function(e){c(NA,NA,NA,NA)})
     
     optim_results[i,1] <- optim_result[1]
     optim_results[i,2] <- optim_result[2]
@@ -208,13 +208,15 @@ sd(optim_results_output[,2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 set.seed(100)
-n=100; sims=20;
+n=1000; sims=100;
 origmu1=10; origmu2=12; a=1; b=1
-se_mles <- matrix(ncol=7,nrow=9)
+se_mles <- matrix(ncol=7,nrow=100)
 i=1
-for (a in c(.25,1,1.75)) {
-  for (b in c(.25,1,1.75)) {
+start=Sys.time()
+for (a in c(.2,1,1.6)) {
+  for (b in c(.2,1,1.6)) {
     
+    print(paste(i,a,b,Sys.time()-start))
     #For B_2
     mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
     par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
@@ -237,10 +239,10 @@ for (a in c(.25,1,1.75)) {
 }
 
 colnames(se_mles) <- c("mu1_se","mu2_se_b2","mu2_se_bt","a","b","mu1","mu2")
-#save(se_mles,file="se_mles_20231121.rds")
+save(se_mles,file="se_mles_20231121_n1000sims100.rds")
 #load(file="se_mles_20231121.rds")
 
-se_mles<-cbind(se_mles,c(NA,NA,NA,NA,NA,NA,NA,NA,NA))
+se_mles<-cbind(se_mles,matrix(NA,ncol=1,nrow=nrow(se_mles)))
 
 origmu1=10; origmu2=12; n=1000
 for (i in 1:nrow(se_mles)) {
@@ -254,10 +256,17 @@ for (i in 1:nrow(se_mles)) {
   se_mles[i,8]=cor(gamma_c_mu1,gamma_c_mu2,method="kendall") 
 }
 
-par(mfrow=c(1,3))
-plot(se_mles[,8],se_mles[,1],ylim=c(0,.1))
-plot(se_mles[,8],se_mles[,2],ylim=c(0,.1))
-plot(se_mles[,8],se_mles[,3],ylim=c(0,.1))
+par(mfrow=c(2,3))
+plot(se_mles[c(1:9,11:100),8],se_mles[c(1:9,11:100),1]/sqrt(10),ylim=c(0,.06))
+curve_values1 <- loess(se_mles[c(1:9,11:100),1]/sqrt(10) ~ se_mles[c(1:9,11:100),8]) 
+plot(se_mles[,8],se_mles[,2]/sqrt(10),ylim=c(0,.06))
+curve_values2 <- loess(se_mles[c(1:9,11:100),2]/sqrt(10) ~ se_mles[c(1:9,11:100),8]) 
+plot(se_mles[,8],se_mles[,3]/sqrt(10),ylim=c(0,.06))
+curve_values3 <- loess(se_mles[c(1:6,8:100),3]/sqrt(10) ~ se_mles[c(1:6,8:100),8]) 
+
+plot(se_mles[c(1:9,11:100),8],predict(curve_values1),ylim = c(0,.06))
+plot(se_mles[c(1:9,11:100),8],predict(curve_values2),ylim = c(0,.06))
+plot(se_mles[c(1:6,8:100),8],predict(curve_values3),ylim = c(0,.06))
 
 #########Load and analyse
 #load(file="se_mles_20231121.rds")
