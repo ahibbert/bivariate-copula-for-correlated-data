@@ -174,7 +174,7 @@ mle_simulation <- function(par,n,sims,parameterisation) {
     optim_result<-tryCatch(
       {      optim(par=c(log(1/11),startingVal,1.5,1.5), fn=maximiserForPDF, y1vector=gamma_c_mu1, y2vector=gamma_c_mu2
                         ,parameterisation=parameterisation
-                        , control = c(maxit=10000,trace=1), lower=c(NA,NA,0.1,0.1))$par},error=function(e){c(NA,NA,NA,NA)})
+                        , control = c(maxit=10000,trace=0), lower=c(NA,NA,0.1,0.1))$par},error=function(e){c(NA,NA,NA,NA)})
     
     optim_results[i,1] <- optim_result[1]
     optim_results[i,2] <- optim_result[2]
@@ -208,13 +208,15 @@ sd(optim_results_output[,2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 set.seed(100)
-n=100; sims=20;
+n=50; sims=20;
 origmu1=10; origmu2=12; a=1; b=1
 se_mles <- matrix(ncol=7,nrow=9)
 i=1
-for (a in c(.25,1,1.75)) {
-  for (b in c(.25,1,1.75)) {
+start=Sys.time()
+for (a in .1+.1*1:20) {
+  for (b in .1+.1*1:20) {
     
+    print(paste(i, " | ", a, " | ", b, " | Time taken:",(Sys.time()-start)))
     #For B_2
     mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
     par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
