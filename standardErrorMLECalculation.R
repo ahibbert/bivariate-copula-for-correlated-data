@@ -257,16 +257,18 @@ for (i in 1:nrow(se_mles)) {
 }
 
 par(mfrow=c(2,3))
-plot(se_mles[c(1:9,11:100),8],se_mles[c(1:9,11:100),1]/sqrt(10),ylim=c(0,.06))
-curve_values1 <- loess(se_mles[c(1:9,11:100),1]/sqrt(10) ~ se_mles[c(1:9,11:100),8]) 
-plot(se_mles[,8],se_mles[,2]/sqrt(10),ylim=c(0,.06))
-curve_values2 <- loess(se_mles[c(1:9,11:100),2]/sqrt(10) ~ se_mles[c(1:9,11:100),8]) 
-plot(se_mles[,8],se_mles[,3]/sqrt(10),ylim=c(0,.06))
-curve_values3 <- loess(se_mles[c(1:6,8:100),3]/sqrt(10) ~ se_mles[c(1:6,8:100),8]) 
+adjuster=1
+###Need to exclude some outliers
+plot(se_mles[,8],se_mles[,1]/sqrt(adjuster),ylim=c(0,.1))
+curve_values1 <- loess(se_mles[,1]/sqrt(adjuster) ~ se_mles[,8]) 
+plot(se_mles[,8],se_mles[,2]/sqrt(adjuster),ylim=c(0,.1))
+curve_values2 <- loess(se_mles[,2]/sqrt(adjuster) ~ se_mles[,8]) 
+plot(se_mles[,8],se_mles[,3]/sqrt(adjuster),ylim=c(0,.1))
+curve_values3 <- loess(se_mles[,3]/sqrt(adjuster) ~ se_mles[,8]) 
 
-plot(se_mles[c(1:9,11:100),8],predict(curve_values1),ylim = c(0,.06))
-plot(se_mles[c(1:9,11:100),8],predict(curve_values2),ylim = c(0,.06))
-plot(se_mles[c(1:6,8:100),8],predict(curve_values3),ylim = c(0,.06))
+plot(se_mles[,8],predict(curve_values1),ylim = c(0,.1))
+plot(se_mles[,8],predict(curve_values2),ylim = c(0,.1))
+plot(se_mles[,8],predict(curve_values3),ylim = c(0,.1))
 
 #########Load and analyse
 #load(file="se_mles_20231121.rds")
