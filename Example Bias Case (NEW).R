@@ -18,6 +18,7 @@ gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=mu2) #Mean 12 * .5 = 6
 patient<-as.factor(seq(1:n))
 dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
 colnames(dataset)<-c("patient","random_variable","time")
+dataset<-dataset[order(dataset$patient),]
 
 ################# 1. Investigating the dependence structure and best copula fit #############
 require(GJRM)
@@ -176,7 +177,6 @@ ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
 
 ################# 2. GLM, GEE, GLMM fits to the data #########
 
-
 ### Running all models
 require(gamlss)
 require(gee)
@@ -185,8 +185,7 @@ require(mgcv)
 library(geepack)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log", corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
 model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
