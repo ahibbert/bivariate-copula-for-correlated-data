@@ -208,15 +208,15 @@ sd(optim_results_output[,2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 set.seed(100)
-n=50; sims=20;
+n=100; sims=100;
 origmu1=10; origmu2=12; a=1; b=1
-se_mles <- matrix(ncol=7,nrow=9)
+se_mles <- matrix(ncol=7,nrow=100)
 i=1
 start=Sys.time()
-for (a in .1+.1*1:20) {
-  for (b in .1+.1*1:20) {
+for (a in c(.2,.6,1.2,1.6,2)) {
+  for (b in c(.2,.6,1.2,1.6,2)) {
     
-    print(paste(i, " | ", a, " | ", b, " | Time taken:",(Sys.time()-start)))
+    print(paste(i,a,b,Sys.time()-start))
     #For B_2
     mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
     par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
@@ -238,32 +238,9 @@ for (a in .1+.1*1:20) {
   }
 }
 
-colnames(se_mles) <- c("mu1_se","mu2_se_b2","mu2_se_bt","a","b","mu1","mu2")
-#save(se_mles,file="se_mles_20231121.rds")
-#load(file="se_mles_20231121.rds")
+colnames
 
-se_mles<-cbind(se_mles,c(NA,NA,NA,NA,NA,NA,NA,NA,NA))
-
-origmu1=10; origmu2=12; n=1000
-for (i in 1:nrow(se_mles)) {
-  a=se_mles[i,"a"]
-  b=se_mles[i,"b"]
-  mu1=log(a*1/origmu1); mu2=log(a*1/origmu2);
-  par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
-  w<-rbeta(n=n,par[3],par[4])
-  gamma_c_mu1<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[1])/par[3])
-  gamma_c_mu2<-w*rgamma(n,shape=par[3]+par[4],scale=exp(par[2])/par[3])
-  se_mles[i,8]=cor(gamma_c_mu1,gamma_c_mu2,method="kendall") 
-}
-
-par(mfrow=c(1,3))
-plot(se_mles[,8],se_mles[,1],ylim=c(0,.1))
-plot(se_mles[,8],se_mles[,2],ylim=c(0,.1))
-plot(se_mles[,8],se_mles[,3],ylim=c(0,.1))
-
-#########Load and analyse
-#load(file="se_mles_20231121.rds")
-
+save(se_mles,file="se_mles_20231127_n100sims100.rds")
 
 ################## 4. Numerical differentiation####################
 
@@ -474,12 +451,58 @@ numDerivResults
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
 colnames(numDerivResults) <- c("mu1_se","mu2_se_B2","a_se","b_se","mu2_se_Bt","a","b")
-save(numDerivResults,file="numDerivResults_20231121.rds")
+#save(numDerivResults,file="numDerivResults_20231121.rds")
 
-par(mfrow=c(1,3))
-plot(tau,numDerivResults[,1])
-plot(tau,numDerivResults[,2])
-plot(tau,numDerivResults[,5])
+
+###################### 5. Plotting MLEs for all methods #####################
+
+require(latex2exp)
+require(ggplot2)
+require(ggpubr)
+library(RColorBrewer)
+
+load(file="se_mles_20231121_n100sims20.rds")
+
+colnames(se_mles) <- c("mu1_se","mu2_se_B2","mu2_se_Bt","a","b","mu1","mu2")
+tau_plus_par<-cbind(tau,parameters)
+colnames(tau_plus_par) <- c("tau","a","b","mu1","mu2")
+se_mles_tau<-merge(se_mles,tau_plus_par,by.x=c("a","b"),by.y=c("a","b"))
+
+numDevMLEs <- as.data.frame(cbind(tau,numDerivResults[,c(1,2,5)]))
+
+plot1 <- ggplot(numDevMLEs, aes(x = V1, y = mu1_se)) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+plot2 <- ggplot(numDevMLEs, aes(x = V1, y = mu2_se_B2)) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+plot3 <- ggplot(numDevMLEs, aes(x = V1, y = mu2_se_Bt)) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+
+plot4 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu1_se/sqrt(10))) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+plot5 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu2_se_B2/sqrt(10))) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+plot6 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu2_se_Bt/sqrt(10))) + geom_point() + 
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+
+ggarrange(plot1,plot2,plot3,plot4,plot5,plot6,nrow=2,ncol=3)
+
+
+#load(file="se_mles_20231121.rds")
+
+par(mfrow=c(2,3))
+adjuster=1
+###Need to exclude some outliers
+plot(se_mles[,8],se_mles[,1]/sqrt(adjuster),ylim=c(0,.1))
+curve_values1 <- loess(se_mles[,1]/sqrt(adjuster) ~ se_mles[,8]) 
+plot(se_mles[,8],se_mles[,2]/sqrt(adjuster),ylim=c(0,.1))
+curve_values2 <- loess(se_mles[,2]/sqrt(adjuster) ~ se_mles[,8]) 
+plot(se_mles[,8],se_mles[,3]/sqrt(adjuster),ylim=c(0,.1))
+curve_values3 <- loess(se_mles[,3]/sqrt(adjuster) ~ se_mles[,8]) 
+
+plot(se_mles[,8],predict(curve_values1),ylim = c(0,.1))
+plot(se_mles[,8],predict(curve_values2),ylim = c(0,.1))
+plot(se_mles[,8],predict(curve_values3),ylim = c(0,.1))
+
 
 
 ###Need to calculate these derivatives at a given point
