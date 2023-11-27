@@ -191,30 +191,30 @@ mle_simulation <- function(par,n,sims,parameterisation) {
 ########################################################## 3.2 MLE RUN #############################################
 
 ###Quick test of MLE simulation
-set.seed(100)
-origmu1=10; origmu2=12; a=1; b=1
+#set.seed(100)
+#origmu1=10; origmu2=12; a=1; b=1
 #For B_2
-mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
-par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
-optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "B2")
-sd(optim_results_output[,1])
-sd(optim_results_output[,2])
+#mu1=log(a*1/origmu1); mu2=log(a*1/origmu2); 
+#par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+#optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "B2")
+#sd(optim_results_output[,1])
+#sd(optim_results_output[,2])
 #For B_t
-mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1));
-par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
-optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "Bt")
-sd(optim_results_output[,1])
-sd(optim_results_output[,2])
+#mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1));
+#par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
+#optim_results_output<-mle_simulation(par[1:4],n=1000,sims=5,parameterisation = "Bt")
+#sd(optim_results_output[,1])
+#sd(optim_results_output[,2])
 
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 set.seed(100)
-n=100; sims=100;
+n=100; sims=20;
 origmu1=10; origmu2=12; a=1; b=1
-se_mles <- matrix(ncol=7,nrow=100)
+se_mles <- matrix(ncol=7,nrow=400)
 i=1
 start=Sys.time()
-for (a in c(.2,.6,1.2,1.6,2)) {
-  for (b in c(.2,.6,1.2,1.6,2)) {
+for (a in .1+.1*1:20) {
+  for (b in .1+.1*1:20) {
     
     print(paste(i,a,b,Sys.time()-start))
     #For B_2
@@ -238,9 +238,8 @@ for (a in c(.2,.6,1.2,1.6,2)) {
   }
 }
 
-colnames
-
-save(se_mles,file="se_mles_20231127_n100sims100.rds")
+colnames(se_mles) <- c("mu1_se","mu2_se_B2","mu2_se_Bt","a","b","mu1","mu2")
+save(se_mles,file="se_mles_20231127_n100sims20_ALL.rds")
 
 ################## 4. Numerical differentiation####################
 
@@ -462,6 +461,7 @@ require(ggpubr)
 library(RColorBrewer)
 
 load(file="se_mles_20231121_n100sims20.rds")
+load(file="numDerivResults_20231121.rds")
 
 colnames(se_mles) <- c("mu1_se","mu2_se_B2","mu2_se_Bt","a","b","mu1","mu2")
 tau_plus_par<-cbind(tau,parameters)
@@ -471,18 +471,18 @@ se_mles_tau<-merge(se_mles,tau_plus_par,by.x=c("a","b"),by.y=c("a","b"))
 numDevMLEs <- as.data.frame(cbind(tau,numDerivResults[,c(1,2,5)]))
 
 plot1 <- ggplot(numDevMLEs, aes(x = V1, y = mu1_se)) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 plot2 <- ggplot(numDevMLEs, aes(x = V1, y = mu2_se_B2)) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 plot3 <- ggplot(numDevMLEs, aes(x = V1, y = mu2_se_Bt)) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 
 plot4 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu1_se/sqrt(10))) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 plot5 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu2_se_B2/sqrt(10))) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 plot6 <- ggplot(as.data.frame(se_mles_tau), aes(x = tau, y = mu2_se_Bt/sqrt(10))) + geom_point() + 
-  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.15)
+  stat_smooth(method = "loess", se = FALSE, span = 1) + ylim(0,.1)
 
 ggarrange(plot1,plot2,plot3,plot4,plot5,plot6,nrow=2,ncol=3)
 
