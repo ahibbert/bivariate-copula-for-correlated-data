@@ -1,3 +1,5 @@
+############## 0. Required functions ################### 
+
 simulateCorrelatedVarNOGJRM <- function(n,a,b,mu1,mu2)  {
   
   set.seed(100)
@@ -8,7 +10,7 @@ simulateCorrelatedVarNOGJRM <- function(n,a,b,mu1,mu2)  {
   require(gee)
   require(VGAM)
   
-  #Simulating bivariate random variable according to functional input
+    #Simulating bivariate random variable according to functional input
   w<-rbeta(n,a,b)
   gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu1)
   gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu2)
@@ -18,6 +20,8 @@ simulateCorrelatedVarNOGJRM <- function(n,a,b,mu1,mu2)  {
   dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0)
                                ,cbind(patient,gamma_c_mu2,1)))
   colnames(dataset)<-c("patient","random_variable","time")
+  
+  dataset<-dataset[order(dataset$patient),]
   
   #Running generalised linear model for the realisation
   model_glm <- glm(random_variable~as.factor(time==1)
@@ -176,10 +180,10 @@ simulateCorrelatedVarGJRM <- function(n,a,b,mu1,mu2)  {
   return(output)
 }
 
-##############Run simulations for non-GJRM models
+############## 1. Run simulations for non-GJRM models########################
 results<-list()
 #a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=100
-a=.2+.1*1:20; b=.2+.1*1:20; mu1=10; mu2=12; n=1000
+a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
 
 #Code to iterate through various shapes of the bivariate distribution and fit the non-GJRM models
 i=1; j=1; k=1; l=1; z=1;
@@ -205,12 +209,12 @@ for (i in 1:length(a)) {
 }
 
 results_re <- results
-save(results_re,file="results_NOGJRM_n1000_geefix_mu1mu21012.rds")
+save(results_re,file="results_NOGJRM_n1000_geefix_mu1mu21012_GEEFIXV2.rds")
 
-##############Run simulations for GJRM models
+############## 2. Run simulations for GJRM models#############################
 results<-list()
 #a=.1+.1*1:20; b=.1+.1*1:20; mu1=1; mu2=2; n=100
-a=.2+.1*1:20; b=.2+.1*1:20; mu1=10; mu2=12; n=1000
+a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
 
 #Code to iterate through various shapes of the bivariate distribution and fit the GJRM models
 i=1; j=1; k=1; l=1; z=1;
@@ -237,17 +241,16 @@ for (i in 1:length(a)) {
 results_gjrm<-results
 save(results_gjrm,file="results_GJRM_C0_N_n1000_geefix_mu1mu21012.rds")
 
-
 #load(file="results_GJRM.rds")
 #load(file="results_GJRM_AMH.rds")
 
-#######Combine GJRM and non-GJRM results into one table for comparison
-load(file="results_NOGJRM_n1000_geefix_mu1mu21020.rds")
-load(file="results_GJRM_C0_N_n1000_geefix_mu1mu21020.rds")
+######### 3. Combine GJRM and non-GJRM results into one table for comparison######
+load(file="results_NOGJRM_n1000_geefix_mu1mu21012_GEEFIXV2.rds")
+load(file="results_GJRM_C0_N_n1000_geefix_mu1mu21012.rds")
 
 results=results_gjrm
 for(i in 1:length(results_gjrm)) {
   results[[i]][1:7,]=results_gjrm[[i]][1:7,]+results_re[[i]][1:7,]
 }
 
-save(results,file="results_combined_N_C0_n1000_geefix_mu1mu21020.rds")
+save(results,file="results_combined_N_C0_n1000_geefix_mu1mu21020_GEEFIXV2.rds")
