@@ -450,7 +450,7 @@ numDerivResults
 #eGamma(rgamma(n=1000,shape=1,scale=10)) ##SE Benchmark using method of moments
 
 colnames(numDerivResults) <- c("mu1_se","mu2_se_B2","a_se","b_se","mu2_se_Bt","a","b")
-#save(numDerivResults,file="numDerivResults_20231121.rds")
+save(numDerivResults,file="numDerivResults_20231127.rds")
 
 
 ###################### 5. Plotting MLEs for all methods #####################

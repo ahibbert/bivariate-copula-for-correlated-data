@@ -253,4 +253,4 @@ for(i in 1:length(results_gjrm)) {
   results[[i]][1:7,]=results_gjrm[[i]][1:7,]+results_re[[i]][1:7,]
 }
 
-save(results,file="results_combined_N_C0_n1000_geefix_mu1mu21020_GEEFIXV2.rds")
+save(results,file="results_combined_N_C0_n1000_geefix_mu1mu21012_GEEFIXV2.rds")
