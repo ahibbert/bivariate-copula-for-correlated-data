@@ -127,13 +127,14 @@ n=length(gamma_c_mu1)
 patient<-as.factor(seq(1:n))
 dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
 colnames(dataset)<-c("patient","random_variable","time")
+dataset<-dataset[order(dataset$patient),]
 
 #Loading required pacakges
 require(gamlss); require(gee); require(geepack);
 
 #Running each of the models for the application dataset
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), mean.link = "log",corstr = "exchangeable",control=geese.control(trace=TRUE,maxit=10000))
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"),corstr = "exchangeable")
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient))
                          ,data=dataset,family=GA(),method=RS())
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
@@ -147,11 +148,10 @@ summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[4]
 )
 
-
-summary_gee<-c( summary(model_gee)$mean[1,1]
-                ,summary(model_gee)$mean[2,1]
-                ,summary(model_gee)$mean[1,2] #Robust SE - look into this
-                ,summary(model_gee)$mean[2,2] #Robust SE - look into this
+summary_gee<-c( summary(model_gee)$coeff[1]
+                ,summary(model_gee)$coeff[2]
+                ,summary(model_gee)$coeff[3] 
+                ,summary(model_gee)$coeff[4] 
 )
 
 invisible(capture.output(
@@ -266,7 +266,7 @@ model_copula_h<-gjrm(fl, margins = c("GA" , "GA") , copula = "HO",data=data.fram
   
   application_model_summary2<-cbind(application_model_summary,exp(application_model_summary[,1]),exp(application_model_summary[,2]+application_model_summary[,1]))
   colnames(application_model_summary2) <- c("bm1","bm2","se1","se2","ebm1","ebm1plus2")
-  application_model_summary2
+  application_model_summary2[,c(5,6,1,2,3,4,4)]
   
   #help("gjrm")
   #summary(model_copula$logLik)
