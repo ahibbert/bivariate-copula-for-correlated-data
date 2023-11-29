@@ -187,7 +187,7 @@ require(mgcv)
 library(geepack)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
+model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
 model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
@@ -201,10 +201,10 @@ summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[3]
                 ,summary(model_glm)$coeff[4]
 )
-summary_gee<-c( summary(model_gee)$mean[1,1]
-                ,summary(model_gee)$mean[2,1] + summary(model_gee)$mean[1,1]
-                ,summary(model_gee)$mean[1,2] #Robust SE - look into this
-                ,summary(model_gee)$mean[2,2] #Robust SE - look into this
+summary_gee<-c( summary(model_gee)$coeff[1]
+                ,summary(model_gee)$coeff[2]+summary(model_gee)$coeff[1]
+                ,summary(model_gee)$coeff[3] 
+                ,summary(model_gee)$coeff[4] 
 )
 
 invisible(capture.output(
@@ -221,8 +221,8 @@ invisible(capture.output(
                  ,summary(model_re)[6]
   )
 ))
-actuals<-c( log(a*(1/mu1))
-            , log(a*(1/mu2))
+actuals<-c( log(a*(mu1))
+            , log(a*(mu2))
             , 0#model_copula$tau
             , 0
 )
@@ -275,29 +275,29 @@ summary_cop_n<-c( model_copula_n$coefficients[1]
 ########### 4. Combining results #########
 
 rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
-exp(rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals))
 
-#Results for bias case (EXP)
-#(Intercept) (Intercept)                  
-#summary_glm       0.27790949 0.133037154 1.045690 1.065221
-#summary_gee       0.27790948 0.133037154 1.046683 1.065204
-#summary_re_nosig  0.01844942 0.008929757 1.011789 1.016713
-#summary_re        0.01619289 0.014708712 1.000906 1.023602
-#summary_cop       0.28406920 0.135318812 1.042085 1.041990
-#summary_cop_n     0.41422316 0.197520118 1.054372 1.054211
-#actuals           0.25000000 0.125000000 1.000000 1.000000
+getSE(10,12,.25,1.75,1000)
 
 
-#Results for RE model
-#(Intercept) (Intercept)                        
-#summary_glm         1.802780   1.4608502 0.011221056 0.015868969
-#summary_gee         1.802780   1.4608502 0.012989056 0.015865001
-#summary_re_nosig    1.718899   1.5016149 0.008028506 0.011354022
-#summary_re          1.798033   1.3814264 0.008070156 0.008070156
-#summary_cop         1.809899   1.4542516 0.012965674 0.009114965
-#summary_cop_n       1.802569   1.4611255 0.012861624 0.009052048
-#actuals            -1.386294  -0.6931472 0.000000000 0.000000000
+getSE <- function(origmu1,origmu2,a,b,n) {
 
+  results <- c(0,0,0,0,0)
+  #B_2 parameterisation
+  mu1=log(a*1/origmu1); mu2=log(a*1/origmu2);  ###Changes a lot based on y1/y2
+  par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu2)/a)
+  results[1:4]=sqrt(numericalDerivativeSE(par,parameterisation="B2")/n) #sqrt(numericalDerivativeSE(par))/sqrt(n)
+  
+  #B_t parameterisation
+  mu1=log(a*1/origmu1); mu2=log((1/origmu2)/(1/origmu1));  ###Changes a lot based on y1/y2
+  par=c(mu1,mu2,a,b,exp(mu1)/a,exp(mu1+mu2)/a)
+  results[5]=sqrt(numericalDerivativeSE(par,parameterisation="Bt")/n)[2] #sqrt(numericalDerivativeSE(par))/sqrt(n)
+  
+  return(results)
+
+}
+
+
+rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
 
 ########## 5. Investigating GLMM fits
 
