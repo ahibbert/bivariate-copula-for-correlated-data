@@ -7,12 +7,15 @@
 # a. Simulation parameters
 set.seed(1000)
 options(scipen=999)
-a=1; b=1; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
+a=.25; b=1.75; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
 
 # b. Simualating Nadarajah and Gupta bivariate Gamma
 w<-rbeta(n,a,b) #Mean .5
 gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=mu1) #Mean 6 * .5 = 3
 gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=mu2) #Mean 12 * .5 = 6
+
+mean(gamma_c_mu1)
+mean(gamma_c_mu2)
 
 # c.Setting up as longitiduinal structured data
 patient<-as.factor(seq(1:n))
@@ -129,22 +132,22 @@ fittedTDist=rCopula(n, tCopula(BiCopSelect(u,v,family=2)$par,dim=2,df=BiCopSelec
 z<-ggplot(data = as.data.frame(gamma_c_mu1)) +
   geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=75) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu1, y=dgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])), color="blue", size = .75) +
-  #ylim(0,10) +
-  #xlim(0,2) +
+  ylim(0,.5) +
+  xlim(0,20) +
   labs(x="time 1 margin",title="time 1 margin") +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 x<-ggplot(data = as.data.frame(gamma_c_mu2)) +
   geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=50) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu2, y=dgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])), color="blue", size = .75) +
-  #ylim(0,10) +
+  ylim(0,.5) +
   labs(x="time 2 margin",title="time 2 margin") +
-  #xlim(0,1) +
+  xlim(0,20) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 c<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
   geom_point(size=0.5,color="black") + 
   labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2") +
-  #xlim(0,2) +
-  #ylim(0,1) +
+  xlim(0,20) +
+  ylim(0,20) +
   geom_smooth(method="loess", level=.99) 
 d<-ggplot(data=as.data.frame(cbind(u,v)),aes(x=u,y=v)) +
   #geom_point(size=0.25,color="black") + 
@@ -173,7 +176,6 @@ ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
 #persp(kde2d(u,v,h=.4,n=65),main="Uniform transform of marginals",zlim=c(0,4))
 #persp(kde2d(fittedClayton[,1],fittedClayton[,2],h=.4,n=65),main="Simulated fitted copula",zlim=c(0,4))
 #persp(kde2d(fittedTDist[,1],fittedTDist[,2],h=.4,n=65),main="Simulated fitted normal",zlim=c(0,4))
-
 
 ################# 2. GLM, GEE, GLMM fits to the data #########
 
