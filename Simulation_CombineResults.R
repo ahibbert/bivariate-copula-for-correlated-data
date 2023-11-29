@@ -130,7 +130,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-  #ggsave(file="simulation__bias_charts_all_in_one.png",last_plot(),width=8,height=2.5,dpi=900)
+  #ggsave(file="simulation_bias_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
@@ -182,7 +182,7 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-  #ggsave(file="simulation_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
+  #ggsave(file="simulation_error_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
   
   
 #########Time 1 BIAS AND ERROR AGAINST TAU (OLD - separate plots) ##############
