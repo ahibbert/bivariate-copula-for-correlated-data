@@ -23,10 +23,8 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
   parameters=results[[1]][8,1:4]
   for (i in 2:length(results)) {parameters=rbind(parameters,results[[i]][8,1:4]) }
   
-  ###NOTE THESE ARE THE WRONG WAY AROUND because they are setup for reverse sim atm
   mu1=parameters[,1]/parameters[,3]
   mu2=parameters[,1]/parameters[,4]
-  
   
   t1error=results[[1]][1:6,3]
   for (i in 2:length(results)) {t1error=rbind(t1error,results[[i]][1:6,3]) }
