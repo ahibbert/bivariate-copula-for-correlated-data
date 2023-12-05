@@ -7,7 +7,7 @@ library(moments)
 require(ggpubr)
 require(ggplot2)
 require(dglm)
-require(latex2exp)
+library(latex2exp)
 
 plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
   
@@ -40,7 +40,7 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
       scale_fill_brewer()  +
       xlim(0,xlim) +
       ylim(0,ylim) +
-      labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"), title=TeX(paste("$\\mu_1=",a,"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
+      labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"), title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
   }
   else
   {
@@ -48,7 +48,7 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
       #geom_point(size=0.25,color="black") + 
       geom_density_2d(contour_var="density",bins=cbins,color="black") + 
       scale_fill_brewer() +
-      labs(x = Tex("$Y_1$ (Uniform)"), y=TeX("$Y_2$ (Uniform)"), title=TeX(paste("$\\mu_1=",a,"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
+      labs(x = TeX("$Y_1$ (Uniform)"), y=TeX("$Y_2$ (Uniform)"), title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
   }
   #plot1<-persp(kde2d(gamma_c_mu1,gamma_c_mu2),main="Uniform transform of marginals",axes=T,scale=T,ticktype="detailed",theta=15,xlab="Y1",ylab="Y2",zlab="Density") #zlim=c(0,4) #,h=.4,n=65
   
@@ -60,20 +60,22 @@ options(scipen=999)
 
 plot_list = list()
 
-i=1; plot_list[[i]]<-plotSimBiGamma(a=2, b=.2,mu1=1, mu2=2, n=10000,cbins=12,xlim=6,ylim=3,type="biv");
-i=2; plot_list[[i]]<-plotSimBiGamma(a=.5, b=.2,mu1=1, mu2=2, n=10000,cbins=12,xlim=.1,ylim=.05,type="biv");
-i=3; plot_list[[i]]<-plotSimBiGamma(a=2, b=2,mu1=1, mu2=2, n=10000,cbins=12,xlim=6,ylim=3,type="biv");
-i=4; plot_list[[i]]<-plotSimBiGamma(a=.5, b=2,mu1=1, mu2=2, n=10000,cbins=12,xlim=.1,ylim=.05,type="biv");
+i=1; plot_list[[i]]<-plotSimBiGamma(a=2, b=.2,mu1=10, mu2=12, n=10000,cbins=12,xlim=.5,ylim=.5,type="biv");
+i=2; plot_list[[i]]<-plotSimBiGamma(a=.5, b=.2,mu1=10, mu2=12, n=10000,cbins=12,xlim=.04,ylim=.04,type="biv");
+i=3; plot_list[[i]]<-plotSimBiGamma(a=2, b=2,mu1=10, mu2=12, n=10000,cbins=12,xlim=.5,ylim=.5,type="biv");
+i=4; plot_list[[i]]<-plotSimBiGamma(a=.5, b=2,mu1=10, mu2=12, n=10000,cbins=12,xlim=.04,ylim=.04,type="biv");
 
-i=5; plot_list[[i]]<-plotSimBiGamma(a=2, b=.2,mu1=1, mu2=2, n=10000,cbins=11,xlim=6,ylim=3,type="unif");
-i=6; plot_list[[i]]<-plotSimBiGamma(a=.5, b=.2,mu1=1, mu2=2, n=10000,cbins=11,xlim=.1,ylim=.05,type="unif");
-i=7; plot_list[[i]]<-plotSimBiGamma(a=2, b=2,mu1=1, mu2=2, n=10000,cbins=11,xlim=6,ylim=3,type="unif");
-i=8; plot_list[[i]]<-plotSimBiGamma(a=.5, b=2,mu1=1, mu2=2, n=10000,cbins=11,xlim=.1,ylim=.05,type="unif");
+i=5; plot_list[[i]]<-plotSimBiGamma(a=2, b=.2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.6,ylim=.3,type="unif");
+i=6; plot_list[[i]]<-plotSimBiGamma(a=.5, b=.2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.1,ylim=.05,type="unif");
+i=7; plot_list[[i]]<-plotSimBiGamma(a=2, b=2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.6,ylim=.3,type="unif");
+i=8; plot_list[[i]]<-plotSimBiGamma(a=.5, b=2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.01,ylim=.005,type="unif");
 
 ggarrange(plotlist = plot_list,nrow=2,ncol=4)
 ggsave(file="bivariate_distribution_contours.png",last_plot(),width=12,height=6,dpi=300)
 
 
+
+round((2/10)*10^2)/10^2
 
 
 
