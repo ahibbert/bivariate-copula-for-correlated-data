@@ -4,6 +4,8 @@
 
 ########### 0. DATA SETUP ##############
 
+############## 0.1 Simulation ##################
+
 # a. Simulation parameters
 set.seed(1000)
 options(scipen=999)
@@ -25,7 +27,43 @@ dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_
 colnames(dataset)<-c("patient","random_variable","time")
 dataset<-dataset[order(dataset$patient),]
 
-################# 1. Investigating the dependence structure and best copula fit #############
+############### 0.2 Applications #############
+
+set.seed(1000); a=.25; b=1.75; mu1=10; mu2=12;
+
+####CHOOSE A DATASET
+
+  #Lipids Data
+  #require(sas7bdat)
+  #lipid <- read.sas7bdat("LipidsData.sas7bdat")
+  #lipids_merged<-(merge(lipid[lipid$MONTH==0,],lipid[lipid$MONTH==24,],by="PATIENT"))
+  lipids_merged<-readRDS("lipids_merged.rds")
+  gamma_c_mu1<-lipids_merged$TRG.x
+  gamma_c_mu2<-lipids_merged$TRG.y
+  
+  #Stock prices over 10 years
+  
+  #ASX2018<-read.table("20180102.txt", header=FALSE, sep=",")
+  #ASX1998<-read.table("19980102.txt", header=FALSE, sep=",")
+  #ASX98_18<-merge(ASX1998,ASX2018,by="V1")
+  ASX98_18<-readRDS("ASX98_18.rds")
+  gamma_c_mu1<-ASX98_18$V6.x
+  gamma_c_mu2<-ASX98_18$V6.y
+  
+  #Avocado prices
+  #avo<-read.table("avocado prices.csv", header=T, sep=",")
+  avo<-readRDS("avo.rds")
+  gamma_c_mu1<-avo[avo$Date=="4/01/2015","AveragePrice"]
+  gamma_c_mu2<-avo[avo$Date=="25/03/2018","AveragePrice"]
+
+# c.Setting up as longitiduinal structured data
+patient<-as.factor(seq(1:length(gamma_c_mu1)))
+dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
+colnames(dataset)<-c("patient","random_variable","time")
+dataset<-dataset[order(dataset$patient),]
+
+################# 1. Investigating the dependence structure and best copula fit  #############
+################## 1.1 bias case plotting #######
 require(GJRM)
 library(MASS)
 library(psych)
@@ -186,6 +224,82 @@ ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4
 #persp(kde2d(fittedClayton[,1],fittedClayton[,2],h=.4,n=65),main="Simulated fitted copula",zlim=c(0,4))
 #persp(kde2d(fittedTDist[,1],fittedTDist[,2],h=.4,n=65),main="Simulated fitted normal",zlim=c(0,4))
 
+################ 1.2 Applications case plotting #############
+
+library(moments)
+skewness(gamma_c_mu1)
+skewness(gamma_c_mu2)
+
+require(MASS)  
+require(copula)
+require(gamlss)
+require(dglm)
+require(ggplot2)
+require(ggpubr)
+u<-0
+v<-0
+
+fit <- dglm(gamma_c_mu1~1, family=Gamma(link="log"))
+mu=exp(fit$coefficients)
+shape=exp(-1*fit$dispersion.fit$coefficients)
+scale <- mu/shape
+
+u<-pgamma(gamma_c_mu1,shape=shape,scale=scale)
+
+fit <- dglm(gamma_c_mu2~1, family=Gamma(link="log"))
+mu=exp(fit$coefficients)
+shape=exp(-1*fit$dispersion.fit$coefficients)
+scale <- mu/shape
+
+v<-pgamma(gamma_c_mu2,shape=shape,scale=scale)
+
+#ASX# bins=30; binsc=15; limx=50; limy=0.15
+#lipids 
+bins=20; binsc=15; limx=3; limy=2
+# Plot density as points
+a<-ggplot(data = as.data.frame(gamma_c_mu1)) +
+  geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=bins) +
+  geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu1, y=dgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])), color="blue", size = .75) +
+  ylim(0,limy) +
+  xlim(0,limx) +
+  labs(x="time 1 margin",title="time 1 margin") +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+b<-ggplot(data = as.data.frame(gamma_c_mu2)) +
+  geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=bins) +
+  geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu2, y=dgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])), color="blue", size = .75) +
+  ylim(0,limy) +
+  labs(x="time 2 margin",title="time 2 margin") +
+  xlim(0,limx) +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+c<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
+  geom_point(size=0.5,color="black") + 
+  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2") +
+  geom_smooth(method="loess", level=.95) +
+  xlim(0,limx) +
+  ylim(0,limx) 
+d<-ggplot(data=as.data.frame(cbind(u,v)),aes(x=u,y=v)) +
+  #geom_point(size=0.25,color="black") + 
+  geom_density_2d(contour_var="density",bins=binsc,color="black") + 
+  scale_fill_brewer() +
+  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2 (unif. transform)",fill="density")
+#e<-ggplot(data=as.data.frame(fittedClayton),aes(x=V1,y=V2)) + 
+#  #geom_point(size=0.25,color="black") + 
+#  geom_density_2d(contour_var="density",bins=20,color="black") +
+#  scale_fill_brewer() +
+#  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
+#f<-ggplot(data=as.data.frame(fittedTDist),aes(x=V1,y=V2)) + 
+#  #geom_point(size=0.25,color="black") + 
+#  geom_density_2d( contour_var="density",bins=20,color="black") + 
+#  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted normal copula")
+ggarrange(a,b,d,nrow=1)
+#ggsave(file="applications_asx.jpeg",last_plot(),width=14,height=4,dpi=300)
+#ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
+##ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
+
+
+
+
+
 ################# 2. GLM, GEE, GLMM fits to the data #########
 
 ### Running all models
@@ -212,7 +326,7 @@ summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2]
                 ,summary(model_glm)$coeff[3]
                 ,summary(model_glm)$coeff[4]
-                , 2*3-logLik(model_glm)
+                , 2*3-2*logLik(model_glm)
 )
 summary_gee<-c( summary(model_gee)$coeff[1]
                 ,summary(model_gee)$coeff[2]
