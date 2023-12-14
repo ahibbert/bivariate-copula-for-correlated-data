@@ -11,11 +11,13 @@ a=.25; b=1.75; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
 
 # b. Simualating Nadarajah and Gupta bivariate Gamma
 w<-rbeta(n,a,b) #Mean .5
-gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=mu1) #Mean 6 * .5 = 3
-gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=mu2) #Mean 12 * .5 = 6
+gamma_c_mu1<-w*rgamma(n,shape=a+b,scale=1/mu1) #Mean 6 * .5 = 3
+gamma_c_mu2<-w*rgamma(n,shape=a+b,scale=1/mu2) #Mean 12 * .5 = 6
 
-mean(gamma_c_mu1)
-mean(gamma_c_mu2)
+mean(gamma_c_mu1) # .25/10 = .250 is true value 
+mean(gamma_c_mu2) # .25/12 = .208 is true value
+
+cor(gamma_c_mu1,gamma_c_mu2,method = "kendall")
 
 # c.Setting up as longitiduinal structured data
 patient<-as.factor(seq(1:n))
@@ -34,6 +36,7 @@ library(moments)
 require(ggpubr)
 require(ggplot2)
 require(dglm)
+library(latex2exp)
 
 #Setting up GJRM equations
 eq.mu.1 <- gamma_c_mu1~1
@@ -130,43 +133,49 @@ fittedTDist=rCopula(n, tCopula(BiCopSelect(u,v,family=2)$par,dim=2,df=BiCopSelec
 
 # Plot density as points
 z<-ggplot(data = as.data.frame(gamma_c_mu1)) +
-  geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=75) +
+  geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=50) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu1, y=dgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])), color="blue", size = .75) +
-  ylim(0,.5) +
-  xlim(0,20) +
-  labs(x="time 1 margin",title="time 1 margin") +
+  ylim(0,30) +
+  xlim(0,.30) +
+  labs(x=TeX("$Y_1$")) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 x<-ggplot(data = as.data.frame(gamma_c_mu2)) +
   geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=50) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu2, y=dgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])), color="blue", size = .75) +
-  ylim(0,.5) +
-  labs(x="time 2 margin",title="time 2 margin") +
-  xlim(0,20) +
+  ylim(0,30) +
+  labs(x=TeX("$Y_2$")) +
+  xlim(0,.30) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 c<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
   geom_point(size=0.5,color="black") + 
-  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2") +
-  xlim(0,20) +
-  ylim(0,20) +
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$")) +
+  xlim(0,.30) +
+  ylim(0,.30) +
   geom_smooth(method="loess", level=.99) 
 d<-ggplot(data=as.data.frame(cbind(u,v)),aes(x=u,y=v)) +
   #geom_point(size=0.25,color="black") + 
   geom_density_2d(contour_var="density",bins=20,color="black") + 
   scale_fill_brewer() +
-  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2 (unif. transform)",fill="density")
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"),fill="density")+
+  xlim(0,1) +
+  ylim(0,1) 
 e<-ggplot(data=as.data.frame(fittedClayton),aes(x=V1,y=V2)) + 
   #geom_point(size=0.25,color="black") + 
   geom_density_2d(contour_var="density",bins=20,color="black") +
   scale_fill_brewer() +
-  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted clayton copula")
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"))+
+  xlim(0,1) +
+  ylim(0,1) 
 f<-ggplot(data=as.data.frame(fittedTDist),aes(x=V1,y=V2)) + 
   #geom_point(size=0.25,color="black") + 
   geom_density_2d( contour_var="density",bins=20,color="black") + 
-  labs(x = "time 1 margin", y="time 2 margin", title="simulated fitted normal copula")
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"))+
+  xlim(0,1) +
+  ylim(0,1) 
 ggarrange(z,x,c,nrow=1)
-##ggsave(file="example_bias_case_margin_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
-ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
-##ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
+ggsave(file="example_bias_case_margin_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
+ggarrange(d,e,f,nrow=1)
+ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
 
 #plot(u,v,main="Uniform transform of both marginals",xlab="Time 1 Marginal Gamma (Uniform Transform)",ylab="Time 2 Marginal Gamma (Uniform Transform)")
 #plot(fittedClayton,main="Simulation of Fitted Clayton Copula",xlab="Fitted Time 1 Marginal Gamma",ylab="Fitted Time 2 Marginal Gamma")
@@ -185,10 +194,13 @@ require(gee)
 require(lme4)
 require(mgcv)
 library(geepack)
+library(MASS)
 
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
-model_gee<-geese(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
-model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
+#model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
+#model_glmm<-glmmPQL(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+#model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
 model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
 model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
                    , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
@@ -197,39 +209,43 @@ model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(p
 model_re_nosig_np<-gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000),mixture="np")
 help(gamlss.random)
 summary_glm<-c( summary(model_glm)$coeff[1]
-                ,summary(model_glm)$coeff[2] + summary(model_glm)$coeff[1]
+                ,summary(model_glm)$coeff[2]
                 ,summary(model_glm)$coeff[3]
                 ,summary(model_glm)$coeff[4]
+                , 2*3-logLik(model_glm)
 )
 summary_gee<-c( summary(model_gee)$coeff[1]
-                ,summary(model_gee)$coeff[2]+summary(model_gee)$coeff[1]
+                ,summary(model_gee)$coeff[2]
                 ,summary(model_gee)$coeff[3] 
                 ,summary(model_gee)$coeff[4] 
+                , NA
 )
+
+summary(model_gee)
 
 invisible(capture.output(
   summary_re_nosig<-c( summary(model_re_nosig)[1]
-                         ,summary(model_re_nosig)[2] + summary(model_re_nosig)[1]
+                         ,summary(model_re_nosig)[2]
                        ,summary(model_re_nosig)[4]
                        ,summary(model_re_nosig)[5]
+                       , 2*4 - 2*logLik(model_re_nosig)
   )
 ))
+
 invisible(capture.output(
   summary_re<-c( summary(model_re)[1]
-                 ,summary(model_re)[2] + summary(model_re)[1]
+                 ,summary(model_re)[2]
                  ,summary(model_re)[5]
                  ,summary(model_re)[6]
+                 , 2*5 - 2*logLik(model_re)
   )
 ))
-actuals<-c( log(a*(mu1))
-            , log(a*(mu2))
+actuals<-c( log(a/mu1)
+            , log(a/mu2)
             , 0#model_copula$tau
             , 0
+            , NA
 )
-
-### Investigating
-
-
 
 ########### 3. GJRM fits #########
 
@@ -239,8 +255,24 @@ eq.mu.2 <- gamma_c_mu2~1
 fl <- list(eq.mu.1, eq.mu.2)
 model_copula<-gjrm(fl, margins = c("GA" , "GA") , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
 model_copula_n<-gjrm(fl, margins = c("GA" , "GA") , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_j<-gjrm(fl, margins = c("GA" , "GA") , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_g<-gjrm(fl, margins = c("GA" , "GA") , copula = "G0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_f<-gjrm(fl, margins = c("GA" , "GA") , copula = "F",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_amh<-gjrm(fl, margins = c("GA" , "GA") , copula = "AMH",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_fgm<-gjrm(fl, margins = c("GA" , "GA") , copula = "FGM",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_pl<-gjrm(fl, margins = c("GA" , "GA") , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_h<-gjrm(fl, margins = c("GA" , "GA") , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
 
-
+#aics=c(
+#  model_copula$logLik
+#  ,model_copula_n$logLik
+#  ,model_copula_j$logLik
+#  ,model_copula_g$logLik
+#  ,model_copula_f$logLik
+#  ,model_copula_amh$logLik
+#  ,model_copula_fgm$logLik
+#  ,model_copula_pl$logLik
+#  ,model_copula_h$logLik)
 
 #AIC for copula
 
@@ -264,17 +296,78 @@ summary_cop<-c( model_copula$coefficients[1]
                 , model_copula$coefficients[2]
                 , summary(model_copula)$tableP1[2] #SE for time 0
                 , summary(model_copula)$tableP2[2] #SE for time 1
+                , 2*5-2*logLik(model_copula)
 )
 summary_cop_n<-c( model_copula_n$coefficients[1]
                   , model_copula_n$coefficients[2] 
                   , summary(model_copula_n)$tableP1[2] #SE for time 0
                   , summary(model_copula_n)$tableP2[2] #SE for time 1
+                  , 2*5-2*logLik(model_copula_n)
+                  
+)
+summary_cop_j<-c( model_copula_j$coefficients[1]
+                  , model_copula_j$coefficients[2]
+                  , summary(model_copula_j)$tableP1[2] #SE for time 0
+                  , summary(model_copula_j)$tableP2[2] #SE for time 1
+                  , 2*5-2*logLik(model_copula_j)
+                  
+)
+summary_cop_g<-c( model_copula_g$coefficients[1]
+                  , model_copula_g$coefficients[2] 
+                  , summary(model_copula_g)$tableP1[2] #SE for time 0
+                  , summary(model_copula_g)$tableP2[2] #SE for time 1
+                  , 2*5-2*logLik(model_copula_g)
+                  
+)
+summary_cop_f<-c( model_copula_f$coefficients[1]
+                  , model_copula_f$coefficients[2]
+                  , summary(model_copula_f)$tableP1[2] #SE for time 0
+                  , summary(model_copula_f)$tableP2[2] #SE for time 1
+                  , 2*5-2*logLik(model_copula_f)
+                  
+)
+summary_cop_amh<-c( model_copula_amh$coefficients[1]
+                    , model_copula_amh$coefficients[2]
+                    , summary(model_copula_amh)$tableP1[2] #SE for time 0
+                    , summary(model_copula_amh)$tableP2[2] #SE for time 1
+                    , 2*5-2*logLik(model_copula_amh)
+                    
+)
+summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
+                    , model_copula_fgm$coefficients[2]
+                    , summary(model_copula_fgm)$tableP1[2] #SE for time 0
+                    , summary(model_copula_fgm)$tableP2[2] #SE for time 1
+                    , 2*5-2*logLik(model_copula_fgm)
+                    
+)
+summary_cop_pl<-c( model_copula_pl$coefficients[1]
+                   , model_copula_pl$coefficients[2]
+                   , summary(model_copula_pl)$tableP1[2] #SE for time 0
+                   , summary(model_copula_pl)$tableP2[2] #SE for time 1
+                   , 2*5-2*logLik(model_copula_pl)
+                   
+)
+summary_cop_h<-c( model_copula_h$coefficients[1]
+                  , model_copula_h$coefficients[2]
+                  , summary(model_copula_h)$tableP1[2] #SE for time 0
+                  , summary(model_copula_h)$tableP2[2] #SE for time 1
+                  , 2*5-2*logLik(model_copula_h)
                   
 )
 
 ########### 4. Combining results #########
 
-rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
+results_exbias<- rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n
+      ,summary_cop_j
+      ,summary_cop_g
+      ,summary_cop_f
+      ,summary_cop_amh
+      ,summary_cop_fgm
+      ,summary_cop_pl
+      ,summary_cop_h
+      , actuals)
+
+results_exbias
 
 getSE(10,12,.25,1.75,1000)
 
@@ -299,7 +392,7 @@ getSE <- function(origmu1,origmu2,a,b,n) {
 
 rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n,actuals)
 
-########## 5. Investigating GLMM fits
+########## 5. Investigating GLMM fits #######
 
 library(gamlss)
 library(mgcv)
