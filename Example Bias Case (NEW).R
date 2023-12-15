@@ -236,6 +236,7 @@ require(gamlss)
 require(dglm)
 require(ggplot2)
 require(ggpubr)
+library(latex2exp)
 u<-0
 v<-0
 
@@ -262,18 +263,18 @@ a<-ggplot(data = as.data.frame(gamma_c_mu1)) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu1, y=dgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])), color="blue", size = .75) +
   ylim(0,limy) +
   xlim(0,limx) +
-  labs(x="time 1 margin",title="time 1 margin") +
+  labs(x=TeX("$Y_1$")) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 b<-ggplot(data = as.data.frame(gamma_c_mu2)) +
   geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=bins) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu2, y=dgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])), color="blue", size = .75) +
   ylim(0,limy) +
-  labs(x="time 2 margin",title="time 2 margin") +
+  labs(x=TeX("$Y_2$")) +
   xlim(0,limx) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 c<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
   geom_point(size=0.5,color="black") + 
-  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2") +
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$")) +
   geom_smooth(method="loess", level=.95) +
   xlim(0,limx) +
   ylim(0,limx) 
@@ -281,7 +282,7 @@ d<-ggplot(data=as.data.frame(cbind(u,v)),aes(x=u,y=v)) +
   #geom_point(size=0.25,color="black") + 
   geom_density_2d(contour_var="density",bins=binsc,color="black") + 
   scale_fill_brewer() +
-  labs(x = "time 1 margin", y="time 2 margin", title="margin 1 v margin 2 (unif. transform)",fill="density")
+  labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"),fill="density")
 #e<-ggplot(data=as.data.frame(fittedClayton),aes(x=V1,y=V2)) + 
 #  #geom_point(size=0.25,color="black") + 
 #  geom_density_2d(contour_var="density",bins=20,color="black") +
@@ -295,10 +296,6 @@ ggarrange(a,b,d,nrow=1)
 #ggsave(file="applications_asx.jpeg",last_plot(),width=14,height=4,dpi=300)
 #ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
 ##ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
-
-
-
-
 
 ################# 2. GLM, GEE, GLMM fits to the data #########
 
