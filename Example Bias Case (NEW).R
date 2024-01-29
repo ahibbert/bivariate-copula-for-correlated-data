@@ -9,7 +9,7 @@
 # a. Simulation parameters
 set.seed(1000);# set.seed(10000)
 options(scipen=999)
-a=.25; b=1.75; mu1=10; mu2=12; n=10#00 #100,500,1000,5000,n=10000
+a=.25; b=1.75; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
 
 # b. Simualating Nadarajah and Gupta bivariate Gamma
 w<-rbeta(n,a,b) #Mean .5
@@ -326,6 +326,10 @@ model_re_gam_df1 <- gamlss(formula=random_variable~as.factor(time==1)+random(as.
 model_re_nosig_gam_df1 <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient),df=1),data=dataset,family=GA()) ###Bias increases as the degrees of freedom increases
 
 
+model_glm_GAMLSS_2sigma <- gamlss(formula=random_variable~as.factor(time==1)
+                   , sigma.formula=~as.factor(time==1), data=dataset, family=GA(),method=CG(10000))
+
+
 ###Capturing coefficient values and errors from each model
 summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2]
@@ -333,15 +337,15 @@ summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[4]
                 , AIC(model_glm)
                 , BIC(model_glm)
-                ,2
+                , 2
 )
 summary_gee<-c( summary(model_gee)$coeff[1]
-                ,summary(model_gee)$coeff[2]
-                ,summary(model_gee)$coeff[3] 
-                ,summary(model_gee)$coeff[4] 
-                ,NA
-                ,NA
-                ,3
+                , summary(model_gee)$coeff[2]
+                , summary(model_gee)$coeff[3] 
+                , summary(model_gee)$coeff[4] 
+                , NA
+                , NA
+                , 3
 )
 
 invisible(capture.output(
