@@ -7,9 +7,9 @@
 ############## 0.1 Simulation ##################
 
 # a. Simulation parameters
-set.seed(1000)
+set.seed(1000);# set.seed(10000)
 options(scipen=999)
-a=.25; b=1.75; mu1=10; mu2=12; n=1000 #100,500,1000,5000,n=10000
+a=.25; b=1.75; mu1=10; mu2=12; n=10#00 #100,500,1000,5000,n=10000
 
 # b. Simualating Nadarajah and Gupta bivariate Gamma
 w<-rbeta(n,a,b) #Mean .5
@@ -306,40 +306,70 @@ require(lme4)
 require(mgcv)
 library(geepack)
 library(MASS)
+library(nlme)
 
+#Running each model
 model_glm <- glm(random_variable~as.factor(time==1),data=dataset,family=Gamma(link = "log"),maxit=10000)
 model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link="log"), corstr = "exchangeable")#model_lme4<-glmer(random_variable~as.factor(time==1) + (1 | patient), data=dataset, family=Gamma(link="log")) #lme4
-#model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
+model_gamm<-gamm(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"),niterPQL=1000) #mgcv
 #model_glmm<-glmmPQL(random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-#model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
-model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000))
-model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
-                   , sigma.formula=~as.factor(time==1), data=dataset, family=GA()
-                   , method=CG(10000))
 
-model_re_nosig_np<-gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA(),method=CG(10000),mixture="np")
-help(gamlss.random)
+model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+
+model_re_nosig <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient)),data=dataset,family=GA())
+model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                   , sigma.formula=~as.factor(time==1), data=dataset, family=GA(),method=CG(10000))
+#model_re_nosig_nlme <- gamlss(random_variable~as.factor(time==1)+re(random=~1|patient,df=1),data=dataset,family=GA())
+#model_re_nlme <- gamlss(random_variable~as.factor(time==1)+re(random=~1|patient,df=1), sigma.formula=~as.factor(time==1),data=dataset,family=GA(),method=CG(10000))
+model_re_gam_df1 <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient),df=1)
+                           , sigma.formula=~as.factor(time==1), data=dataset, family=GA())
+model_re_nosig_gam_df1 <- gamlss(random_variable~as.factor(time==1)+random(as.factor(patient),df=1),data=dataset,family=GA()) ###Bias increases as the degrees of freedom increases
+
+
+###Capturing coefficient values and errors from each model
 summary_glm<-c( summary(model_glm)$coeff[1]
                 ,summary(model_glm)$coeff[2]
                 ,summary(model_glm)$coeff[3]
                 ,summary(model_glm)$coeff[4]
-                , 2*3-2*logLik(model_glm)
+                , AIC(model_glm)
+                , BIC(model_glm)
+                ,2
 )
 summary_gee<-c( summary(model_gee)$coeff[1]
                 ,summary(model_gee)$coeff[2]
                 ,summary(model_gee)$coeff[3] 
                 ,summary(model_gee)$coeff[4] 
-                , NA
+                ,NA
+                ,NA
+                ,3
 )
 
-summary(model_gee)
+invisible(capture.output(
+summary_gamm <- c(
+  model_gamm$gam$coefficients[1]
+  ,model_gamm$gam$coefficients[2]
+  ,sqrt(vcov(model_gamm$lme))[1,1]
+  ,sqrt(vcov(model_gamm$lme))[2,2]
+  ,  NA
+  ,NA
+  ,4
+)))
+
+#summary_glmm<-c( model_glmm$coefficients$fixed[1]
+#                 ,model_glmm$coefficients$fixed[2]
+#                 ,sqrt(vcov(model_glmm))[1,1]
+#                 ,sqrt(vcov(model_glmm))[2,2]
+#                 , NA
+#)
 
 invisible(capture.output(
   summary_re_nosig<-c( summary(model_re_nosig)[1]
-                         ,summary(model_re_nosig)[2]
+                       ,summary(model_re_nosig)[2]
                        ,summary(model_re_nosig)[4]
                        ,summary(model_re_nosig)[5]
-                       , 2*4 - 2*logLik(model_re_nosig)
+                       , AIC(model_re_nosig)
+                       ,BIC(model_re_nosig)
+                       , model_re_nosig$df.fit
   )
 ))
 
@@ -348,15 +378,136 @@ invisible(capture.output(
                  ,summary(model_re)[2]
                  ,summary(model_re)[5]
                  ,summary(model_re)[6]
-                 , 2*5 - 2*logLik(model_re)
+                 , AIC(model_re)
+                 , BIC(model_re)
+                 , model_re$df.fit
   )
 ))
+
+# invisible(capture.output(
+#   summary_re_nosig_nlme<-c( summary(model_re_nosig_nlme)[1]
+#                  ,summary(model_re_nosig_nlme)[2]
+#                  ,summary(model_re_nosig_nlme)[5]
+#                  ,summary(model_re_nosig_nlme)[6]
+#                  , AIC(model_re_nosig_nlme)
+#   )
+# ))
+# 
+# invisible(capture.output(
+#   summary_re_nlme<-c( summary(model_re_nlme)[1]
+#                  ,summary(model_re_nlme)[2]
+#                  ,summary(model_re_nlme)[5]
+#                  ,summary(model_re_nlme)[6]
+#                  , AIC(model_re_nlme)
+#   )
+# ))
+
+invisible(capture.output(
+  summary_re_gam_df1<-c( summary(model_re_gam_df1)[1]
+                 ,summary(model_re_gam_df1)[2]
+                 ,summary(model_re_gam_df1)[5]
+                 ,summary(model_re_gam_df1)[6]
+                 , AIC(model_re_gam_df1)
+                 , BIC(model_re_gam_df1)
+                 ,model_re_gam_df1$df.fit
+  )
+))
+
+invisible(capture.output(
+  summary_re_nosig_gam_df1<-c( summary(model_re_nosig_gam_df1)[1]
+                 ,summary(model_re_nosig_gam_df1)[2]
+                 ,summary(model_re_nosig_gam_df1)[5]
+                 ,summary(model_re_nosig_gam_df1)[6]
+                 , AIC(model_re_nosig_gam_df1)
+                 , BIC(model_re_nosig_gam_df1)
+                 ,model_re_nosig_gam_df1$df.fit
+  )
+))
+
 actuals<-c( log(a/mu1)
             , log(a/mu2)
             , 0#model_copula$tau
             , 0
             , NA
+            ,NA
+            ,NA
 )
+
+
+
+###Calculating effective degrees of freedom from Donohue
+ X<-getME(model_lme4,name="X")
+ Z<-getME(model_lme4,name="Z")
+# getME(model_lme4,name="mmList")
+# 
+# #Z_order<-Z[ order(as.numeric(row.names(Z))), ]
+# #Z_matrix<-as.matrix(diag(Z_order))
+# 
+# beta_fix<-getME(model_lme4,name="beta")
+# beta_ran<-getME(model_lme4,name="theta")
+# theta<-as.matrix(c(beta_fix,beta_ran))
+# 
+# b_i<-getME(model_lme4,name="b")
+# 
+ U<-cbind(X,Z)
+# theta<-rbind(as.matrix(beta_fix),b_i)
+# 
+# ###Confirm we have the correct X,Z etc.
+# U%*%theta==X%*%beta_fix+Z%*%b_i
+# 
+# getME(model_lme4,name="weights")
+# 
+ W<-model_lme4@resp$sqrtrwt #weights(model_lme4,type = "working")
+# 
+# nrow((t(U)%*%as.matrix(W)))
+# ncol((t(U)%*%as.matrix(W)))
+# 
+# nrow(U)
+# ncol()
+# 
+# ncol(as.matrix(Z*W))
+# nrow(as.matrix(Z*W))
+# 
+# ncol(t(as.matrix(U))%*%(Z*W))
+# nrow(t(as.matrix(U))%*%(Z*W))
+# 
+# ###UWU###### (t(as.matrix(U))%*%(diag(W))%*%as.matrix(U))
+# 
+
+ UWU=(t(as.matrix(U))%*%(diag(as.vector(W)))%*%as.matrix(U))
+ dim(UWU)
+# 
+ D<-getME(model_lme4,name="Lambda")
+ D_inv<-solve(D)
+ dinv_plus_00<-c(0,0,diag(D_inv))
+ 
+ 
+lme_EDF=sum(diag(UWU%*%solve(UWU+diag(dinv_plus_00))))
+ 
+# 
+# 
+# model.matrix(model_lme4)
+# 
+# model_lme4@resp$sqrtrwt
+# model_lme4@resp$sqrtXwt
+# model_lme4@resp$weights
+# model_lme4@resp$wtres
+# 
+# weights(model_lme4)
+# 
+# 
+# Z
+# X%*%beta_fix
+# Z_matrix%*%beta_ran
+
+summary_lme4 <- c(summary(model_lme4)$coefficients[1]
+                  ,summary(model_lme4)$coefficients[2]
+                  ,summary(model_lme4)$coefficients[3]
+                  ,summary(model_lme4)$coefficients[4]
+                  ,-2*logLik(model_lme4)+2*lme_EDF
+                  , BIC(model_lme4)
+                  ,lme_EDF)
+
 
 ########### 3. GJRM fits #########
 
@@ -408,12 +559,17 @@ summary_cop<-c( model_copula$coefficients[1]
                 , summary(model_copula)$tableP1[2] #SE for time 0
                 , summary(model_copula)$tableP2[2] #SE for time 1
                 , 2*5-2*logLik(model_copula)
+                ,BIC(model_copula)
+                , 5
 )
+
 summary_cop_n<-c( model_copula_n$coefficients[1]
                   , model_copula_n$coefficients[2] 
                   , summary(model_copula_n)$tableP1[2] #SE for time 0
                   , summary(model_copula_n)$tableP2[2] #SE for time 1
                   , 2*5-2*logLik(model_copula_n)
+                  ,BIC(model_copula_n)
+                  , 5
                   
 )
 summary_cop_j<-c( model_copula_j$coefficients[1]
@@ -421,6 +577,8 @@ summary_cop_j<-c( model_copula_j$coefficients[1]
                   , summary(model_copula_j)$tableP1[2] #SE for time 0
                   , summary(model_copula_j)$tableP2[2] #SE for time 1
                   , 2*5-2*logLik(model_copula_j)
+                  ,BIC(model_copula_j)
+                  , 5
                   
 )
 summary_cop_g<-c( model_copula_g$coefficients[1]
@@ -428,6 +586,8 @@ summary_cop_g<-c( model_copula_g$coefficients[1]
                   , summary(model_copula_g)$tableP1[2] #SE for time 0
                   , summary(model_copula_g)$tableP2[2] #SE for time 1
                   , 2*5-2*logLik(model_copula_g)
+                  ,BIC(model_copula_g)
+                  , 5
                   
 )
 summary_cop_f<-c( model_copula_f$coefficients[1]
@@ -435,6 +595,8 @@ summary_cop_f<-c( model_copula_f$coefficients[1]
                   , summary(model_copula_f)$tableP1[2] #SE for time 0
                   , summary(model_copula_f)$tableP2[2] #SE for time 1
                   , 2*5-2*logLik(model_copula_f)
+                  ,BIC(model_copula_f)
+                  , 5
                   
 )
 summary_cop_amh<-c( model_copula_amh$coefficients[1]
@@ -442,6 +604,8 @@ summary_cop_amh<-c( model_copula_amh$coefficients[1]
                     , summary(model_copula_amh)$tableP1[2] #SE for time 0
                     , summary(model_copula_amh)$tableP2[2] #SE for time 1
                     , 2*5-2*logLik(model_copula_amh)
+                    ,BIC(model_copula_amh)
+                    , 5
                     
 )
 summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
@@ -449,6 +613,8 @@ summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
                     , summary(model_copula_fgm)$tableP1[2] #SE for time 0
                     , summary(model_copula_fgm)$tableP2[2] #SE for time 1
                     , 2*5-2*logLik(model_copula_fgm)
+                    ,BIC(model_copula_fgm)
+                    , 5
                     
 )
 summary_cop_pl<-c( model_copula_pl$coefficients[1]
@@ -456,6 +622,8 @@ summary_cop_pl<-c( model_copula_pl$coefficients[1]
                    , summary(model_copula_pl)$tableP1[2] #SE for time 0
                    , summary(model_copula_pl)$tableP2[2] #SE for time 1
                    , 2*5-2*logLik(model_copula_pl)
+                   ,BIC(model_copula_pl)
+                   , 5
                    
 )
 summary_cop_h<-c( model_copula_h$coefficients[1]
@@ -463,12 +631,27 @@ summary_cop_h<-c( model_copula_h$coefficients[1]
                   , summary(model_copula_h)$tableP1[2] #SE for time 0
                   , summary(model_copula_h)$tableP2[2] #SE for time 1
                   , 2*5-2*logLik(model_copula_h)
+                  ,BIC(model_copula_h)
+                  , 5
                   
 )
 
 ########### 4. Combining results #########
 
-results_exbias<- rbind(summary_glm, summary_gee,summary_re_nosig,summary_re,summary_cop,summary_cop_n
+results_exbias<- rbind(
+      summary_glm
+      ,summary_gee
+      ,summary_re_nosig
+      ,summary_re
+      ,summary_gamm
+      #,summary_glmm
+      ,summary_lme4
+      #,summary_re_nlme
+      #,summary_re_nosig_nlme
+      ,summary_re_gam_df1
+      ,summary_re_nosig_gam_df1
+      ,summary_cop
+      ,summary_cop_n
       ,summary_cop_j
       ,summary_cop_g
       ,summary_cop_f
