@@ -35,12 +35,15 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
   
   if(type=="biv") {
     plot1<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
-      geom_point(size=0.1,color="gray") + 
+      #geom_point(size=0.1,color="gray") + 
       geom_density_2d(contour_var="density",bins=cbins,color="black") + 
       scale_fill_brewer()  +
+      theme(panel.background = element_blank()) +
       xlim(0,xlim) +
       ylim(0,ylim) +
-      labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"), title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
+      labs(x = TeX("$Y_1$"), y=TeX("$Y_2$")
+           #, title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2))
+           ,fill="density")
   }
   else
   {
@@ -48,7 +51,9 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
       #geom_point(size=0.25,color="black") + 
       geom_density_2d(contour_var="density",bins=cbins,color="black") + 
       scale_fill_brewer() +
-      labs(x = TeX("$Y_1$ (Uniform)"), y=TeX("$Y_2$ (Uniform)"), title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2)),fill="density")
+      theme(panel.background = element_blank()) +
+      labs(x = TeX("$Y_1$ (Uniform)"), y=TeX("$Y_2$ (Uniform)")#, title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2))
+           ,fill="density")
   }
   #plot1<-persp(kde2d(gamma_c_mu1,gamma_c_mu2),main="Uniform transform of marginals",axes=T,scale=T,ticktype="detailed",theta=15,xlab="Y1",ylab="Y2",zlab="Density") #zlim=c(0,4) #,h=.4,n=65
   
@@ -70,17 +75,43 @@ i=6; plot_list[[i]]<-plotSimBiGamma(a=.5, b=.2,mu1=10, mu2=12, n=10000,cbins=11,
 i=7; plot_list[[i]]<-plotSimBiGamma(a=2, b=2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.6,ylim=.3,type="unif");
 i=8; plot_list[[i]]<-plotSimBiGamma(a=.5, b=2,mu1=10, mu2=12, n=10000,cbins=11,xlim=.01,ylim=.005,type="unif");
 
-ggarrange(plotlist = plot_list,nrow=2,ncol=4)
-ggsave(file="bivariate_distribution_contours.png",last_plot(),width=12,height=6,dpi=300)
 
+ggarrange(plotlist = plot_list[c(1,2,5,6,3,4,7,8)],nrow=2,ncol=4,
+                        common.legend = TRUE, legend="bottom")
 
+# library(grid)
+# pl <- plot_list[c(1,2,5,6,3,4,7,8)]
+ 
+ #N <- length(pl)
+# nr <- 2
+# nc <- 4
+# 
+ #combine <- rbind(tableGrob(t(c("\u03B2=0.2","\u03B2=2")), theme = ttheme_minimal(), rows = ""), 
+ #                cbind(tableGrob(c("     \u03BC=0.2","     \u03BC=0.05","     \u03BC=0.05","     \u03BC=0.2"), theme = ttheme_minimal()), 
+#                       arrangeGrob(grobs = pl),  size = "last"), size = "last")
+# grid.newpage()
+# grid.draw(combine)
+ 
+library(grid)
+# Create list of plots
+set.seed(0)
+pl = plot_list[c(1,3,2,4,5,7,6,8)]
+# Create row and column titles
+col.titles = c("     \u03C3\u00B2=0.5","     \u03C3\u00B2=2","     \u03C3\u00B2=0.5","     \u03C3\u00B2=2")
+row.titles = c("\u03B2=0.2","\u03B2=2")
 
-round((2/10)*10^2)/10^2
+grid.newpage()
 
+nr=2
+# Add row titles
+pl[1:nr] = lapply(1:nr, function(i) arrangeGrob(pl[[i]], left=row.titles[i]))
 
+# Add column titles and lay out plots
+plot=grid.arrange(grobs=lapply(c(1,3,5,7), function(i) {
+  arrangeGrob(grobs=pl[i:(i+1)], top=col.titles[(i+1)/2], ncol=1)
+}), ncol=4)
 
-#skewness(gamma_c_mu1)
-#skewness(gamma_c_mu2)
+ggsave(file="bivariate_distribution_contours.png",plot,width=12,height=6,dpi=300) 
 
 
 
