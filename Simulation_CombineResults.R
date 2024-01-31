@@ -97,9 +97,11 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1, color="GLMM (5)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1, color="GJRM (C)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1, color="GJRM (N)"),level=.99) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
-                        , values=brewer.pal(n = 6, name = "Dark2"))
-  
+    geom_hline(aes(yintercept=0,color="True"), size=1) +
+    guides(color=guide_legend(override.aes=list(fill=NA))) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 6, name = "Dark2"),"black"))
+
   data_input<-as.data.frame(cbind(t2intercepts[,1:6]+t1intercepts[,1:6],mu1,tau))
   colnames(data_input)[7:8] <- c("actuals","tau")
   bias_2_plot<-ggplot() + ylim(-1,1) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\mu_2}/\\mu_2)-1$")) +
@@ -109,8 +111,10 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1, color="GLMM (5)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1, color="GJRM (C)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1, color="GJRM (N)"),level=.99) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
-                        , values=brewer.pal(n = 6, name = "Dark2"))
+    geom_hline(aes(yintercept=0,color="True"), size=1) +
+    guides(color=guide_legend(override.aes=list(fill=NA))) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 6, name = "Dark2"),"black"))
   
   data_input<-as.data.frame(cbind(t2intercepts[,1:6],mu1/mu2,tau))
   colnames(data_input)[7:8] <- c("actuals","tau")
@@ -121,13 +125,18 @@ a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_re)/(actuals))-1, color="GLMM (5)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop)/(actuals))-1, color="GJRM (C)"),level=.99) +
     geom_smooth(data=data_input, aes(x=tau, y=(exp(summary_cop_n)/(actuals))-1, color="GJRM (N)"),level=.99) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)")
-                        , values=brewer.pal(n = 6, name = "Dark2"))
+    geom_hline(aes(yintercept=0,color="True"), size=1) +
+    guides(color=guide_legend(override.aes=list(fill=NA))) +
+
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","GLMM (4)","GLMM (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 6, name = "Dark2"),"black"))
     
+plot.new()
   ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
-    bgcolor("white")+border(color = "white")
+    bgcolor("white")+border(color = "white")  + guides(color=guide_legend(override.aes=list(fill=NA)))
+
   
-  #ggsave(file="simulation_bias_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
+ggsave(file="simulation_bias_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
