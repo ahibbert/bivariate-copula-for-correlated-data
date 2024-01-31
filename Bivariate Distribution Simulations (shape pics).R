@@ -38,7 +38,7 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
       #geom_point(size=0.1,color="gray") + 
       geom_density_2d(contour_var="density",bins=cbins,color="black") + 
       scale_fill_brewer()  +
-      theme(panel.background = element_blank()) +
+      #theme(panel.background = element_blank()) +
       xlim(0,xlim) +
       ylim(0,ylim) +
       labs(x = TeX("$Y_1$"), y=TeX("$Y_2$")
@@ -51,7 +51,7 @@ plotSimBiGamma <- function(n,a,b,mu1,mu2,cbins,xlim,ylim,type)  {
       #geom_point(size=0.25,color="black") + 
       geom_density_2d(contour_var="density",bins=cbins,color="black") + 
       scale_fill_brewer() +
-      theme(panel.background = element_blank()) +
+      #theme(panel.background = element_blank()) +
       labs(x = TeX("$Y_1$ (Uniform)"), y=TeX("$Y_2$ (Uniform)")#, title=TeX(paste("$\\mu_1=",(a/mu1),"\\ \\beta=",b,"\\ \\tau=",round(tau*10^2)/10^2))
            ,fill="density")
   }
@@ -92,7 +92,7 @@ ggarrange(plotlist = plot_list[c(1,2,5,6,3,4,7,8)],nrow=2,ncol=4,
 # grid.newpage()
 # grid.draw(combine)
  
-library(grid)
+library(gridExtra)
 # Create list of plots
 set.seed(0)
 pl = plot_list[c(1,3,2,4,5,7,6,8)]
@@ -111,7 +111,7 @@ plot=grid.arrange(grobs=lapply(c(1,3,5,7), function(i) {
   arrangeGrob(grobs=pl[i:(i+1)], top=col.titles[(i+1)/2], ncol=1)
 }), ncol=4)
 
-ggsave(file="bivariate_distribution_contours.png",plot,width=12,height=6,dpi=300) 
+#ggsave(file="bivariate_distribution_contours.png",plot,width=12,height=6,dpi=300) 
 
 
 
