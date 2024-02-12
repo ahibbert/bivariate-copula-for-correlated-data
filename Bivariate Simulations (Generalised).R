@@ -4,7 +4,7 @@
 
 options(scipen=999)
 
-generateBivDist <- function(n,a,b,c,mu1,mu2,dist="GA") {
+generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
 
   if(dist=="GA") {
     #Simulating bivariate random variable according to functional input
@@ -41,7 +41,7 @@ simulateCorrelatedVarNOGJRM <- function(n,a,b,c,mu1,mu2,dist)  {
   require(gee)
   require(VGAM)
   
-  dataset <- generateBivDist(n,a,b,c,mu1,mu2)
+  dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
   
   #Running all non-GJRM models
   
@@ -116,7 +116,7 @@ simulateCorrelatedVarGJRM <- function(n,a,b,c,mu1,mu2,dist)  {
   require(GJRM)
   require(MASS)
   
-  dataset <- generateBivDist(n,a,b,c,mu1,mu2)
+  dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
   
   gamma_c_mu1<-dataset[dataset$time==0,]
   gamma_c_mu2<-dataset[dataset$time==1,]
