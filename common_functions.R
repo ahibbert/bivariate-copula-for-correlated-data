@@ -284,3 +284,49 @@ fitBivModels <-function(data,dist,include="ALL") {
   
 }
 
+plotDist <- function (dataset,dist) {
+  
+  require(gamlss)  
+  require(latex2exp)
+  require(ggplot2)
+  require(ggpubr)
+  
+  num_margins=length(unique(dataset[,"time"]))
+  
+  margin_data=list()
+  margin_unif=list()
+  margin_fit=list()
+  
+  for (i in 1:num_margins-1) {
+    margin_data[[i+1]]<-(dataset[dataset[,"time"]==i,"random_variable"])
+    margin_fit[[i+1]]<-gamlss(margin_data[[i + 1]]~1,family=dist)
+    margin_unif[[i+1]]<-pnorm(margin_fit[[i+1]]$residuals)
+  }
+  
+  plot.new()
+  par(mfrow=c(1,num_margins))
+  
+  for (i in 1:num_margins) {histDist(margin_data[[i]],family=dist,xlab=TeX(paste("$Y_",i,"$")),main=paste("Histogram of margin",i,"and fitted",dist))}
+  invisible(readline(prompt="Press [enter] to continue"))
+  
+  plots=list()
+  for (i in 1:(num_margins-1)) {
+    input_data=data.frame(cbind(margin_data[[i]],margin_data[[i+1]]))
+    plots[[(i*2)-1]]=ggplot(data=input_data,aes(x=X1,y=X2)) +
+      #geom_point(size=0.25,color="black") + 
+      geom_density_2d(contour_var="density",bins=20,color="black") + 
+      scale_fill_brewer() +
+      labs(x = TeX(paste("$Y_",i,"$")), y=TeX(paste("$Y_",i+1,"$")),fill="density")
+    
+    input_data=data.frame(cbind(margin_unif[[i]],margin_unif[[i+1]]))
+    
+    plots[[(i*2)]]=ggplot(data=input_data,aes(x=X1,y=X2)) +
+      #geom_point(size=0.25,color="black") + 
+      geom_density_2d(contour_var="density",bins=20,color="black") + 
+      scale_fill_brewer() +
+      labs(x = TeX(paste("$Y_",i,"$")), y=TeX(paste("$Y_",i+1,"$")),fill="density")
+  }
+  
+  ggarrange(plotlist=plots)
+  
+}
