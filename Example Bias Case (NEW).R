@@ -8,17 +8,46 @@
 source("common_functions.R")
 
 # a. Simulation parameters
-dist="GA"; set.seed(1000)#; a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
+dist="NO"; set.seed(1000)#; a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
 options(scipen=999)
 
-dataset <- generateBivDist(a=.25, b=1.75, c=NA, mu1=10, mu2=12, n=1000,dist)
-#dataset <- generateBivDist(a=1, b=1, c=0.75, mu1=1, mu2=2, n=1000,dist)
+#dataset <- generateBivDist(a=.25, b=1.75, c=NA, mu1=10, mu2=12, n=1000,dist)
+dataset <- generateBivDist(a=1, b=2, c=0.75, mu1=1, mu2=2, n=1000,dist)
 
 plotDist(dataset,dist)
 
 ###########2. Fitting all models to the data##############
 results<-fitBivModels(data=dataset,dist,include="ALL")
 results
+
+
+
+################Investigating copula fit
+
+
+require(GJRM)
+eq.mu.1 <- formula(random_variable~1)
+eq.mu.2 <- formula(random_variable.1~1)
+fl <- list(eq.mu.1, eq.mu.2)
+
+gamma_c_mu1<-dataset[dataset$time==0,]
+gamma_c_mu2<-dataset[dataset$time==1,]
+
+if(dist=="NO"){margin_dist="N"}
+if(dist=="GA"){margin_dist="GA"}
+
+model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+summary(model_copula_n)
+
+
+
+
+
+
+
+
+
+
 
 ############### 0.2 Applications #############
 ####CHOOSE A DATASET

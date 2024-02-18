@@ -16,6 +16,12 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
     margin_2<-normData[,2]
   }
   
+  if(dist=="PO") {
+    
+    margin_1<-rpois(n,mu1*c)
+    margin_2<-rpois(n,mu2*c)
+  }
+
   #Transforming data to format required for random effect models
   patient<-as.factor(seq(1:n))
   dataset<-as.data.frame(rbind(cbind(patient,margin_1,0)
@@ -336,4 +342,30 @@ plotDist <- function (dataset,dist) {
   }
   ggarrange(plotlist=plots,ncol=num_margins,nrow=num_margins)
   
+}
+
+generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
+  
+  if(dist=="NO") {
+    require(MASS)
+    cor_matrix<-diag(rep(1,length(sigma_vector)))
+    if (length(rho_vector)==1) {
+      cor_matrix[lower.tri(cor_matrix,diag=FALSE)]<-rho_vector[1]
+      cor_matrix[upper.tri(cor_matrix,diag=FALSE)]<-rho_vector[1]
+      
+      cov_matrix<-diag(sigma_vector) %*% cor_matrix %*% diag(sigma_vector)
+    } else {
+      cor_matrix=cor_matrix+rho_vector
+      cov_matrix<-diag(sigma_vector) %*% cor_matrix %*% diag(sigma_vector)
+    }
+    
+    data<-mvrnorm(n,mu=mu_vector,Sigma = cov_matrix)
+  }
+  
+  data_output<-cbind(data[,1],0)
+  for (i in 2:ncol(data)) {
+    data_output<-rbind(data_output,cbind(data[,i],i-1)) 
+  }
+  colnames(data_output) <- cbind("random_variable","time")
+  return(data_output)
 }
