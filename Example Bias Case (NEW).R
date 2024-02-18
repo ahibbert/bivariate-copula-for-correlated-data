@@ -8,11 +8,16 @@
 source("common_functions.R")
 
 # a. Simulation parameters
-dist="NO"; set.seed(1000)#; a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
-options(scipen=999)
+set.seed(1000);options(scipen=999);
+#dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
+#dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
+dist="PO";a=NA; b=NA; c=10; mu1=.5; mu2=1.2; n=1000
+#a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
+
 
 #dataset <- generateBivDist(a=.25, b=1.75, c=NA, mu1=10, mu2=12, n=1000,dist)
-dataset <- generateBivDist(a=1, b=2, c=0.75, mu1=1, mu2=2, n=1000,dist)
+#dataset <- generateBivDist(a=1, b=2, c=0.75, mu1=1, mu2=2, n=1000,dist)
+dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
 plotDist(dataset,dist)
 

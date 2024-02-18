@@ -18,8 +18,17 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
   
   if(dist=="PO") {
     
-    margin_1<-rpois(n,mu1*c)
-    margin_2<-rpois(n,mu2*c)
+    #Compound multiple poisson of Stein & Juritz, 1987
+    c<-rgamma(n,c)
+  
+    margin_1=vector(length = n) 
+    margin_2=vector(length = n) 
+    for (i in 1:n) {
+      margin_1[i]=rpois(1,mu1*c[i])
+    }
+    for (i in 1:n) {
+      margin_2[i]=rpois(1,mu2*c[i])
+    }
   }
 
   #Transforming data to format required for random effect models
