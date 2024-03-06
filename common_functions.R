@@ -54,8 +54,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                 , NA
                 , NA
                 , NA
-                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]
-                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]
+                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
     )
   }
   if(dist=="NO"){
@@ -65,8 +65,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
       , (a*sqrt(1-c^2))/sqrt(n)
       , (b*sqrt(1-c^2))/sqrt(n)
       , sqrt(a^2+b^2-2*a*b*c)/sqrt(n)
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]
+      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
     )
   }
   if(dist=="PO"){
@@ -85,8 +85,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
           (v_x2/(e_x2^2)) + (v_x1/(e_x1^2))
           - log((mu1*mu2*c)/(e_x1*e_x2))
       ) /sqrt(n)
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]
+      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
     )
   }
   
@@ -140,7 +140,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                     , logLik(model_glm)
                     , AIC(model_glm)
                     , BIC(model_glm)
-                    , 2
+                    , 3
     )
     #if(dist=="PO"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
     summary_gee<-c( summary(model_gee)$coeff[1]
@@ -150,7 +150,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                     , NA
                     , NA
                     , NA
-                    , 3
+                    , 4
     )#}
     
     invisible(capture.output(

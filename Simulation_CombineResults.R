@@ -1,49 +1,21 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
-#Combine simulations
-
+#Load a simulation
 #if(dist=="NO"){load("results_NO_n1000_1_2.rds")}
 #if(dist=="GA"){load("results_combined_N_C0_n1000_geefix_mu1mu21012_GEEFIXV2.rds")}
 #if(dist=="PO"){load("results_combined_PO_1000_2024-02-19")}
 
-results=results_combined
+#load("results_combined_GA_1000_2024-03-06.RData")
+load("results_combined_NO_1000_2024-03-06.RData")
 
-###HOPE THIS ONE WORKS
-parameters=matrix(0,nrow=length(results),ncol=8)
-for (i in length(results)) {
-  parameters[z,]=results[[z]][nrow(results[[z]]),]
-}
+results <- results_combined; dist="NO"
 
-
-
-
-
-
-
-#a=.1+.1*1:20; b=.1+.1*1:20; mu1=10; mu2=12; n=1000;dist="GA"
-#a=.5*1:5; b=.5*1:5;c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9); mu1=1; mu2=2; n=1000;dist="NO"
-#a=NA; b=NA;c=c(.25,.5,1,5); mu1=c(.25,.5,1,5); mu2=c(.25,.5,1,5); n=1000;dist="PO"
-
-parameters=matrix(0,nrow=length(a)*length(b)*length(mu1)*length(mu2)*length(c),ncol=6)
-z=1
-for (i in 1:length(a)) {
-  for (j in 1:length(b)) {
-    for (k in 1:length(mu1)) {
-      for (l in 1:length(mu2)) {
-        for (m in 1:length(c))  {
-          parameters[z,]= c(n,a[i],b[j],c[m],mu1[k],mu2[l])
-          z=z+1
-        }
-      }
-    }
-  }
+#Take out parameters
+parameters=matrix(0,nrow=length(results_combined),ncol=6)
+for (z in 1:length(results_combined)) {
+  parameters[z,]=results_combined[[z]][nrow(results_combined[[z]]),1:6]
 }
 colnames(parameters)<-c("n","a","b","c","mu1","mu2")
-
-
-
-
-
 
 #################################1. DATA SETUP##################################################
 
@@ -55,19 +27,16 @@ require(RColorBrewer)
 set.seed(1000)
 options(scipen=999)
 
-if(dist=="NO"){tau=parameters[,"c"]}
-if(dist=="GA"){}#UPDATE value of tau
-if(dist=="PO"){pcol=((1+(1/parameters[,"mu1"]))*(1+(1/parameters[,"mu2"])))^-0.5;tau=pcol}
-
 #Theoretical errors
 if(dist=="GA") {
   #Parameters
-  mu1=parameters["a"]/parameters[,"mu1"]
-  mu2=parameters["a"]/parameters[,"mu2"]
+  mu1=parameters[,"a"]*parameters[,"mu1"]
+  mu2=parameters[,"a"]*parameters[,"mu2"]
   #Errors
   load(file="numDerivResults_20231127.rds")
   trueSE<-numDerivResults[,c(1,2,5)]
 }
+
 if(dist=="NO") {
   #Parameters
   mu1=parameters[,"mu1"]
@@ -99,8 +68,8 @@ for (i in 1:length(results)) {
   t1error[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"se_b1"])
   t2error[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"se_b2"])
   
-  tau[i]=results[[i]][(nrow(results[[i]])-1),5]
-  emp_cor[i]=results[[i]][(nrow(results[[i]])-1),6]
+  tau[i]=results[[i]][(nrow(results[[i]])-1),6]/100
+  emp_cor[i]=results[[i]][(nrow(results[[i]])-1),7]/100
     
   colnames(t1intercepts)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
   colnames(t2intercepts)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
@@ -173,7 +142,7 @@ ggsave(file=paste("simulation_bias_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""
   if(dist=="NO") {data_input<-as.data.frame(cbind(t1error,tau,trueSE))} ###Add theoretircal errors
   
 #  data_input<-as.data.frame(cbind(t1error,tau,numDerivResults[,c(1,2)]))
-  error_1_plot<- ggplot() + ylim(0,.08) + xlim(0.15,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{1}})$")) +
+  error_1_plot<- ggplot() + ylim(0,.08) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{1}})$")) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE) + 
     geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001)) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE) + 
@@ -196,7 +165,7 @@ ggsave(file=paste("simulation_bias_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""
   if(dist=="NO") {data_input<-as.data.frame(cbind(t2error,tau,trueSE))} ###Add theoretircal errors
   
   error_2_plot<-
-    ggplot() + ylim(0,.08) + xlim(0.15,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{2}})$")) +
+    ggplot() + ylim(0,.08)  + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{2}})$")) +
     geom_smooth(data=data_input, aes(x=tau, y=mu2_se_B2, color="True"), span=1,level=.95,se=FALSE) +
     #geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
     #geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
@@ -209,7 +178,7 @@ ggsave(file=paste("simulation_bias_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""
                         , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
     
   error_2_plot_bt<-
-    ggplot() + ylim(0,.08) + xlim(0.15,.75) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{t}})$")) +
+    ggplot() + ylim(0,.08)  + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{t}})$")) +
     geom_smooth(data=data_input, aes(x=tau, y=mu2_se_Bt, color="True"), span=1,level=.95,se=FALSE) +
     geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.95,se=FALSE,linetype = "dashed",position=position_jitter(w=0.005, h=0.0001)) + 
     geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.95,se=FALSE,linetype = "dashed") +
