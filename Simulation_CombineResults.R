@@ -5,10 +5,11 @@
 #if(dist=="GA"){load("results_combined_N_C0_n1000_geefix_mu1mu21012_GEEFIXV2.rds")}
 #if(dist=="PO"){load("results_combined_PO_1000_2024-02-19")}
 
-#load("results_combined_GA_1000_2024-03-06.RData")
-load("results_combined_NO_1000_2024-03-06.RData")
+load("results_combined_GA_1000_2024-03-06.RData") ####GA
+#load("results_combined_NO_1000_2024-03-06.RData") ####NO
+#load("results_combined_PO_1000_2024-03-07.RData") ####NB/PO
 
-results <- results_combined; dist="NO"
+results <- results_combined; dist="GA"
 
 #Take out parameters
 parameters=matrix(0,nrow=length(results_combined),ncol=6)

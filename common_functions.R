@@ -121,15 +121,16 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
       model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
     }
     
-    if(dist=="PO") {
-      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=, maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson, maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=PO())))
+    if(dist=="PO"||dist=="NB") {
+      invisible(capture.output(model_glm <- glm.nb(random_variable~as.factor(time==1), data=dataset, maxit=1000)))
+      #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
+      
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=PO()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
-      model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family=poisson)
+      model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
     }
     
     ###Capturing coefficient values and errors from each model
@@ -142,7 +143,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                     , BIC(model_glm)
                     , 3
     )
-    #if(dist=="PO"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
+    if(dist=="PO"||dist=="NB"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
     summary_gee<-c( summary(model_gee)$coeff[1]
                     , summary(model_gee)$coeff[2]
                     , summary(model_gee)$coeff[3] 
@@ -151,7 +152,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                     , NA
                     , NA
                     , 4
-    )#}
+    )}
     
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]
@@ -236,7 +237,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
     
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
-    if(dist=="PO"){margin_dist="PO"}
+    if(dist=="PO"){margin_dist="NBI"}
     
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")

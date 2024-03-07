@@ -11,8 +11,8 @@ source("common_functions.R")
 set.seed(1000);options(scipen=999);
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 #dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
-dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
-#dist="PO";a=NA; b=NA; c=2; mu1=1; mu2=2; n=1000
+#dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
+dist="PO";a=NA; b=NA; c=2; mu1=1; mu2=2; n=1000
 #a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
 
 #dataset <- generateBivDist(a=.25, b=1.75, c=NA, mu1=10, mu2=12, n=1000,dist)
@@ -30,39 +30,35 @@ results
 #############Investigating gamlss (5) fit errors
 
 require(gamlss.mx)
-model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                          , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
 
-model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~1, data=dataset, family=GA())
+model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~1, data=dataset, family=NBI())
 
-model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
+model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NBI(), method=CG(1000))
 
 summary(model_re)
+summary(model_re_nosig)
+summary(model_re_np)
 
 library(gamlss.mx)
 
-model_re1 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re1 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
          , g.control = gamlss.control(trace = TRUE), mixture="np")
-model_re2 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re2 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                      , g.control = gamlss.control(trace = TRUE), mixture="gq")
-model_re3 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re3 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                      , g.control = gamlss.control(trace = TRUE), mixture="np",K=20)
-model_re4 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re4 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                      , g.control = gamlss.control(trace = TRUE), mixture="gq",K=20)
-
-
-model_re12 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re12 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                       , g.control = gamlss.control(trace = TRUE), mixture="np",K=2)
-model_re22 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+model_re22 <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                       , g.control = gamlss.control(trace = TRUE), mixture="gq",K=2)
 
-
-model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
-summary(model_lme4)
-help(glmer)
-#summary(model_re1)
+summary(model_re1)
 summary(model_re2)
-#summary(model_re3)
+summary(model_re3)
 summary(model_re4)
 summary(model_re12)
 summary(model_re22)
