@@ -61,145 +61,111 @@ if(dist=="PO") {
 }
   
 tau<-emp_cor<-vector(length=length(results))
-t1intercepts=matrix(ncol=(nrow(results[[1]])-2),nrow=length(results))
-t1error=t1intercepts;t2error=t1intercepts;t2intercepts=t1intercepts
+t1intercepts<-t1error<-t2intercepts<-t2error<-aic<-bic<-loglik<-matrix(ncol=(nrow(results[[1]])-2),nrow=length(results))
 for (i in 1:length(results)) {
   t1intercepts[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"b_1"])
   t2intercepts[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"b_2"])
   t1error[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"se_b1"])
   t2error[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"se_b2"])
   
+  loglik[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])
+  aic[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"AIC"])
+  bic[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"BIC"])
+  
   tau[i]=results[[i]][(nrow(results[[i]])-1),6]/100
   emp_cor[i]=results[[i]][(nrow(results[[i]])-1),7]/100
     
-  colnames(t1intercepts)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
-  colnames(t2intercepts)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
-  colnames(t1error)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
-  colnames(t2error)=colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
+  colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
+}
 
+###Wrapper for easy plotting
+plotVersusTrue <- function (limits,inputs,true,tau,ylab,scaled=FALSE,type="ALL") {
+  
+  if (scaled==TRUE) {
+    inputs = inputs / true-1
+    true = true/true-1
+  }
+  
+  inputs=as.data.frame(inputs)
+  
+  plot<-ggplot() + ylim(limits[3],limits[4]) + labs(x = TeX("Kendall's $\\tau$"), y=ylab) +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE)}} + 
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001))}} +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE)}} + 
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_cop, color="GJRM (C)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="GJRM") { geom_smooth(data=inputs, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),linetype = "dashed",se=FALSE)}} +
+    geom_smooth(data=inputs, aes(x=tau, y=true, color="True"), span=1,se=FALSE) +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
+  return(plot)
 }
 
 ###################### BIAS CHARTS ######################
 
-  ylim_max<-1
+bias_1_plot<- plotVersusTrue(c(-1,1,-1,1)
+               ,if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}
+               ,mu1
+               ,tau
+               ,ylab=TeX("$(\\hat{\\mu_1}/\\mu_1)-1$")
+               , scaled=TRUE)
+bias_2_plot<- plotVersusTrue(c(-1,1,-1,1)
+               ,if(dist=="NO"){cbind((t2intercepts+t1intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
+                else{cbind(exp(t2intercepts+t1intercepts)[,1:5],exp(t2intercepts)[,6:ncol(t1intercepts)])}
+               ,mu2
+               ,tau
+               ,ylab=TeX("$(\\hat{\\mu_2}/\\mu_2)-1$")
+               , scaled=TRUE)
+bias_3_plot<- plotVersusTrue(c(-1,1,-1,1)
+              ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
+               else{cbind(exp(t2intercepts)[,1:5],exp(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
+              ,if(dist=="NO"){(mu2-mu1)}else{(mu2/mu1)}
+              ,tau
+              ,ylab=TeX("$\\left(\\frac{\\hat{\\mu_2}}{\\hat{\\mu_1}}\\div\\frac{\\mu_2}{\\mu_1}\\right)-1$")
+              ,scaled=TRUE)
 
-  if(dist=="GA" || dist=="PO") {data_input<-as.data.frame(cbind(exp(t1intercepts),mu1,mu2,tau))}
-  if(dist=="NO") {data_input<-as.data.frame(cbind((t1intercepts),mu1,mu2,tau))}
-
-  bias_1_plot<-ggplot() + ylim(-1*ylim_max,1*ylim_max) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\mu_1}/\\mu_1)-1$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_glm)/(mu1))-1, color="GLM"),level=.99) + 
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_gee)/(mu1))-1, color="GEE"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_lme4)/(mu1))-1, color="LME4"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_nosig)/(mu1))-1, color="GAMLSS (4)"),level=.99,position=position_jitter(w=0.005, h=0.0001)) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_np)/(mu1))-1, color="GAMLSS NP (5)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop)/(mu1))-1, color="GJRM (C)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop_n)/(mu1))-1, color="GJRM (N)"),level=.99) +
-    geom_hline(aes(yintercept=0,color="True"), size=1) +
-    guides(color=guide_legend(override.aes=list(fill=NA))) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"black"))
-  
-  if(dist=="GA"||dist=="PO") {data_input<-as.data.frame(cbind(exp(t2intercepts+t1intercepts)[,1:5],exp(t2intercepts)[,6:ncol(t1intercepts)],mu1,mu2,tau))}
-  if(dist=="NO") {data_input<-as.data.frame(cbind((t2intercepts+t1intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)],mu1,mu2,tau))}
-
-  bias_2_plot<-ggplot() + ylim(-1*ylim_max,1*ylim_max) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\hat{\\mu_2}/\\mu_2)-1$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_glm)/(mu2))-1, color="GLM"),level=.99) + 
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_gee)/(mu2))-1, color="GEE"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_lme4)/(mu2))-1, color="LME4"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_nosig)/(mu2))-1, color="GAMLSS (4)"),level=.99,position=position_jitter(w=0.005, h=0.0001)) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_np)/(mu2))-1, color="GAMLSS NP (5)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop)/(mu2))-1, color="GJRM (C)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop_n)/(mu2))-1, color="GJRM (N)"),level=.99) +
-    geom_hline(aes(yintercept=0,color="True"), size=1) +
-    guides(color=guide_legend(override.aes=list(fill=NA))) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"black"))
-  
-  if(dist=="GA"||dist=="PO") {data_input<-as.data.frame(cbind(exp(t2intercepts)[,1:5],exp(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)],mu1,mu2/mu1,tau))}
-  if(dist=="NO") {data_input<-as.data.frame(cbind((t2intercepts)[,1:5],(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)],mu1,mu2-mu1,tau))}
-  bias_3_plot<-ggplot()  + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$(\\frac{\\hat{\\mu_2}}{\\hat{\\mu_1}}\\div\\frac{\\mu_2}{\\mu_1})-1$")) + ylim(-1*ylim_max,1*ylim_max)+
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_glm)/((V17)))-1, color="GLM"),level=.99) + 
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_gee)/(V17))-1, color="GEE"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_nosig)/(V17))-1, color="GAMLSS (4)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_re_np)/(V17))-1, color="GAMLSS NP (5)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop)/(V17))-1, color="GJRM (C)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=((summary_cop_n)/(V17))-1, color="GJRM (N)"),level=.99) +
-    geom_hline(aes(yintercept=0,color="True"), size=1) +
-    guides(color=guide_legend(override.aes=list(fill=NA))) +
-
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"black"))
-    
 plot.new()
   ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")  + guides(color=guide_legend(override.aes=list(fill=NA)))
 
-#ggsave(file="simulation_bias_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
 ggsave(file=paste("simulation_bias_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
-  if(dist=="GA"||dist=="PO") {data_input<-as.data.frame(cbind(t1error,tau,trueSE))}
-  if(dist=="NO") {data_input<-as.data.frame(cbind(t1error,tau,trueSE))} ###Add theoretircal errors
-  
-#  data_input<-as.data.frame(cbind(t1error,tau,numDerivResults[,c(1,2)]))
-  error_1_plot<- ggplot() + ylim(0,.08) + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{1}})$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE) + 
-    geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001)) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE) + 
-    geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_cop, color="GJRM (C)"),linetype = "dashed",se=FALSE) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),linetype = "dashed",se=FALSE) +
-    geom_smooth(data=data_input, aes(x=tau, y=mu1_se, color="True"), span=1,se=FALSE) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
+error_1_plot<- plotVersusTrue(c(-1,1,0,.08)
+                             ,t1error
+                             ,trueSE[,"mu1_se"]
+                             ,tau
+                             ,ylab=TeX("$SE(\\hat{\\beta_{1}})$")
+                             ,scaled=FALSE)
+error_2_plot<- plotVersusTrue(c(-1,1,0,.08)
+                              ,t1error
+                              ,trueSE[,"mu2_se_B2"]
+                              ,tau
+                              ,ylab=TeX("$SE(\\hat{\\beta_{2}})$")
+                              ,scaled=FALSE
+                              ,type="GJRM")
+error_2_plot_bt<- plotVersusTrue(c(-1,1,0,.08)
+                              ,t1error
+                              ,trueSE[,"mu2_se_Bt"]
+                              ,tau
+                              ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
+                              ,scaled=FALSE
+                              ,type="non-GJRM")
 
-  #                    ) +
-  #scale_linetype_manual(name="linetype", c('GLM'=1, 'GEE'=2, 'GLMM (4)'=3,'GLMM (5)'=4, 'GJRM (C)'=5, 'GJRM (N)'=6))
-  #theme(legend.position = "right", legend.title=element_text(size=20),
-  #      legend.text=element_text(size=14))
-  
-  #data_input<-as.data.frame(cbind(t2error,tau,numDerivResults[,c(1,2)]))
-  
-  if(dist=="GA"||dist=="PO") {data_input<-as.data.frame(cbind(t2error,tau,trueSE))}
-  if(dist=="NO") {data_input<-as.data.frame(cbind(t2error,tau,trueSE))} ###Add theoretircal errors
-  
-  error_2_plot<-
-    ggplot() + ylim(0,.08)  + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{2}})$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=mu2_se_B2, color="True"), span=1,level=.95,se=FALSE) +
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.99) + 
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.99) +
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GLMM (4)"),level=.99) +
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_re, color="GLMM (5)"),level=.99) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.95,se=FALSE,linetype = "dashed") +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.95,se=FALSE,linetype = "dashed") +
-    
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GLMM (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
-    
-  error_2_plot_bt<-
-    ggplot() + ylim(0,.08)  + labs(x = TeX("Kendall's $\\tau$"), y=TeX("$SE(\\hat{\\beta_{t}})$")) +
-    geom_smooth(data=data_input, aes(x=tau, y=mu2_se_Bt, color="True"), span=1,level=.95,se=FALSE) +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_glm, color="GLM"),level=.95,se=FALSE,linetype = "dashed",position=position_jitter(w=0.005, h=0.0001)) + 
-    geom_smooth(data=data_input, aes(x=tau, y=summary_gee, color="GEE"),level=.95,se=FALSE,linetype = "dashed") +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_lme4, color="LME4"),level=.95,se=FALSE,linetype = "dashed") +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),level=.95,se=FALSE,linetype = "dashed") +
-    geom_smooth(data=data_input, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),level=.95,se=FALSE,linetype = "dashed") +
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_cop, color="GJRM (C)"),level=.99) +
-    #geom_smooth(data=data_input, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),level=.99) +
-    
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
-  
-  ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
+ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-  ggsave(file=paste("simulation_error_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
-  
-  #ggsave(file="simulation_error_charts_all_in_one.png",last_plot(),width=12,height=3,dpi=900)
-  #ggsave(file="simulation_error_charts_all_in_one_MVTNORMAL.png",last_plot(),width=12,height=3,dpi=900)
-  
+ggsave(file=paste("simulation_error_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+
+
+
+
+
+
+
+
   ##########Individual plots###############
   par(mfrow=c(2,3))
   plot(x=trueSE[,"mu1_se"],y=t1error[,"summary_glm"]      ,xlab="True SE",ylab="Estimated SE", main="GLM")      ; abline(a=0, b=1,col="red")
