@@ -5,11 +5,11 @@
 #if(dist=="GA"){load("results_combined_N_C0_n1000_geefix_mu1mu21012_GEEFIXV2.rds")}
 #if(dist=="PO"){load("results_combined_PO_1000_2024-02-19")}
 
-load("results_combined_GA_1000_2024-03-06.RData") ####GA
-#load("results_combined_NO_1000_2024-03-06.RData") ####NO
-#load("results_combined_PO_1000_2024-03-07.RData") ####NB/PO
+#load("results_combined_GA_1000_2024-03-06.RData"); dist="GA" ####GA
+#load("results_combined_NO_1000_2024-03-06.RData"); dist="NO" ####NO
+load("results_combined_PO_1000_2024-03-07.RData"); dist="PO" ####NB/PO
 
-results <- results_combined; dist="GA"
+results <- results_combined
 
 #Take out parameters
 parameters=matrix(0,nrow=length(results_combined),ncol=6)
@@ -17,6 +17,30 @@ for (z in 1:length(results_combined)) {
   parameters[z,]=results_combined[[z]][nrow(results_combined[[z]]),1:6]
 }
 colnames(parameters)<-c("n","a","b","c","mu1","mu2")
+
+###Wrapper for easy plotting
+plotVersusTrue <- function (limits,inputs,true,tau,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE) {
+  
+  if (scaled==TRUE) {
+    inputs = inputs / true-1
+    true = true/true-1
+  }
+  
+  inputs=as.data.frame(inputs)
+  
+  plot<-ggplot() + ylim(limits[3],limits[4]) + labs(x = TeX("Kendall's $\\tau$"), y=ylab) +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE)}} + 
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001))}} +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE)}} + 
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_cop, color="GJRM (C)"),linetype = "dashed",se=FALSE)}} +
+    {if(type=="ALL"||type=="GJRM") { geom_smooth(data=inputs, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),linetype = "dashed",se=FALSE)}} +
+    {if(plotTrue==TRUE){geom_smooth(data=inputs, aes(x=tau, y=true, color="True"), span=1,se=FALSE)}} +
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
+  return(plot)
+}
 
 #################################1. DATA SETUP##################################################
 
@@ -78,29 +102,6 @@ for (i in 1:length(results)) {
   colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
 }
 
-###Wrapper for easy plotting
-plotVersusTrue <- function (limits,inputs,true,tau,ylab,scaled=FALSE,type="ALL") {
-  
-  if (scaled==TRUE) {
-    inputs = inputs / true-1
-    true = true/true-1
-  }
-  
-  inputs=as.data.frame(inputs)
-  
-  plot<-ggplot() + ylim(limits[3],limits[4]) + labs(x = TeX("Kendall's $\\tau$"), y=ylab) +
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE)}} + 
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001))}} +
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE)}} + 
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE)}} +
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE)}} +
-    {if(type=="ALL"||type=="GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_cop, color="GJRM (C)"),linetype = "dashed",se=FALSE)}} +
-    {if(type=="ALL"||type=="GJRM") { geom_smooth(data=inputs, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),linetype = "dashed",se=FALSE)}} +
-    geom_smooth(data=inputs, aes(x=tau, y=true, color="True"), span=1,se=FALSE) +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
-  return(plot)
-}
 
 ###################### BIAS CHARTS ######################
 
@@ -159,9 +160,34 @@ ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, n
   
 ggsave(file=paste("simulation_error_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
 
+########Likelihoods
 
+lik1<- plotVersusTrue(c(-1,1,-10000,0)
+                              ,loglik
+                              ,NA
+                              ,tau
+                              ,ylab="LogLik"
+                              ,scaled=FALSE
+                              ,plotTrue = FALSE)
+lik2<- plotVersusTrue(c(-1,1,0,10000)
+                              ,aic
+                              ,NA
+                              ,tau
+                              ,ylab="AIC"
+                              ,scaled=FALSE
+                              ,plotTrue = FALSE)
+lik3<- plotVersusTrue(c(-1,1,0,10000)
+                                 ,bic
+                                 ,NA
+                                 ,tau
+                                 ,ylab="BIC"
+                                  ,scaled=FALSE
+                                 ,plotTrue = FALSE)
 
+ggarrange(lik1,lik2,lik3,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
+  bgcolor("white")+border(color = "white")
 
+ggsave(file=paste("simulation_loglik_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
 
 
 
