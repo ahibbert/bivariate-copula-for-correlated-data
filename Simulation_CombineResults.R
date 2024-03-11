@@ -19,7 +19,9 @@ for (z in 1:length(results_combined)) {
 colnames(parameters)<-c("n","a","b","c","mu1","mu2")
 
 ###Wrapper for easy plotting
-plotVersusTrue <- function (limits,inputs,true,tau,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE) {
+plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE) {
+  
+  library(ggplot2)
   
   if (scaled==TRUE) {
     inputs = inputs / true-1
@@ -28,9 +30,11 @@ plotVersusTrue <- function (limits,inputs,true,tau,ylab,scaled=FALSE,type="ALL",
   
   inputs=as.data.frame(inputs)
   
-  plot<-ggplot() + ylim(limits[3],limits[4]) + labs(x = TeX("Kendall's $\\tau$"), y=ylab) +
+  plot<-ggplot() + labs(x = xlab, y=ylab) +
+    {if(!(is.na(limits[1])||is.na(limits[2]))){xlim(limits[1],limits[2])}} +
+    {if(!(is.na(limits[3])||is.na(limits[4]))){ylim(limits[3],limits[4])}} +
     {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE)}} + 
-    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter(w=0.005, h=0.0001))}} +
+    {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE)}} +
     {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE)}} + 
     {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE)}} +
     {if(type=="ALL"||type=="non-GJRM") {geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE)}} +
@@ -67,9 +71,9 @@ if(dist=="NO") {
   mu1=parameters[,"mu1"]
   mu2=parameters[,"mu2"]
   #Errors
-  trueSE<-t(rbind((parameters[,"a"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(n)
-                  ,(parameters[,"b"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(n)
-                  ,sqrt((parameters[,"a"]^2)+(parameters[,"b"]^2)-2*parameters[,"a"]*parameters[,"b"]*parameters[,"c"])/sqrt(n)))
+  trueSE<-t(rbind((parameters[,"a"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(parameters[,"n"])
+                  ,(parameters[,"b"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(parameters[,"n"])
+                  ,sqrt((parameters[,"a"]^2)+(parameters[,"b"]^2)-2*parameters[,"a"]*parameters[,"b"]*parameters[,"c"])/sqrt(parameters[,"n"])))
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 }
 if(dist=="PO") {
@@ -105,24 +109,31 @@ for (i in 1:length(results)) {
 
 ###################### BIAS CHARTS ######################
 
-bias_1_plot<- plotVersusTrue(c(-1,1,-1,1)
+library(latex2exp)
+limits_bias = c(.1,0.7,-1,1); xlab=TeX("Kendall's \\tau")
+#if(dist=="NO") {tau=parameters[,"c"]; xlab="Pearson Correlation"}
+
+bias_1_plot<- plotVersusTrue(limits_bias
                ,if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}
                ,mu1
                ,tau
+               ,xlab
                ,ylab=TeX("$(\\hat{\\mu_1}/\\mu_1)-1$")
                , scaled=TRUE)
-bias_2_plot<- plotVersusTrue(c(-1,1,-1,1)
+bias_2_plot<- plotVersusTrue(limits_bias
                ,if(dist=="NO"){cbind((t2intercepts+t1intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
                 else{cbind(exp(t2intercepts+t1intercepts)[,1:5],exp(t2intercepts)[,6:ncol(t1intercepts)])}
                ,mu2
                ,tau
+               ,xlab
                ,ylab=TeX("$(\\hat{\\mu_2}/\\mu_2)-1$")
                , scaled=TRUE)
-bias_3_plot<- plotVersusTrue(c(-1,1,-1,1)
+bias_3_plot<- plotVersusTrue(limits_bias
               ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
                else{cbind(exp(t2intercepts)[,1:5],exp(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
               ,if(dist=="NO"){(mu2-mu1)}else{(mu2/mu1)}
               ,tau
+              ,xlab
               ,ylab=TeX("$\\left(\\frac{\\hat{\\mu_2}}{\\hat{\\mu_1}}\\div\\frac{\\mu_2}{\\mu_1}\\right)-1$")
               ,scaled=TRUE)
 
@@ -130,27 +141,32 @@ plot.new()
   ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")  + guides(color=guide_legend(override.aes=list(fill=NA)))
 
-ggsave(file=paste("simulation_bias_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+ggsave(file=paste("simulation_bias_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
-error_1_plot<- plotVersusTrue(c(-1,1,0,.08)
+limits_error <- c(limits_bias[1:2],0,.1)
+
+error_1_plot<- plotVersusTrue(limits_error
                              ,t1error
                              ,trueSE[,"mu1_se"]
                              ,tau
+                             ,xlab
                              ,ylab=TeX("$SE(\\hat{\\beta_{1}})$")
                              ,scaled=FALSE)
-error_2_plot<- plotVersusTrue(c(-1,1,0,.08)
-                              ,t1error
+error_2_plot<- plotVersusTrue(limits_error
+                              ,t2error
                               ,trueSE[,"mu2_se_B2"]
                               ,tau
+                              ,xlab
                               ,ylab=TeX("$SE(\\hat{\\beta_{2}})$")
                               ,scaled=FALSE
                               ,type="GJRM")
-error_2_plot_bt<- plotVersusTrue(c(-1,1,0,.08)
-                              ,t1error
+error_2_plot_bt<- plotVersusTrue(limits_error
+                              ,t2error
                               ,trueSE[,"mu2_se_Bt"]
                               ,tau
+                              ,xlab
                               ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
                               ,scaled=FALSE
                               ,type="non-GJRM")
@@ -158,36 +174,40 @@ error_2_plot_bt<- plotVersusTrue(c(-1,1,0,.08)
 ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-ggsave(file=paste("simulation_error_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+ggsave(file=paste("simulation_error_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
 
 ########Likelihoods
 
-lik1<- plotVersusTrue(c(-1,1,-10000,0)
+limits_lik <- c(limits_bias[1:2],NA,NA)
+
+lik1<- plotVersusTrue(limits_lik
                               ,loglik
                               ,NA
                               ,tau
+                              ,xlab
                               ,ylab="LogLik"
                               ,scaled=FALSE
                               ,plotTrue = FALSE)
-lik2<- plotVersusTrue(c(-1,1,0,10000)
+lik2<- plotVersusTrue(limits_lik
                               ,aic
                               ,NA
                               ,tau
+                              ,xlab
                               ,ylab="AIC"
                               ,scaled=FALSE
                               ,plotTrue = FALSE)
-lik3<- plotVersusTrue(c(-1,1,0,10000)
+lik3<- plotVersusTrue(limits_lik
                                  ,bic
                                  ,NA
                                  ,tau
+                                 ,xlab
                                  ,ylab="BIC"
                                   ,scaled=FALSE
                                  ,plotTrue = FALSE)
 
 ggarrange(lik1,lik2,lik3,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
   bgcolor("white")+border(color = "white")
-
-ggsave(file=paste("simulation_loglik_AIO_",dist,"_",n,"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+ggsave(file=paste("simulation_loglik_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
 
 
 

@@ -9,10 +9,11 @@ source("common_functions.R")
 
 # a. Simulation parameters
 set.seed(1000);options(scipen=999);
-#dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
+dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 #dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 #dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
-dist="PO";a=NA; b=NA; c=2; mu1=1; mu2=2; n=1000
+#dist="PO";a=NA; b=NA; c=2; mu1=1; mu2=2; n=1000
+#dist="PO";a=NA; b=NA; c=5; mu1=.2; mu2=.2; n=1000
 #a=1; b=1; c=0.75; mu1=1; mu2=2; n=1000
 
 #dataset <- generateBivDist(a=.25, b=1.75, c=NA, mu1=10, mu2=12, n=1000,dist)
@@ -24,6 +25,8 @@ plotDist(dataset,dist)
 ###########2. Fitting all models to the data##############
 results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2)
 results
+
+summary(lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset))
 
 ###USING APPROXIMATION FOR POISSION ESTIMATES OF SE FOR NOW
 
