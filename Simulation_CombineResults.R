@@ -1,10 +1,5 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
-#Load a simulation
-#if(dist=="NO"){load("results_NO_n1000_1_2.rds")}
-#if(dist=="GA"){load("results_combined_N_C0_n1000_geefix_mu1mu21012_GEEFIXV2.rds")}
-#if(dist=="PO"){load("results_combined_PO_1000_2024-02-19")}
-
 #load("results_combined_GA_1000_2024-03-06.RData"); dist="GA" ####GA
 #load("results_combined_NO_1000_2024-03-06.RData"); dist="NO" ####NO
 load("results_combined_PO_1000_2024-03-07.RData"); dist="PO" ####NB/PO
@@ -82,8 +77,20 @@ if(dist=="PO") {
   mu2=parameters[,"mu2"]*parameters[,"c"]
   #Errors
   trueSE<-matrix(ncol=3,nrow=length(results))
+  
+  e_x1 = parameters[,"mu1"]*parameters[,"c"]
+  e_x2 = parameters[,"mu2"]*parameters[,"c"]
+  v_x1 = (((parameters[,"mu1"]^2)*(parameters[,"c"])+(parameters[,"mu1"]*parameters[,"c"]))/((parameters[,"mu1"]*parameters[,"c"])^2))
+  v_x2 = (((parameters[,"mu2"]^2)*(parameters[,"c"])+(parameters[,"mu2"]*parameters[,"c"]))/((parameters[,"mu2"]*parameters[,"c"])^2))
+  
+  se_bt_final <- sqrt(
+    (v_x2 + (v_x1)
+     - log((parameters[,"mu1"]*parameters[,"mu2"]*parameters[,"c"])/(e_x1*e_x2))
+    ) 
+  )/sqrt(parameters[,"n"])    
+  
   for (i in 1:length(results)) {
-    trueSE[i,]<-results[[i]]["actuals",c("se_b1","se_b2","se_b2")]  
+    trueSE[i,]<-c(results[[i]]["actuals",c("se_b1","se_b2")], se_bt_final[i]) 
   }
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 }
@@ -107,6 +114,9 @@ for (i in 1:length(results)) {
 }
 
 
+
+
+  
 ###################### BIAS CHARTS ######################
 
 library(latex2exp)
@@ -141,7 +151,7 @@ plot.new()
   ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")  + guides(color=guide_legend(override.aes=list(fill=NA)))
 
-ggsave(file=paste("simulation_bias_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+#ggsave(file=paste("simulation_bias_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
   
 ###################### ERROR CHARTS #####################
 
@@ -174,11 +184,12 @@ error_2_plot_bt<- plotVersusTrue(limits_error
 ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
-ggsave(file=paste("simulation_error_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
+#ggsave(file=paste("simulation_error_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
 
 ########Likelihoods
 
 limits_lik <- c(limits_bias[1:2],NA,NA)
+if (dist=="PO") {limits_lik <- c(limits_bias[1:2],-5000,0)}
 
 lik1<- plotVersusTrue(limits_lik
                               ,loglik
@@ -188,7 +199,7 @@ lik1<- plotVersusTrue(limits_lik
                               ,ylab="LogLik"
                               ,scaled=FALSE
                               ,plotTrue = FALSE)
-lik2<- plotVersusTrue(limits_lik
+lik2<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
                               ,aic
                               ,NA
                               ,tau
@@ -196,7 +207,7 @@ lik2<- plotVersusTrue(limits_lik
                               ,ylab="AIC"
                               ,scaled=FALSE
                               ,plotTrue = FALSE)
-lik3<- plotVersusTrue(limits_lik
+lik3<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
                                  ,bic
                                  ,NA
                                  ,tau
