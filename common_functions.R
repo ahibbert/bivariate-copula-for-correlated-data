@@ -82,7 +82,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
       , sqrt(v_x1)     /sqrt(n)
       , sqrt(v_x2)     /sqrt(n)
       , sqrt(
-          (v_x2/(e_x2^2)) + (v_x1/(e_x1^2))
+          (v_x2 + v_x1)
           - log((mu1*mu2*c)/(e_x1*e_x2))
       ) /sqrt(n)
       ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
