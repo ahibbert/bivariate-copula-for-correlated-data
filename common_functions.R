@@ -17,15 +17,15 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
   if(dist=="PO") {
     
     #Compound multiple poisson of Stein & Juritz, 1987
-    c<-rgamma(n,c)
+    mixing_dist<-rgamma(n,shape=c,scale=b)
   
     margin_1=vector(length = n) 
     margin_2=vector(length = n) 
     for (i in 1:n) {
-      margin_1[i]=rpois(1,mu1*c[i])
+      margin_1[i]=rpois(1,mu1*mixing_dist[i])
     }
     for (i in 1:n) {
-      margin_2[i]=rpois(1,mu2*c[i])
+      margin_2[i]=rpois(1,mu2*mixing_dist[i])
     }
   }
 
@@ -71,10 +71,10 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
   }
   if(dist=="PO"){
     
-    e_x1 = mu1*c
-    e_x2 = mu2*c
-    v_x1 = (((mu1^2)*(c)+(mu1*c))/((mu1*c)^2))
-    v_x2 = (((mu2^2)*(c)+(mu2*c))/((mu2*c)^2))
+    e_x1 = mu1*c*b
+    e_x2 = mu2*c*b
+    v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
+    v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
     
     actuals<-c( 
       e_x1

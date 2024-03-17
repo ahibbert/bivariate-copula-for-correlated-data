@@ -1,15 +1,24 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
-#load("results_combined_GA_1000_2024-03-06.RData"); dist="GA" ####GA
-#load("results_combined_NO_1000_2024-03-06.RData"); dist="NO" ####NO
-load("results_combined_PO_1000_2024-03-07.RData"); dist="PO" ####NB/PO
+#load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
+#load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
+#load("results_combined_nointPO_1000_2024-03-15.RData"); dist="PO" ####NB/PO
 
-results <- results_combined
+load("results_combined_nointPO_1000_2024-03-16.RData"); dist="PO" ####NB/PO
+
+check_length=c()
+for (i in 1:length(results_combined)) {
+  check_length[i]<-nrow(results_combined[[i]])  
+}
+
+if(!(min(check_length)==max(check_length))) {print("WARNING: Some simulations are incomplete")}
+
+results <- results_combined[check_length==max(check_length)]
 
 #Take out parameters
-parameters=matrix(0,nrow=length(results_combined),ncol=6)
-for (z in 1:length(results_combined)) {
-  parameters[z,]=results_combined[[z]][nrow(results_combined[[z]]),1:6]
+parameters=matrix(0,nrow=length(results),ncol=6)
+for (z in 1:length(results)) {
+  parameters[z,]=results[[z]][nrow(results[[z]]),1:6]
 }
 colnames(parameters)<-c("n","a","b","c","mu1","mu2")
 
@@ -73,24 +82,26 @@ if(dist=="NO") {
 }
 if(dist=="PO") {
   #Parameters
-  mu1=parameters[,"mu1"]*parameters[,"c"]
-  mu2=parameters[,"mu2"]*parameters[,"c"]
+  #mu1=parameters[,"mu1"]*parameters[,"c"]
+  #mu2=parameters[,"mu2"]*parameters[,"c"]
   #Errors
   trueSE<-matrix(ncol=3,nrow=length(results))
   
-  e_x1 = parameters[,"mu1"]*parameters[,"c"]
-  e_x2 = parameters[,"mu2"]*parameters[,"c"]
-  v_x1 = (((parameters[,"mu1"]^2)*(parameters[,"c"])+(parameters[,"mu1"]*parameters[,"c"]))/((parameters[,"mu1"]*parameters[,"c"])^2))
-  v_x2 = (((parameters[,"mu2"]^2)*(parameters[,"c"])+(parameters[,"mu2"]*parameters[,"c"]))/((parameters[,"mu2"]*parameters[,"c"])^2))
+  #e_x1 = parameters[,"mu1"]*parameters[,"c"]
+  #e_x2 = parameters[,"mu2"]*parameters[,"c"]
+  #v_x1 = (((parameters[,"mu1"]^2)*(parameters[,"c"])+(parameters[,"mu1"]*parameters[,"c"]))/((parameters[,"mu1"]*parameters[,"c"])^2))
+  #v_x2 = (((parameters[,"mu2"]^2)*(parameters[,"c"])+(parameters[,"mu2"]*parameters[,"c"]))/((parameters[,"mu2"]*parameters[,"c"])^2))
   
-  se_bt_final <- sqrt(
-    (v_x2 + (v_x1)
-     - log((parameters[,"mu1"]*parameters[,"mu2"]*parameters[,"c"])/(e_x1*e_x2))
-    ) 
-  )/sqrt(parameters[,"n"])    
+  #se_bt_final <- sqrt(
+  #  (v_x2 + (v_x1)
+  #   - log((parameters[,"mu1"]*parameters[,"mu2"]*parameters[,"c"])/(e_x1*e_x2))
+  #  ) 
+  #)/sqrt(parameters[,"n"])    
   
   for (i in 1:length(results)) {
-    trueSE[i,]<-c(results[[i]]["actuals",c("se_b1","se_b2")], se_bt_final[i]) 
+    trueSE[i,]<-c(results[[i]]["actuals",c("se_b1","se_b2","LogLik")]) 
+    mu1[i]=c(results[[i]]["actuals",c("b_1")]) 
+    mu2[i]=c(results[[i]]["actuals",c("b_2")]) 
   }
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 }
@@ -113,15 +124,14 @@ for (i in 1:length(results)) {
   colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
 }
 
-
-
-
-  
 ###################### BIAS CHARTS ######################
 
 library(latex2exp)
 limits_bias = c(.1,0.7,-1,1); xlab=TeX("Kendall's \\tau")
 #if(dist=="NO") {tau=parameters[,"c"]; xlab="Pearson Correlation"}
+
+nrow(t1intercepts)
+nrow(t2intercepts)
 
 bias_1_plot<- plotVersusTrue(limits_bias
                ,if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}
@@ -131,24 +141,15 @@ bias_1_plot<- plotVersusTrue(limits_bias
                ,ylab=TeX("$(\\hat{\\mu_1}/\\mu_1)-1$")
                , scaled=TRUE)
 bias_2_plot<- plotVersusTrue(limits_bias
-               ,if(dist=="NO"){cbind((t2intercepts+t1intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
-                else{cbind(exp(t2intercepts+t1intercepts)[,1:5],exp(t2intercepts)[,6:ncol(t1intercepts)])}
+               ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
+                else{cbind(exp(t2intercepts)[,1:5],exp(t2intercepts)[,6:ncol(t1intercepts)])}
                ,mu2
                ,tau
                ,xlab
                ,ylab=TeX("$(\\hat{\\mu_2}/\\mu_2)-1$")
-               , scaled=TRUE)
-bias_3_plot<- plotVersusTrue(limits_bias
-              ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
-               else{cbind(exp(t2intercepts)[,1:5],exp(t2intercepts-t1intercepts)[,6:ncol(t1intercepts)])}
-              ,if(dist=="NO"){(mu2-mu1)}else{(mu2/mu1)}
-              ,tau
-              ,xlab
-              ,ylab=TeX("$\\left(\\frac{\\hat{\\mu_2}}{\\hat{\\mu_1}}\\div\\frac{\\mu_2}{\\mu_1}\\right)-1$")
-              ,scaled=TRUE)
-
+               ,scaled=TRUE)
 plot.new()
-  ggarrange(bias_1_plot,bias_2_plot, bias_3_plot,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
+  ggarrange(bias_1_plot,bias_2_plot,common.legend=TRUE,nrow=1, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")  + guides(color=guide_legend(override.aes=list(fill=NA)))
 
 #ggsave(file=paste("simulation_bias_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
@@ -170,18 +171,9 @@ error_2_plot<- plotVersusTrue(limits_error
                               ,tau
                               ,xlab
                               ,ylab=TeX("$SE(\\hat{\\beta_{2}})$")
-                              ,scaled=FALSE
-                              ,type="GJRM")
-error_2_plot_bt<- plotVersusTrue(limits_error
-                              ,t2error
-                              ,trueSE[,"mu2_se_Bt"]
-                              ,tau
-                              ,xlab
-                              ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
-                              ,scaled=FALSE
-                              ,type="non-GJRM")
+                              ,scaled=FALSE)
 
-ggarrange(error_1_plot,error_2_plot,error_2_plot_bt,common.legend=TRUE,nrow=1, ncol=3, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
+ggarrange(error_1_plot,error_2_plot,common.legend=TRUE,nrow=1, ncol=2, legend="right",labels="AUTO") + #,labels=c("(a)","(b)","(c)","(d)"), font.label = list(size=12,face="plain"
     bgcolor("white")+border(color = "white")
   
 #ggsave(file=paste("simulation_error_AIO_",dist,"_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=3,dpi=900)
