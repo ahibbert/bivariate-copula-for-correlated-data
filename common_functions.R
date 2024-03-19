@@ -48,6 +48,9 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
   gamma_c_mu1<-dataset[dataset$time==0,]
   gamma_c_mu2<-dataset[dataset$time==1,]
   
+  #Calculating actuals for parameters where available
+  library(e1071)
+  
   if(dist=="GA"){
     actuals<-c( log(a/mu1)
                 , log(a/mu2)
@@ -56,6 +59,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
                 , NA
                 ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
                 ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+                ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
     )
   }
   if(dist=="NO"){
@@ -67,6 +71,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
       , sqrt(a^2+b^2-2*a*b*c)/sqrt(n)
       ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
       ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+      ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
     )
   }
   if(dist=="PO"){
@@ -87,6 +92,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
       ) /sqrt(n)
       ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
       ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+      ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
     )
   }
   
