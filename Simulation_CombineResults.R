@@ -1,37 +1,10 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
-load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
-#load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
-#load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
-
-multiplot=TRUE
-
-#################################1. DATA SETUP##################################################
-
-if ( (multiplot==FALSE) || (multiplot==TRUE && (!exists("first_run"))) ) {
-  plot_count_lik<-plotcount<-0; bias_plots <- lik_plots_skew <- skew_error_plots <- skew_bias_plots <- error_plots <- lik_plots<-list(); first_run=FALSE;
-}
-
-check_length=c()
-for (i in 1:length(results_combined)) {
-  check_length[i]<-nrow(results_combined[[i]])  
-}
-
-if(!(min(check_length)==max(check_length))) {print("WARNING: Some simulations are incomplete")}
-
-results <- results_combined[check_length==max(check_length)]
-
-#Take out parameters
-parameters=matrix(0,nrow=length(results),ncol=6)
-for (z in 1:length(results)) {
-  parameters[z,]=results[[z]][nrow(results[[z]]),1:6]
-}
-colnames(parameters)<-c("n","a","b","c","mu1","mu2")
-
-###Wrapper for easy plotting
+require(latex2exp)
+require(ggplot2)
+require(ggpubr)
+require(RColorBrewer)
 plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE) {
-  
-  library(ggplot2)
   
   if (scaled==TRUE) {
     inputs = inputs / true-1
@@ -56,16 +29,41 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
   return(plot)
 }
 
-require(latex2exp)
-require(ggplot2)
-require(ggpubr)
-require(RColorBrewer)
+#load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
+#load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
+load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
+
+multiplot=TRUE
+
+#################################1. DATA SETUP##################################################
+
+if ( (multiplot==FALSE) || (multiplot==TRUE && (!exists("first_run"))) ) {
+  plot_count_lik<-plotcount<-0; bias_plots <- lik_plots_skew <- skew_error_plots <- skew_bias_plots <- error_plots <- lik_plots<-list(); first_run=FALSE;bias_all<-list();
+}
+
+check_length=c()
+for (i in 1:length(results_combined)) {
+  check_length[i]<-nrow(results_combined[[i]])  
+}
+
+if(!(min(check_length)==max(check_length))) {print("WARNING: Some simulations are incomplete")}
+
+results <- results_combined[check_length==max(check_length)]
+
+#Take out parameters
+parameters=matrix(0,nrow=length(results),ncol=6)
+for (z in 1:length(results)) {
+  parameters[z,]=results[[z]][nrow(results[[z]]),1:6]
+}
+colnames(parameters)<-c("n","a","b","c","mu1","mu2")
+
+###Wrapper for easy plotting
 
 set.seed(1000)
 options(scipen=999)
 
 tau<-emp_cor<-mu1<-mu2<-skew<-vector(length=length(results))
-t1intercepts<-t1error<-t2intercepts<-t2error<-aic<-bic<-loglik<-matrix(ncol=(nrow(results[[1]])-2),nrow=length(results))
+t1intercepts<-t1error<-t2intercepts<-t2error<-aic<-bic<-adj_bic<-aic_4<-loglik<-matrix(ncol=(nrow(results[[1]])-2),nrow=length(results))
 
 for (i in 1:length(results)) {
   t1intercepts[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"b_1"])
@@ -75,12 +73,16 @@ for (i in 1:length(results)) {
   
   loglik[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])
   aic[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"AIC"])
+  aic_4[i,]=-2*t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])+4*t(results[[i]][1:(nrow(results[[i]])-2),"EDF"])
+  
+  adj_bic[i,]=-2*t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])+log(1000)*t(results[[i]][1:(nrow(results[[i]])-2),"EDF"])
+  
   bic[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"BIC"])
   
   tau[i]=results[[i]][(nrow(results[[i]])-1),6]/100
   emp_cor[i]=results[[i]][(nrow(results[[i]])-1),7]/100
   
-  colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
+  colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(aic_4)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(adj_bic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
 }
 
 #Theoretical errors
@@ -120,9 +122,9 @@ if(dist=="PO") {
 
 library(latex2exp)
 limits_bias = c(.1,0.7,-1,1); xlab=TeX("Kendall's \\tau")
-limits_error <- c(limits_bias[1:2],0,if(dist=="PO"){.25}else{.15})
+limits_error <- c(limits_bias[1:2],0,if(dist=="PO"){.25}else{.125})
 limits_bias_skew = c(min(skew),max(skew),-1,1); xlabskew=TeX("Skewness")
-limits_error_skew <- c(limits_bias_skew[1:2],0,if(dist=="PO"){.25}else{.15})
+limits_error_skew <- c(limits_bias_skew[1:2],0,if(dist=="PO"){.25}else{.125})
 #if(dist=="NO") {tau=parameters[,"c"]; xlab="Pearson Correlation"}
 
 plotcount=plotcount+1
@@ -217,7 +219,7 @@ lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)
                                              ,NA
                                              ,tau
                                              ,xlab
-                                             ,ylab="AIC"
+                                             ,ylab="AIC (2)"
                                              ,scaled=FALSE
                                              ,plotTrue = FALSE)
 lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
@@ -225,12 +227,31 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
                                                   ,NA
                                                   ,skew
                                                   ,xlabskew
-                                                  ,ylab="AIC"
+                                                  ,ylab="AIC (2)"
+                                                  ,scaled=FALSE
+                                                  ,plotTrue = FALSE)
+
+plot_count_lik=plot_count_lik+1
+lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
+                                             ,aic_4#bic
+                                             ,NA
+                                             ,tau
+                                             ,xlab
+                                             ,ylab="AIC (4)"
+                                             ,scaled=FALSE
+                                             ,plotTrue = FALSE)
+
+lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
+                                                  ,aic_4#bic
+                                                  ,NA
+                                                  ,skew
+                                                  ,xlabskew
+                                                  ,ylab="AIC (4)"
                                                   ,scaled=FALSE
                                                   ,plotTrue = FALSE)
 plot_count_lik=plot_count_lik+1
 lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
-                                             ,bic
+                                             ,adj_bic#bic
                                              ,NA
                                              ,tau
                                              ,xlab
@@ -239,7 +260,7 @@ lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)
                                              ,plotTrue = FALSE)
 
 lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
-                                                  ,bic
+                                                  ,adj_bic#bic
                                                   ,NA
                                                   ,skew
                                                   ,xlabskew
@@ -248,19 +269,39 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
                                                   ,plotTrue = FALSE)
 
 
+
+
+
 ###################PLOT FUNCTION#############################
 
-ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels="AUTO") + bgcolor("white") + border(color = "white") # Bias x Tau
-ggsave(file=paste("simulation_bias_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-ggarrange(plotlist=skew_bias_plots  ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels="AUTO") + bgcolor("white") + border(color = "white") # Bias x Skew
-ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
-ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels="AUTO") + bgcolor("white") + border(color = "white") # Error x Tau
-ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels="AUTO") + bgcolor("white") + border(color = "white") # Error x Skew
-ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
-ggarrange(plotlist=lik_plots        ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels="AUTO") + bgcolor("white") + border(color = "white") # Likelihoods x Tau
-ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=9,dpi=900)
-ggarrange(plotlist=lik_plots_skew   ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels="AUTO") + bgcolor("white") + border(color = "white") # Likelihoods x Skew
-ggsave(file=paste("simulation_loglik_AIO_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
+#ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Bias x Tau
+#ggsave(file=paste("simulation_bias_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
+#ggarrange(plotlist=skew_bias_plots  ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Bias x Skew
+#ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
+#ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Tau
+#ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
+#ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
+#ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
+ggarrange(plotlist=lik_plots[c(1,5,9,2,6,10,3,7,11,4,8,12)]     ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels=c("N","P","G","N","P","G","N","P","G","N","P","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=10,dpi=900)
+#ggarrange(plotlist=lik_plots_skew   ,common.legend=TRUE, ncol=4, nrow=plot_count_lik/4, labels=c("P","P","P","G","G","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Skew
+#ggsave(file=paste("simulation_loglik_AIO_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
   
 ###guides(color=guide_legend(override.aes=list(fill=NA)))
+
+#############Bias v skew table
+
+bias_all[[plotcount/2]]<-cbind(trunc(tau*10,1)*10,trunc(skew),(if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}/mu1)-1)
+
+#bias_all_combined<-rbind(bias_all[[1]],bias_all[[2]])
+#bias_all<-bias_all_combined
+
+bias_table_list<-list()
+for (i in 1:3) {
+  dataset<- bias_all[[plotcount/2]][,c(1,2,4+i)]
+  colnames(dataset)<-c("tau","skew","bias")
+  summary<-aggregate(dataset[,"bias"] ~ dataset[,"tau"] + dataset[,"skew"], data = dataset, mean, na.rm = TRUE)
+  colnames(summary)<-c("tau","skew","bias")
+  bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
+}
+
