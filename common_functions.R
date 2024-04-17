@@ -40,7 +40,7 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
   return(dataset)
 }
 
-fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
+fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
   
   n=nrow(dataset[dataset$time==0,])
   
@@ -49,51 +49,55 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
   gamma_c_mu2<-dataset[dataset$time==1,]
   
   #Calculating actuals for parameters where available
-  library(e1071)
+  if(calc_actuals==FALSE) {actuals<-c(NA,NA,NA,NA,NA,NA,NA,NA)} else {
   
-  if(dist=="GA"){
-    actuals<-c( log(a/mu1)
-                , log(a/mu2)
-                , NA
-                , NA
-                , NA
-                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
-                ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
-                ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
-    )
-  }
-  if(dist=="NO"){
-    actuals<-c( 
-      mu1
-      , mu2
-      , (a*sqrt(1-c^2))/sqrt(n)
-      , (b*sqrt(1-c^2))/sqrt(n)
-      , sqrt(a^2+b^2-2*a*b*c)/sqrt(n)
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
-      ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
-    )
-  }
-  if(dist=="PO"){
+  library(e1071)
+
+    if(dist=="GA"){
+      actuals<-c( log(a*mu1)
+                  , log(a*mu2)
+                  , NA
+                  , NA
+                  , NA
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+                  ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
+      )
+    }
+    if(dist=="NO"){
+      actuals<-c( 
+        mu1
+        , mu2
+        , (a*sqrt(1-c^2))/sqrt(n)
+        , (b*sqrt(1-c^2))/sqrt(n)
+        , sqrt(a^2+b^2-2*a*b*c)/sqrt(n)
+        ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+        ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+        ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
+      )
+    }
+    if(dist=="PO"){
+      
+      e_x1 = mu1*c*b
+      e_x2 = mu2*c*b
+      v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
+      v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
+      
+      actuals<-c( 
+        e_x1
+        , e_x2
+        , sqrt(v_x1)     /sqrt(n)
+        , sqrt(v_x2)     /sqrt(n)
+        , sqrt(
+            (v_x2 + v_x1)
+            - log((mu1*mu2*c)/(e_x1*e_x2))
+        ) /sqrt(n)
+        ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+        ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+        ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
+      )
+    }
     
-    e_x1 = mu1*c*b
-    e_x2 = mu2*c*b
-    v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
-    v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
-    
-    actuals<-c( 
-      e_x1
-      , e_x2
-      , sqrt(v_x1)     /sqrt(n)
-      , sqrt(v_x2)     /sqrt(n)
-      , sqrt(
-          (v_x2 + v_x1)
-          - log((mu1*mu2*c)/(e_x1*e_x2))
-      ) /sqrt(n)
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
-      ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
-      ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
-    )
   }
   
   if(include=="ALL" || include=="non-GJRM" ) {
@@ -152,8 +156,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2) {
     if(dist=="PO"||dist=="NB"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
     summary_gee<-c( summary(model_gee)$coeff[1]
                     , summary(model_gee)$coeff[2]
-                    , summary(model_gee)$coeff[3] 
-                    , summary(model_gee)$coeff[4] 
+                    , summary(model_gee)$coeff[7]#### 
+                    , summary(model_gee)$coeff[8]####
                     , NA
                     , NA
                     , NA

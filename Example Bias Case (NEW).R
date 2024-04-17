@@ -4,26 +4,309 @@
 
 ########### 0. DATA SETUP ##############
 
+############### 0.2 Applications #############
+####CHOOSE A DATASET
+
+#Lipids Data
+#require(sas7bdat)
+#lipid <- read.sas7bdat("LipidsData.sas7bdat")
+#lipids_merged<-(merge(lipid[lipid$MONTH==0,],lipid[lipid$MONTH==24,],by="PATIENT"))
+lipids_merged<-readRDS("lipids_merged.rds")
+gamma_c_mu1<-lipids_merged$TRG.x
+gamma_c_mu2<-lipids_merged$TRG.y
+
+lipids_merged<-readRDS("lipids_merged.rds")
+gamma_c_mu1<-lipids_merged$HDL.x
+gamma_c_mu2<-lipids_merged$HDL.y
+
+#Stock prices over 10 years
+
+#ASX2018<-read.table("20180102.txt", header=FALSE, sep=",")
+#ASX1998<-read.table("19980102.txt", header=FALSE, sep=",")
+#ASX98_18<-merge(ASX1998,ASX2018,by="V1")
+ASX98_18<-readRDS("ASX98_18.rds")
+gamma_c_mu1<-ASX98_18$V6.x
+gamma_c_mu2<-ASX98_18$V6.y
+
+#Avocado prices
+#avo<-read.table("avocado prices.csv", header=T, sep=",")
+avo<-readRDS("avo.rds")
+gamma_c_mu1<-avo[avo$Date=="4/01/2015","AveragePrice"]
+gamma_c_mu2<-avo[avo$Date=="25/03/2018","AveragePrice"]
+
+# c.Setting up as longitiduinal structured data
+patient<-as.factor(seq(1:length(gamma_c_mu1)))
+dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
+colnames(dataset)<-c("patient","random_variable","time")
+dataset<-dataset[order(dataset$patient),]
+dist="GA"
+
+
 ############## 0.1 Simulation ##################
 source("common_functions.R")
 
 # a. Simulation parameters
 set.seed(1000);options(scipen=999);
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
-#dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
+dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 #dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
-dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000
-#dist="PO";a=NA; b=NA; c=5; mu1=.2; mu2=.2; n=1000
+#dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
+#dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
 
 dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
 plotDist(dataset,dist)
 
-###########2. Fitting all models to the data##############
-results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2)
-results
+results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
+if(dist=="NO"){clean_results<-results}else{clean_results<-cbind(results,round(exp(results[,c(1,2)]),4));
+clean_results<-cbind(clean_results[,c(9,10)],clean_results[,1:8]);colnames(clean_results)<-c("mu_1","mu_2",colnames(clean_results[,c(3:10)]))}
+clean_results
 
-###USING APPROXIMATION FOR POISSION ESTIMATES OF SE FOR NOW
+###########Fitting individual models##############
+
+library(gamlss)
+library(lme4)
+library(gee)
+library(gamlss.mx)
+
+model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=GA()) 
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+
+model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+
+model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
+model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                         , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
+summary(model_re_np)
+summary(model_glm)
+summary(model_gee)
+summary(model_lme4)
+summary(model_re_nosig)
+
+
+
+#########Estimating marginal means from predictions ################
+
+
+
+model_glm <- gamlss(formula=random_variable~-1+as.factor(time==1), data=dataset, family=GA()) 
+model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
+model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+model_re_nosig_ident <- gamlss(formula=1+random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA(mu.link="identity")) #UNBIASED
+model_re_no <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NO(mu.link = "identity",sigma.link="log")) #UNBIASED
+model_re_no_log <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NO(mu.link = "log",sigma.link="log")) #BIASED but better AIC
+
+model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+
+mean(predict(model_re_nosig)[dataset$time==0]+model_re_nosig$mu.coefSmo[[1]]$coef)
+mean(predict(model_re_nosig)[dataset$time==1]+model_re_nosig$mu.coefSmo[[1]]$coef)
+
+
+
+mean(predict(model_re_nosig,type="response")[dataset$time==0])
+mean(predict(model_re_nosig,type="response")[dataset$time==1])
+
+hist(predict(model_re_nosig)[dataset$time==0])
+hist(model_re_nosig$mu.coefSmo[[1]]$coef)
+
+hist(predict(model_re_nosig)[dataset$time==0]+model_re_nosig$mu.coefSmo[[1]]$coef)
+
+
+hist(predict(model_re_nosig)[dataset$time==0])
+hist(model_re_nosig$mu.coefSmo[[1]]$coef)
+
+model_re_nosig$mu.coefSmo[[1]]$coef
+
+#install.packages("emmeans")
+#library(emmeans)
+#EMM<-emmeans(model_lme4,specs = all.vars(terms(model_lme4)[[3]]) )
+#EMM
+#pairs(EMM)
+
+install.packages("ggeffects")
+library(ggeffects)
+predict_response(model_lme4)
+
+#install.packages("marginaleffects")
+library(marginaleffects)
+summary(model_lme4)
+glm_mod<-model_lme4
+
+
+predictions(
+  glm_mod,
+  by = "time",type = "response")
+avg_predictions(
+  glm_mod,
+  by = "time",type = "response")
+predictions(
+  glm_mod,
+  by = "time",type = "link")
+avg_predictions(
+  glm_mod,
+  by = "time",type = "link")
+predictions(
+  glm_mod,
+  by = "time",
+  newdata = datagrid(grid_type = "balanced"), type="response")
+predictions(
+  glm_mod,
+  by="time",
+  newdata = datagrid(model=glm_mod, time=0:1, grid_type = "counterfactual"), type="response")
+
+
+re_gamlss<-model_re_nosig$mu.coefSmo[[1]]$coef
+re_lme4<-getME(model_lme4,"b")[,1]
+
+pred_lme4<- predict(model_lme4,type="link", se.fit=TRUE)
+pred_gamlss<- predict(model_re_nosig,type="link", se.fit=TRUE)
+
+#######CONDITIONAL MODEL RESULTS
+
+exp(mean((pred_lme4$fit)[dataset$time==0])) #######This is the result from the conditional model
+exp(mean((pred_lme4$fit)[dataset$time==1]))
+exp(mean((pred_gamlss$fit)[dataset$time==0]))
+exp(mean((pred_gamlss$fit)[dataset$time==1]))
+
+(mean((pred_lme4$fit)[dataset$time==0])) #######This is the result from the conditional model
+(mean((pred_lme4$fit)[dataset$time==1]))
+(mean((pred_gamlss$fit)[dataset$time==0]))
+(mean((pred_gamlss$fit)[dataset$time==1]))
+
+mean(exp(pred_lme4$fit)[dataset$time==0]) ##########But this is the true marginal result
+mean(exp(pred_lme4$fit)[dataset$time==1])
+mean(exp(pred_gamlss$fit)[dataset$time==0])
+mean(exp(pred_gamlss$fit)[dataset$time==1])
+
+
+pred <- predictions(
+  glm_mod,
+  newdata = datagrid(patient = NA,
+                     time = 0:1),
+  re.form = NA)
+
+#glm_mod <- glm(vs ~ hp + am, data = mtcars, family = binomial)
+
+avg_predictions(glm_mod)$estimate
+#> [1] 0.06308965
+
+## Step 1: predict on the link scale
+p <- predictions(glm_mod, type = "link")$estimate
+
+predictions(glm_mod, type = "response",by="time")
+## Step 2: average
+mean_p <- mean(p)
+## Step 3: backtransform
+glm_mod@resp$family$linkinv(mean_p)
+#> [1] 0.06308965
+
+
+#mod<-model_re_nosig
+pred <- predictions(mod, type = "response")
+#Equivalent to
+mean(predict(model_re_nosig,type="response")[dataset$time==0])
+mean(predict(model_re_nosig,type="response")[dataset$time==1])
+
+mean(pred$random_variable[pred$time==0])
+mean(pred$random_variable[pred$time==1])
+
+avg_predictions(mod,by="time") #unbiased
+avg_predictions(mod,by="time",type="link") #Biased
+avg_predictions(mod, by = "time",
+                vcov = "HC3",
+                conf_level = .9)
+
+
+predictions(
+  mod,
+  by="time",type="link")
+
+
+predictions(
+  mod,
+  type = "link",
+  by = "time",
+  newdata = datagrid(time = 0:1, grid_type = "counterfactual"))
+
+
+plot(model_lme4)
+
+##########Looking at the random effects shape ##########
+re_gamlss<-model_re_nosig$mu.coefSmo[[1]]$coef
+re_lme4<-getME(model_lme4,"b")[,1]
+
+re_gamlss_logno<-model_re_nosig_logno$mu.coefSmo[[1]]$coef
+
+par(mfrow=c(2,2))
+hist(re_gamlss,main="GAMLSS Random Effect")
+hist(re_lme4,main="LME4 Random Effect")
+hist(exp(re_gamlss),main="EXP GAMLSS Random Effect")
+hist(exp(re_lme4),main="EXP LME4 Random Effect")
+
+fitDist(re_gamlss,type="realline")$fits ###EGB2
+fitDist(re_lme4,type="realline")$fits
+
+par(mfrow=c(3,2))
+#histDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(re_gamlss)),nbins=100,family="GA")
+histDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(re_lme4)),nbins=20,family="GA",main="GA: Time 1")
+#histDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(re_gamlss)),nbins=100,family="GA")
+histDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(re_lme4)),nbins=20,family="GA",main="GA: Time 2")
+histDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(re_lme4)),nbins=20,family="GG",main="GG: Time 1")
+histDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(re_lme4)),nbins=20,family="GG",main="GG: Time 2")
+histDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(re_lme4)),nbins=20,family="GB2",main="GB2: Time 1")
+histDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(re_lme4)),nbins=20,family="GB2",main="GB2: Time 2")
+
+fit1<-fitDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(model_re_nosig$mu.coefSmo[[1]]$coef)))
+fit2<-fitDist(exp(log(dataset[dataset[,"time"]==0,"random_variable"])-(getME(model_lme4,"b")[,1])))
+fit3<-fitDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(model_re_nosig$mu.coefSmo[[1]]$coef)))
+fit4<-fitDist(exp(log(dataset[dataset[,"time"]==1,"random_variable"])-(getME(model_lme4,"b")[,1])))
+
+fit1$fits
+fit2$fits
+fit3$fits
+fit4$fits
+
+model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=Gamma(link = "log"), maxit=1000)
+model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+model_re_nosig <- gamlss(formula=100+random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA(mu.link="identity")) 
+
+
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=BCPE()) 
+summary(model_re_nosig)
+
+
+
+model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                                                 , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
+
+model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+
+
+model_glm<-glm(random_variable~-1+as.factor(time==1), data=dataset, family=gaussian, maxit=1000)
+
+model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+summary(model_lme4)
+
+as.data.frame(VarCorr(model_lme4))
+
+(dotplot(ranef(model_lme4, postVar=TRUE)))
+
+fixef(model_lme4)
+coef(summary(model_lme4))
+AIC(model_lme4)
+AIC(model_glm)
+
+
+
+
+mean(dataset[dataset[,"time"]==1,"random_variable"])/mean(dataset[dataset[,"time"]==0,"random_variable"])
+mean(dataset[dataset[,"time"]==1,"random_variable"]/dataset[dataset[,"time"]==0,"random_variable"])
+hist(dataset[dataset[,"time"]==1,"random_variable"]/dataset[dataset[,"time"]==0,"random_variable"],breaks=20)
+
+library(copula)
+exchTest(cbind(dataset[dataset[,"time"]==0,"random_variable"],dataset[dataset[,"time"]==1,"random_variable"]))
 
 #############Investigating gamlss (5) fit errors
 
@@ -90,37 +373,6 @@ summary(model_copula_n)
 
 
 
-############### 0.2 Applications #############
-####CHOOSE A DATASET
-
-  #Lipids Data
-  #require(sas7bdat)
-  #lipid <- read.sas7bdat("LipidsData.sas7bdat")
-  #lipids_merged<-(merge(lipid[lipid$MONTH==0,],lipid[lipid$MONTH==24,],by="PATIENT"))
-  lipids_merged<-readRDS("lipids_merged.rds")
-  gamma_c_mu1<-lipids_merged$TRG.x
-  gamma_c_mu2<-lipids_merged$TRG.y
-  
-  #Stock prices over 10 years
-  
-  #ASX2018<-read.table("20180102.txt", header=FALSE, sep=",")
-  #ASX1998<-read.table("19980102.txt", header=FALSE, sep=",")
-  #ASX98_18<-merge(ASX1998,ASX2018,by="V1")
-  ASX98_18<-readRDS("ASX98_18.rds")
-  gamma_c_mu1<-ASX98_18$V6.x
-  gamma_c_mu2<-ASX98_18$V6.y
-  
-  #Avocado prices
-  #avo<-read.table("avocado prices.csv", header=T, sep=",")
-  avo<-readRDS("avo.rds")
-  gamma_c_mu1<-avo[avo$Date=="4/01/2015","AveragePrice"]
-  gamma_c_mu2<-avo[avo$Date=="25/03/2018","AveragePrice"]
-
-# c.Setting up as longitiduinal structured data
-patient<-as.factor(seq(1:length(gamma_c_mu1)))
-dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
-colnames(dataset)<-c("patient","random_variable","time")
-dataset<-dataset[order(dataset$patient),]
 
 ################# 1. Investigating the dependence structure and best copula fit
 ################## 1.1 bias case plotting #######
@@ -138,71 +390,62 @@ library(latex2exp)
 
 ####UKNOWN FIT u,v
 
-u<-0
-v<-0
+gamma_c_mu1<-dataset[dataset$time==0,"random_variable"]
+gamma_c_mu2<-dataset[dataset$time==1,"random_variable"]
 
-fit <- dglm(gamma_c_mu1~1, family=Gamma(link="log"))
-mu=exp(fit$coefficients)
-shape=exp(-1*fit$dispersion.fit$coefficients)
-scale <- mu/shape
-
-u<-pgamma(gamma_c_mu1,shape=shape,scale=scale)
-
-fit <- dglm(gamma_c_mu2~1, family=Gamma(link="log"))
-mu=exp(fit$coefficients)
-shape=exp(-1*fit$dispersion.fit$coefficients)
-scale <- mu/shape
-
-v<-pgamma(gamma_c_mu2,shape=shape,scale=scale)
+fit1<-fitdistr(gamma_c_mu1,"gamma")
+fit2<-fitdistr(gamma_c_mu2,"gamma")
+u<-pgamma(gamma_c_mu1,shape=fit1$estimate[1],rate=fit1$estimate[2])
+v<-pgamma(gamma_c_mu1,shape=fit2$estimate[1],rate=fit2$estimate[2])
 
 fittedClayton=rCopula(n, archmCopula(family="clayton",BiCopSelect(u,v,family=3)$par,dim=2))
 fittedTDist=rCopula(n, tCopula(BiCopSelect(u,v,family=2)$par,dim=2,df=BiCopSelect(u,v,family=2)$par2))
 
 # Plot density as points
 z<-ggplot(data = as.data.frame(gamma_c_mu1)) +
-  geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=50) +
+  geom_histogram(data = as.data.frame(gamma_c_mu1), aes(x=gamma_c_mu1, y=..density..),bins=70) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu1, y=dgamma(gamma_c_mu1,shape=fitdistr(gamma_c_mu1,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu1,"gamma")$estimate[2])), color="blue", size = .75) +
-  ylim(0,30) +
-  xlim(0,.30) +
+  ylim(0,.6) +
+  xlim(0,40) +
   labs(x=TeX("$Y_1$")) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 x<-ggplot(data = as.data.frame(gamma_c_mu2)) +
-  geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=50) +
+  geom_histogram(data = as.data.frame(gamma_c_mu2), aes(x=gamma_c_mu2, y=..density..),bins=70) +
   geom_line(aes(lty = 'fitted gamma',x=gamma_c_mu2, y=dgamma(gamma_c_mu2,shape=fitdistr(gamma_c_mu2,"gamma")$estimate[1],rate=fitdistr(gamma_c_mu2,"gamma")$estimate[2])), color="blue", size = .75) +
-  ylim(0,30) +
+  ylim(0,.6) +
   labs(x=TeX("$Y_2$")) +
-  xlim(0,.30) +
+  xlim(0,40) +
   theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
 c<-ggplot(data=as.data.frame(cbind(gamma_c_mu1,gamma_c_mu2)),aes(x=gamma_c_mu1,y=gamma_c_mu2)) + 
   geom_point(size=0.5,color="black") + 
   labs(x = TeX("$Y_1$"), y=TeX("$Y_2$")) +
-  xlim(0,.30) +
-  ylim(0,.30) +
+  xlim(0,40) +
+  ylim(0,40) +
   geom_smooth(method="loess", level=.99) 
 d<-ggplot(data=as.data.frame(cbind(u,v)),aes(x=u,y=v)) +
   #geom_point(size=0.25,color="black") + 
-  geom_density_2d(contour_var="density",bins=20,color="black") + 
+  geom_density_2d(contour_var="density",bins=15,color="black") + 
   scale_fill_brewer() +
   labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"),fill="density")+
   xlim(0,1) +
   ylim(0,1) 
 e<-ggplot(data=as.data.frame(fittedClayton),aes(x=V1,y=V2)) + 
   #geom_point(size=0.25,color="black") + 
-  geom_density_2d(contour_var="density",bins=20,color="black") +
+  geom_density_2d(contour_var="density",bins=15,color="black") +
   scale_fill_brewer() +
   labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"))+
   xlim(0,1) +
   ylim(0,1) 
 f<-ggplot(data=as.data.frame(fittedTDist),aes(x=V1,y=V2)) + 
   #geom_point(size=0.25,color="black") + 
-  geom_density_2d( contour_var="density",bins=20,color="black") + 
+  geom_density_2d( contour_var="density",bins=15,color="black") + 
   labs(x = TeX("$Y_1$"), y=TeX("$Y_2$"))+
   xlim(0,1) +
   ylim(0,1) 
 ggarrange(z,x,c,nrow=1)
-ggsave(file="example_bias_case_margin_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
+#ggsave(file="example_bias_case_margin_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
 ggarrange(d,e,f,nrow=1)
-ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
+#ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
 
 #plot(u,v,main="Uniform transform of both marginals",xlab="Time 1 Marginal Gamma (Uniform Transform)",ylab="Time 2 Marginal Gamma (Uniform Transform)")
 #plot(fittedClayton,main="Simulation of Fitted Clayton Copula",xlab="Fitted Time 1 Marginal Gamma",ylab="Fitted Time 2 Marginal Gamma")
@@ -286,7 +529,7 @@ ggarrange(a,b,d,nrow=1)
 #ggarrange(d,e,f,common.legend = TRUE,nrow=1,legend="right")
 ##ggsave(file="example_bias_case_contour_plots.jpeg",last_plot(),width=14,height=4,dpi=300)
 
-#################  #########
+################# Getting standard errors for bias case  #########
 
 getSE(10,12,.25,1.75,1000)
 
