@@ -1,25 +1,30 @@
 ############# Overview of file
 #############
-#############
+#############Required functions
+
+source("common_functions.R")
+
+# a. Simulation parameters
+set.seed(1000);options(scipen=999);
 
 ########### 0. DATA SETUP ##############
 
-############### 0.2 Applications #############
+############### 1. Applications #############
 ####CHOOSE A DATASET
 
-#Lipids Data
+####Lipids Data####
 #require(sas7bdat)
-#lipid <- read.sas7bdat("LipidsData.sas7bdat")
+#lipid <- read.sas7bdat("Data/lipid.sas7bdat")
 #lipids_merged<-(merge(lipid[lipid$MONTH==0,],lipid[lipid$MONTH==24,],by="PATIENT"))
 lipids_merged<-readRDS("lipids_merged.rds")
 gamma_c_mu1<-lipids_merged$TRG.x
 gamma_c_mu2<-lipids_merged$TRG.y
 
-lipids_merged<-readRDS("lipids_merged.rds")
-gamma_c_mu1<-lipids_merged$HDL.x
-gamma_c_mu2<-lipids_merged$HDL.y
+#lipids_merged<-readRDS("lipids_merged.rds")
+#gamma_c_mu1<-lipids_merged$HDL.x
+#gamma_c_mu2<-lipids_merged$HDL.y
 
-#Stock prices over 10 years
+####Stock prices over 10 years####
 
 #ASX2018<-read.table("20180102.txt", header=FALSE, sep=",")
 #ASX1998<-read.table("19980102.txt", header=FALSE, sep=",")
@@ -28,25 +33,78 @@ ASX98_18<-readRDS("ASX98_18.rds")
 gamma_c_mu1<-ASX98_18$V6.x
 gamma_c_mu2<-ASX98_18$V6.y
 
-#Avocado prices
+####Avocado prices####
 #avo<-read.table("avocado prices.csv", header=T, sep=",")
 avo<-readRDS("avo.rds")
 gamma_c_mu1<-avo[avo$Date=="4/01/2015","AveragePrice"]
 gamma_c_mu2<-avo[avo$Date=="25/03/2018","AveragePrice"]
 
-# c.Setting up as longitiduinal structured data
+############Diabetes hospitalisations########
+data_read<-read.csv(file="Data/diabetic_data.csv")
+
+admissions<-data.frame(table(data_read$patient_nbr))
+two_plus_admissions<-data.frame(admissions[admissions$Freq>1, "Var1"])
+colnames(two_plus_admissions)<-"patient_nbr"
+m<-data.frame(merge(data_read,two_plus_admissions,by="patient_nbr"))
+
+m$admission_nbr <- with(m, ave(seq_along(patient_nbr), patient_nbr, FUN = seq_along))
+
+gamma_c_mu1_pre<-m$time_in_hospital[m$admission_nbr==1] 
+gamma_c_mu2_pre<-m$time_in_hospital[m$admission_nbr==2]
+
+ranunif<-runif(n=length(gamma_c_mu1))
+
+gamma_c_mu1<-gamma_c_mu1[ranunif<.1]
+gamma_c_mu2<-gamma_c_mu2[ranunif<.1]
+
 patient<-as.factor(seq(1:length(gamma_c_mu1)))
 dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
 colnames(dataset)<-c("patient","random_variable","time")
 dataset<-dataset[order(dataset$patient),]
+dist="PO"
+
+#################asthma and BMI##############
+bmi_data_read<-read.csv(file="Data/BMI_IOS_SCD_Asthma.csv")
+#bmi_data<-bmi_data_read[(bmi_data_read$Observation_number==1|bmi_data_read$Observation_number==2)&!is.na(bmi_data_read$Fres_PP),]
+
+a<-bmi_data_read[bmi_data_read$Observation_number==1,]
+b<- bmi_data_read[bmi_data_read$Observation_number==2,]
+m<- merge(a,b,by="Subject.ID",all.x=TRUE)
+m_nona<-m[!is.na(m$Observation_number.y),]#&m$X5Hz_PP.x>0&m$X5Hz_PP.y>0
+
+
+m_nona<-m[!is.na(m$Observation_number.y)&m$X5Hz_PP.x>0&m$X5Hz_PP.y>0,]#&m$X5Hz_PP.x>0&m$X5Hz_PP.y>0
+gamma_c_mu1<-m_nona$X5Hz_PP.x
+gamma_c_mu2<-m_nona$X5Hz_PP.y
+
+
+##############China Health and Nutrition Study######
+
+library(sas7bdat)
+
+child_health<-read.sas7bdat("Data/hlth_12.sas7bdat")
+head(child_health)
+
+child_health_cost_only<-child_health[,c("IDind","wave","M29","M30","M35","M36","M38","M39","M50","M44")]
+
+i="M30"
+years=c(2011,2009)
+cost_2015_2014<-merge(child_health_cost_only[child_health_cost_only[,"wave"]==years[1],c("IDind",i)],child_health_cost_only[child_health_cost_only[,"wave"]==years[2],c("IDind",i)],by="IDind")
+cost_2015_2014_clean<-cost_2015_2014[cost_2015_2014[,2]>0&cost_2015_2014[,3]>0&is.finite(cost_2015_2014[,2])&is.finite(cost_2015_2014[,3])&!(cost_2015_2014[,3] %in% c(999,9999,99999,999999))&!(cost_2015_2014[,2] %in% c(999,9999,99999,999999)),]
+gamma_c_mu1<-cost_2015_2014_clean[,3]
+gamma_c_mu2<-cost_2015_2014_clean[,2]
 dist="GA"
 
+###### c.Setting up as longitudinal structured data#########
+patient<-as.factor(seq(1:length(gamma_c_mu1)))
+dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
+colnames(dataset)<-c("patient","random_variable","time")
+dataset<-dataset[order(dataset$patient),]
+#dist="GA"
+a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
 
-############## 0.1 Simulation ##################
-source("common_functions.R")
 
-# a. Simulation parameters
-set.seed(1000);options(scipen=999);
+############## 2. Simulation ##################
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 #dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
@@ -55,12 +113,28 @@ dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 
 dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
+####### 3.Plot and fit data #############
+
 plotDist(dataset,dist)
 
-results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
+library(e1071)
+skewness(dataset$random_variable[dataset$time==0])
+skewness(dataset$random_variable[dataset$time==1])
+cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="kendall")
+cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="pearson")
+
+results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
 if(dist=="NO"){clean_results<-results}else{clean_results<-cbind(results,round(exp(results[,c(1,2)]),4));
 clean_results<-cbind(clean_results[,c(9,10)],clean_results[,1:8]);colnames(clean_results)<-c("mu_1","mu_2",colnames(clean_results[,c(3:10)]))}
-clean_results
+rownames(clean_results)<-c("GLM","GEE","GAMLSS (4)","GAMLSS NP (5)","LME4"         ,"GJRM (Clayton)","GJRM (Normal)","GJRM (Joe)"    ,"GJRM (Gumbel)","GJRM (Frank)" ,"GJRM (AMH)"   ,"GJRM (FGM)"    ,"GJRM (Plackett)","GJRM (Hougaard)","GJRM (T)","Actual")
+
+clean_results_2<-cbind(clean_results,clean_results[,"EDF"])
+clean_results_2[,8]<--2*clean_results[,"LogLik"]+2*clean_results[,"EDF"]
+clean_results_2[,9]<--2*clean_results[,"LogLik"]+4*clean_results[,"EDF"]
+clean_results_2[,10]<-round(-2*clean_results[,"LogLik"]+log(nrow(dataset))*clean_results[,"EDF"])
+
+colnames(clean_results_2)<-c(colnames(clean_results)[1:7],"AIC (2)","AIC (4)","BIC","EDF")
+clean_results_2
 
 ###########Fitting individual models##############
 
@@ -84,6 +158,115 @@ summary(model_gee)
 summary(model_lme4)
 summary(model_re_nosig)
 
+
+###########Time to run#############
+source("common_functions.R")
+
+#dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
+#dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
+#dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
+
+dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
+timer <- function(dataset) {
+  
+  require(gamlss)
+  require(gee)
+  require(gamlss.mx)
+  require(lme4)
+  times=rep(0,5);i=0
+  start=Sys.time()
+  
+  tryCatch({model_glm <- glm(formula=random_variable~-1+as.factor(time==1), data=dataset, family=Gamma(link="log")) 
+  }, error=function(error) {})
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  tryCatch({
+  model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+  }, error=function(error) {})
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  tryCatch({
+  model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
+  }, error=function(error) {})
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  tryCatch({
+  model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+  }, error=function(error) {})
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  tryCatch({
+  model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                          , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
+  }, error=function(error) {})
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  
+  #time[2:length(time)]=time[2:length(time)]-time[1:(length(time)-1)]########ADDED NOT TESTED
+  return(times)
+}
+
+timerGJRM <- function(dataset) {
+  
+  require(GJRM)
+  
+  gamma_c_mu1<-dataset[dataset$time==0,]
+  gamma_c_mu2<-dataset[dataset$time==1,]
+  
+  #Setting up GJRM equations
+  eq.mu.1 <- formula(random_variable~1)
+  eq.mu.2 <- formula(random_variable.1~1)
+  fl <- list(eq.mu.1, eq.mu.2)
+  
+  margin_dist="GA"
+  
+  times=rep(0,2)
+  start=Sys.time();i=0
+  
+  model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+  i=i+1;times[i]=difftime(Sys.time(), start, units = "secs")[[1]]
+  
+  #time[2:length(time)]=time[2:length(time)]-time[1:(length(time)-1)]########ADDED NOT TESTED
+
+  return(times)
+}
+
+sumtime_lms<-matrix(nrow=5*10,ncol=6)
+
+samplesizes=c(100,500,1000,5000,10000)
+z=1
+for (n in 1:5) {
+  for (i in 1:10) {
+    dataset <- generateBivDist(samplesizes[n],a,b,c,mu1,mu2,dist)
+    sumtime_lms[z,] = c(n,timer(dataset))
+    z=z+1
+    print(c(n,i))
+  }
+}
+
+
+sumtimeGJRM<-matrix(nrow=5*10,ncol=3)
+samplesizes=c(100,500,1000,5000,10000)
+z=1
+for (n in 1:5) {
+  for (i in 1:10) {
+    tryCatch({
+      dataset <- generateBivDist(samplesizes[n],a,b,c,mu1,mu2,dist)
+      sumtimeGJRM[z,] = c(n,timerGJRM(dataset))}, error=function(error) {sumtimeGJRM[i,]=c(n,rep(NA,2))})
+    z=z+1
+    print(c(n,i))
+  }
+}
+
+sumtime_lm_diff<-cbind(sumtime_lms[,c(1:2)],sumtime_lms[,3:ncol(sumtime_lms)]-sumtime_lms[,2:(ncol(sumtime_lms)-1)])
+sumtime_gjrm_diff<-cbind(sumtimeGJRM[,c(1:2)],sumtimeGJRM[,3:ncol(sumtimeGJRM)]-sumtimeGJRM[,2:(ncol(sumtimeGJRM)-1)])
+sumtime_summary<-cbind(sumtime_lm_diff,sumtime_gjrm_diff[,c(2,3)])
+
+sumtime_summary_avg<-rbind(colMeans(sumtime_summary[sumtime_summary[,1]==1,])
+                             ,colMeans(sumtime_summary[sumtime_summary[,1]==2,])
+                             ,colMeans(sumtime_summary[sumtime_summary[,1]==3,])
+                             ,colMeans(sumtime_summary[sumtime_summary[,1]==4,])
+                             ,colMeans(sumtime_summary[sumtime_summary[,1]==5,]))
+
+colnames(sumtime_summary_avg)<-c("n","GLM","GEE","GAMLSS (4)","LME4","GAMLSS NP (5)","GJRM (C)","GJRM (N)")
+sumtime_summary_avg
 
 
 #########Estimating marginal means from predictions ################
