@@ -3,6 +3,149 @@ source("common_functions.R")
 library(gamlss)
 library(e1071)
 
+require(sas7bdat)
+library(haven)
+
+#hars <- read.sas7bdat("Data/h20n_r.sas7bdat")
+#rand <- read.sas7bdat("Data/randhrs1992_2020v1.sas7bdat")
+
+rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
+                                                                             ,"R14HSPTIM" #Number of hospital stays last 2 years
+                                                                             ,"R15HSPTIM" #Number of hospital stays last 2 years
+                                                                             ,"R14HSPNIT" #Nights in hospital last 2 years
+                                                                             ,"R15HSPNIT" #Nights in hospital last 2 years
+                                                                             ,"R14DOCTIM" #Doctor visits last 2 years
+                                                                             ,"R15DOCTIM" #Doctor visits last 2 years
+                                                                             ,"R14OOPMD" #Out of pocket medical exp. last 2 years
+                                                                             ,"R15OOPMD" #Out of pocket medical exp. last 2 years
+))
+
+rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
+                                                                 ,"R14DOCTIM" #Doctor visits last 2 years
+                                                                 ,"R15DOCTIM" #Doctor visits last 2 years
+))
+
+rand_hosp_visits<-as.data.frame(rand[!(is.na(rand$R14HSPTIM))&!(is.na(rand$R15HSPTIM))&rand$R14HSPTIM>0&rand$R15HSPTIM>0,c("HHIDPN","R14IWENDY","R15IWENDY","R14HSPTIM","R15HSPTIM")])
+rand_hosp_nights<-as.data.frame(rand[!(is.na(rand$R14HSPNIT))&!(is.na(rand$R15HSPNIT))&rand$R14HSPNIT>0&rand$R15HSPNIT>0,c("HHIDPN","R14IWENDY","R15IWENDY","R14HSPNIT","R15HSPNIT")])
+rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>0&rand$R15DOCTIM>0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
+rand_oop_exp    <-as.data.frame(rand[!(is.na(rand$R14OOPMD))&!(is.na(rand$R15OOPMD))&rand$R14OOPMD>0&rand$R15OOPMD>0,        c("HHIDPN","R14IWENDY","R15IWENDY","R14OOPMD","R15OOPMD")])
+
+###Updated to not exclude zero***
+rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>=0&rand$R15DOCTIM>=0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
+
+
+#2018 & 2020/21
+
+listdata <- list()
+listdata[[1]]<-rand_hosp_visits
+listdata[[2]]<-rand_hosp_nights
+listdata[[3]]<-rand_doc_visits
+listdata[[4]]<-rand_oop_exp
+
+par(mfrow=c(4,3))
+for (i in 1:4) {
+  i=3
+  dataset<-listdata[[i]]
+  hist(dataset[,4])
+  hist(dataset[,5])
+  plot(dataset[,4],dataset[,5])
+  print(c(cor(dataset[,4],dataset[,5]),cor(dataset[,4],dataset[,5],method="kendall"),skewness(dataset[,4],dataset[,5])))
+  
+  rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
+                                                                   ,"R14DOCTIM" #Doctor visits last 2 years
+                                                                   ,"R15DOCTIM" #Doctor visits last 2 years
+  ))
+  gamma_c_mu1<-rand[,4]
+  gamma_c_mu2<-rand[,5]
+  dist="PO"
+  
+  patient<-as.factor(seq(1:length(gamma_c_mu1)))
+  dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
+  colnames(dataset)<-c("patient","random_variable","time")
+  dataset<-dataset[order(dataset$patient),]
+  if(i==4){dist="GA"}else(dist="PO")
+  
+  fits1<-fitDist(dataset[dataset$time==0,"random_variable"],type="counts")
+  fits2<-fitDist(dataset[dataset$time==1,"random_variable"],type="counts")
+  
+  
+  results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
+  if(dist=="NO"){clean_results<-results}else{clean_results<-cbind(results,round(exp(results[,c(1,2)]),4));
+  clean_results<-cbind(clean_results[,c(9,10)],clean_results[,1:8]);colnames(clean_results)<-c("mu_1","mu_2",colnames(clean_results[,c(3:10)]))}
+  print(clean_results)
+  
+}
+
+
+library(gamlss)
+library(lme4)
+library(gee)
+library(gamlss.mx)
+
+model_glm <- gamlss(formula=random_variable~-1+as.factor(time==1), data=dataset, family=GA()) 
+model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
+model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
+model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
+
+
+
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG())
+
+
+require(GJRM)
+
+margin_dist="GA"
+#Setting up GJRM equations
+eq.mu.1 <- formula(gamma_c_mu1~1)
+eq.mu.2 <- formula(gamma_c_mu2~1)
+fl <- list(eq.mu.1, eq.mu.2)
+model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
+model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+
+
+
+
+
+rand[!is.na(rand$R14HSPTIM),]
+
+
+
+##Wave is year so we want 15 and 14
+
+rand[,c("HHIDPN","R14IWENDY","R15IWENDY"
+        ,"R14HSPTIM" #Number of hospital stays last 2 years
+        ,"R15HSPTIM" #Number of hospital stays last 2 years
+        ,"R14HSPNIT" #Nights in hospital last 2 years
+        ,"R15HSPNIT" #Nights in hospital last 2 years
+        ,"R14DOCTOR" #Doctor visits last 2 years
+        ,"R15DOCTOR" #Doctor visits last 2 years
+        ,"R14OOPMD" #Out of pocket medical exp. last 2 years
+        ,"R15OOPMD" #Out of pocket medical exp. last 2 years
+        )]
+rand$R1IWENDY
+
+
+#Second number is wave
+R15HSPTIM #Number of hospital stays 12m
+R15HSPNIT #Nights in hospital 12m
+R15DOCTIM #Doctor visits last 12m
+R15OOPMD #Out of pocket medical expenditure
+
+
+save(data, file = "data.Rdata")
+
+summary(hars)
+
+hist(hars$RN106[!is.na(hars$RN106)&hars$RN106<9999998&hars$RN106>0],breaks=100)
+
+head(hars)
+
+
+
+
 #################asthma and BMI##############
 bmi_data_read<-read.csv(file="Data/BMI_IOS_SCD_Asthma.csv")
 #bmi_data<-bmi_data_read[(bmi_data_read$Observation_number==1|bmi_data_read$Observation_number==2)&!is.na(bmi_data_read$Fres_PP),]
@@ -51,13 +194,13 @@ for (i in c("M29","M30","M35","M36","M38","M39","M50","M44")) {
   hist(outcome,breaks=100,main=i)  
 }
 
-plot.new()
+plot.new() # 1989 1991 1993 1997 2000 2004 2006 2009 2011 2015
 library(e1071)
 source("common_functions.R")
 par(mfrow=c(3,3))
 for (i in c("M29","M30","M38","M39","M50")) {
   #i="M30"
-  years=c(2015,2011)
+  years=c(1993,1991)
   cost_2015_2014<-merge(child_health_cost_only[child_health_cost_only[,"wave"]==years[1],c("IDind",i)],child_health_cost_only[child_health_cost_only[,"wave"]==years[2],c("IDind",i)],by="IDind")
   cost_2015_2014_clean<-cost_2015_2014[cost_2015_2014[,2]>0&cost_2015_2014[,3]>0&is.finite(cost_2015_2014[,2])&is.finite(cost_2015_2014[,3])&!(cost_2015_2014[,3] %in% c(999,9999,99999,999999))&!(cost_2015_2014[,2] %in% c(999,9999,99999,999999)),]
   print(c(i,nrow(cost_2015_2014_clean),cor(cost_2015_2014_clean[,2],cost_2015_2014_clean[,3],method="kendall"),skewness(cost_2015_2014_clean[,2])))
