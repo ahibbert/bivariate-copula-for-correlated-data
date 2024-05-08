@@ -12,6 +12,24 @@ set.seed(1000);options(scipen=999);
 ############### 1. Applications #############
 ####CHOOSE A DATASET
 
+#### RAND HLS ####
+library(haven)
+rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
+                                                                 ,"R14DOCTIM" #Doctor visits last 2 years
+                                                                 ,"R15DOCTIM" #Doctor visits last 2 years
+))
+rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>=0&rand$R15DOCTIM>=0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
+
+
+rand_doc_visits_SAMPLED<-rand_doc_visits[runif(nrow(rand_doc_visits))<0.1,]
+gamma_c_mu1<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,4])$`rand_doc_visits_SAMPLED[, 4]`)
+gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,5])$`rand_doc_visits_SAMPLED[, 5]`)
+
+
+#gamma_c_mu1<-as.vector(as.data.frame(rand_doc_visits[,4])$`rand_doc_visits[, 4]`)
+#gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits[,5])$`rand_doc_visits[, 5]`)
+dist="PO"
+
 ####Lipids Data####
 #require(sas7bdat)
 #lipid <- read.sas7bdat("Data/lipid.sas7bdat")
@@ -88,9 +106,11 @@ head(child_health)
 child_health_cost_only<-child_health[,c("IDind","wave","M29","M30","M35","M36","M38","M39","M50","M44")]
 
 i="M30"
-years=c(2011,2009)
+#years=c(2011,2009)
+years=c(2009,2006)
 cost_2015_2014<-merge(child_health_cost_only[child_health_cost_only[,"wave"]==years[1],c("IDind",i)],child_health_cost_only[child_health_cost_only[,"wave"]==years[2],c("IDind",i)],by="IDind")
 cost_2015_2014_clean<-cost_2015_2014[cost_2015_2014[,2]>0&cost_2015_2014[,3]>0&is.finite(cost_2015_2014[,2])&is.finite(cost_2015_2014[,3])&!(cost_2015_2014[,3] %in% c(999,9999,99999,999999))&!(cost_2015_2014[,2] %in% c(999,9999,99999,999999)),]
+
 gamma_c_mu1<-cost_2015_2014_clean[,3]
 gamma_c_mu2<-cost_2015_2014_clean[,2]
 dist="GA"
@@ -138,20 +158,47 @@ clean_results_2
 
 ###########Fitting individual models##############
 
+
+ggsave(file="applications_rand.jpeg",last_plot(),width=8,height=3,dpi=900)
+
 library(gamlss)
 library(lme4)
 library(gee)
 library(gamlss.mx)
 
-model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=GA()) 
-model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+dataset$random_variable[!(dataset$random_variable==round(dataset$random_variable,0))]
 
-model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=NBI()) 
+#model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")
 
-model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
-model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))
-model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
-                         , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)
+#model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())
+
+model_re_nosig_ZIS <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~-1+as.factor(time==1), nu.formula=~-1+as.factor(time==1), tau.formula=~-1+as.factor(time==1), data=dataset, family=ZISICHEL(),method=RS(10))
+
+model_re_np_ZIS <- gamlssNP(formula=random_variable~-1+as.factor(time==1)
+                            , sigma.formula=~as.factor(time==1)
+                            , nu.formula=~-1+as.factor(time==1)
+                            , tau.formula=~-1+as.factor(time==1)
+                            , random=as.factor(dataset$patient), data=dataset
+                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2,family=ZISICHEL())
+
+summary(model_re_nosig_ZIS)
+
+
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = RS(1000))
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = mixed(1,1000))
+
+model_re_fullyparameterisednonu <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = CG(1000))
+model_re_fullyparameterised <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), nu.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = RS(1000))
+
+
+
+summary(model_re_nosig)
+AIC(model_re_nosig)
+
 summary(model_re_np)
 summary(model_glm)
 summary(model_gee)
@@ -641,7 +688,89 @@ ggarrange(d,e,f,nrow=1)
 
 ################ 1.2 Applications case plotting #############
 
+
+library(ggplot2)
+library(latex2exp)
+library(ggpubr)
+links<-ZASICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
+                tau.link = "logit")
+
+fit1<-gamlss(gamma_c_mu1~1,family="ZISICHEL",method=RS(1000))
+fit2<-gamlss(gamma_c_mu2~1,family="ZISICHEL",method=RS(1000))
+
+fitted_density<-dZISICHEL(0:500,links$mu.linkinv(fit1$mu.coefficients),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
+barData<-as.data.frame(table((gamma_c_mu1)))
+barData$percent<-barData$Freq/sum(barData$Freq)
+fitted_density_table<-cbind(0:500,fitted_density)
+colnames(fitted_density_table)<-c("Var1","percent")
+fittedplusreal1<-merge(fitted_density_table,barData, by="Var1",all.x=TRUE)
+
+fitted_density<-dZISICHEL(0:500,links$mu.linkinv(fit2$mu.coefficients),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
+barData<-as.data.frame(table((gamma_c_mu2)))
+barData$percent<-barData$Freq/sum(barData$Freq)
+fitted_density_table<-cbind(0:500,fitted_density)
+colnames(fitted_density_table)<-c("Var1","percent")
+fittedplusreal2<-merge(fitted_density_table,barData, by="Var1",all.x=TRUE)
+
+fit3<-gamlss(gamma_c_mu1~1,family="NBI",method=RS(1000))
+fit4<-gamlss(gamma_c_mu2~1,family="NBI",method=RS(1000))
+
+fitted_density<-dNBI(0:500,links$mu.linkinv(fit3$mu.coefficients),links$sigma.linkinv(fit3$sigma.coefficients))
+barData<-as.data.frame(table((gamma_c_mu1)))
+barData$percent<-barData$Freq/sum(barData$Freq)
+fitted_density_table<-cbind(0:500,fitted_density)
+colnames(fitted_density_table)<-c("Var1","percent")
+fittedplusreal3<-merge(fitted_density_table,barData, by="Var1",all.x=TRUE)
+
+fitted_density<-dNBI(0:500,links$mu.linkinv(fit4$mu.coefficients),links$sigma.linkinv(fit4$sigma.coefficients))
+barData<-as.data.frame(table((gamma_c_mu2)))
+barData$percent<-barData$Freq/sum(barData$Freq)
+fitted_density_table<-cbind(0:500,fitted_density)
+colnames(fitted_density_table)<-c("Var1","percent")
+fittedplusreal4<-merge(fitted_density_table,barData, by="Var1",all.x=TRUE)
+
+
+
+plot.new()
+a<-ggplot(fittedplusreal1, aes(x=Var1,y=percent.y)) + geom_bar(stat = "identity") +
+  geom_point(aes(x=Var1,y=percent.x),color="blue",shape = 21, fill = "white", size = 3) +
+  #geom_point(mapping = aes(x = 0:500, y = fitted_density)) +
+  #geom_line(aes(lty = 'fitted SICHEL',x=gamma_c_mu1, y=fitted_density), color="blue") +
+  ylim(0,.15) +
+  xlim(-1,40) +
+  labs(x=TeX("$Y_1$"),y="density") +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+b<-ggplot(fittedplusreal2, aes(x=Var1,y=percent.y)) + geom_bar(stat = "identity") +
+  geom_point(aes(x=Var1,y=percent.x),color="blue",shape = 21, fill = "white", size = 3) +
+  #geom_point(mapping = aes(x = 0:500, y = fitted_density)) +
+  #geom_line(aes(lty = 'fitted SICHEL',x=gamma_c_mu1, y=fitted_density), color="blue") +
+  ylim(0,.15) +
+  xlim(-1,40) +
+  labs(x=TeX("$Y_2$"),y="density") +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+c<-ggplot(fittedplusreal3, aes(x=Var1,y=percent.y)) + geom_bar(stat = "identity") +
+  geom_point(aes(x=Var1,y=percent.x),color="blue",shape = 21, fill = "white", size = 3) +
+  #geom_point(mapping = aes(x = 0:500, y = fitted_density)) +
+  #geom_line(aes(lty = 'fitted SICHEL',x=gamma_c_mu1, y=fitted_density), color="blue") +
+  ylim(0,.15) +
+  xlim(-1,40) +
+  labs(x=TeX("$Y_1$"),y="density") +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+d<-ggplot(fittedplusreal4, aes(x=Var1,y=percent.y)) + geom_bar(stat = "identity") +
+  geom_point(aes(x=Var1,y=percent.x),color="blue",shape = 21, fill = "white", size = 3) +
+  #geom_point(mapping = aes(x = 0:500, y = fitted_density)) +
+  #geom_line(aes(lty = 'fitted SICHEL',x=gamma_c_mu1, y=fitted_density), color="blue") +
+  ylim(0,.15) +
+  xlim(-1,40) +
+  labs(x=TeX("$Y_2$"),y="density") +
+  theme(legend.position = c(0.75, .92),legend.key = element_rect(fill = "transparent"),legend.title = element_blank(), legend.background = element_blank())
+
+ggarrange(c,d,a,b,labels=c("A","B","C","D"))
+ggsave(file="applications_rand_margin_fits.png",last_plot(),width=12,height=8,dpi=300)
+
 library(moments)
+nrow(gamma_c_mu1)
+nrow(gamma_c_mu2)
 skewness(gamma_c_mu1)
 skewness(gamma_c_mu2)
 
