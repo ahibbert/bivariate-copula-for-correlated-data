@@ -98,9 +98,9 @@ set.seed(0)
 pl = plot_list[c(1,3,2,4,5,7,6,8)]
 # Create row and column titles
 col.titles = c("     \u03C3\u00B2=0.5","     \u03C3\u00B2=2","     \u03C3\u00B2=0.5","     \u03C3\u00B2=2")
-row.titles = c("\u03B2=0.2","\u03B2=2")
+row.titles = c("\u03B8=0.2","\u03B8=2")
 
-grid.newpage()
+#grid.newpage()
 
 nr=2
 # Add row titles

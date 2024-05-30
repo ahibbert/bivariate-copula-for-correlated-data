@@ -248,6 +248,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
+    margin_dist="PIG"
     
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")

@@ -1,6 +1,5 @@
-############# Overview of file
-#############
-#############Required functions
+############# Overview of file #####################
+#############Required functions #################
 
 source("common_functions.R")
 
@@ -14,10 +13,13 @@ set.seed(1000);options(scipen=999);
 
 #### RAND HLS ####
 library(haven)
+
 rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
                                                                  ,"R14DOCTIM" #Doctor visits last 2 years
                                                                  ,"R15DOCTIM" #Doctor visits last 2 years
 ))
+
+head(rand)
 rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>=0&rand$R15DOCTIM>=0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
 
 
@@ -122,7 +124,6 @@ colnames(dataset)<-c("patient","random_variable","time")
 dataset<-dataset[order(dataset$patient),]
 #dist="GA"
 a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
-
 
 ############## 2. Simulation ##################
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
@@ -1003,5 +1004,43 @@ gamlss_fit_PARETO2$aic
 gamlss_fit_LOGNO2$aic
 gamlss_fit_LOGNO$aic
 gamlss_fit_WEI$aic
+
+
+
+
+
+
+############ 6. Manual fitting of ZIS for GJRM #############
+
+
+library(gamlss)
+
+links<-ZASICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
+                tau.link = "logit")
+
+fit1<-gamlss(gamma_c_mu1~1,family=ZISICHEL())
+fit2<-gamlss(gamma_c_mu2~1,family=ZISICHEL())
+
+dMargin1<-pZISICHEL(gamma_c_mu1,links$mu.linkinv(fit1$mu.coefficients),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
+dMargin2<-pZISICHEL(gamma_c_mu2,links$mu.linkinv(fit2$mu.coefficients),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
+
+par(mfrow=c(1,2))
+hist(dMargin1)
+hist(dMargin2)
+
+plot(dMargin1,dMargin2)
+
+library(VineCopula)
+copFits<-BiCopSelect(dMargin1,dMargin2)
+
+ll_m1<--1*fit1$G.deviance/2
+ll_m2<--1*fit2$G.deviance/2
+ll_cop<-copFits$logLik
+
+ll_combined<-ll_m1+ll_m2+ll_cop
+df_fit<-fit1$df.fit+fit2$df.fit+2
+
+-2*ll_combined+2*df_fit
+
 
 
