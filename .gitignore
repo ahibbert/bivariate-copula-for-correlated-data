@@ -2,3 +2,14 @@
 .Rhistory
 .RData
 .Ruserdata
+*.pdf
+*.sas7bdat
+*.sas
+*.zip
+Data/trk2020v1/trk2020TR_R.txt
+Data/trk2020v1/TRK2020TR_R.sps
+Data/trk2020v1/trk2020tr_r.sav
+Data/trk2020v1/trk2020tr_r.dta
+Data/trk2020v1/TRK2020TR_R.do
+Data/trk2020v1/TRK2020TR_R.dct
+Data/trk2020v1/TRK2020TR_R.da
