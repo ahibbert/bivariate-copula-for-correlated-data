@@ -219,7 +219,7 @@ lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)
                                              ,NA
                                              ,tau
                                              ,xlab
-                                             ,ylab="AIC (2)"
+                                             ,ylab="AIC"
                                              ,scaled=FALSE
                                              ,plotTrue = FALSE)
 lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
@@ -227,7 +227,7 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
                                                   ,NA
                                                   ,skew
                                                   ,xlabskew
-                                                  ,ylab="AIC (2)"
+                                                  ,ylab="AIC"
                                                   ,scaled=FALSE
                                                   ,plotTrue = FALSE)
 
@@ -237,7 +237,7 @@ lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)
                                              ,NA
                                              ,tau
                                              ,xlab
-                                             ,ylab="AIC (4)"
+                                             ,ylab="GAIC (4)"
                                              ,scaled=FALSE
                                              ,plotTrue = FALSE)
 
@@ -246,7 +246,7 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
                                                   ,NA
                                                   ,skew
                                                   ,xlabskew
-                                                  ,ylab="AIC (4)"
+                                                  ,ylab="GAIC (4)"
                                                   ,scaled=FALSE
                                                   ,plotTrue = FALSE)
 plot_count_lik=plot_count_lik+1
@@ -268,26 +268,23 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
                                                   ,scaled=FALSE
                                                   ,plotTrue = FALSE)
 
-
-
-
-
 ###################PLOT FUNCTION#############################
 
 #ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(3)],error_plots[c(3)],bias_plots[c(5)],error_plots[c(5)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggsave(file=paste("simulation_bias_plus_error_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew
-ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
+#ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew
+#ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
 #ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Tau
 #ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
 #ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
-#ggarrange(plotlist=lik_plots[c(1,5,9,2,6,10,3,7,11,4,8,12)]     ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels=c("N","P","G","N","P","G","N","P","G","N","P","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
-#ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=10,dpi=900)
+ggarrange(plotlist=lik_plots[c(1,5,9,2,6,10,3,7,11,4,8,12)]     ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels=c("N","NB","G","N","NB","G","N","NB","G","N","NB","G"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=10,dpi=900)
 #ggarrange(plotlist=lik_plots_skew   ,common.legend=TRUE, ncol=4, nrow=plot_count_lik/4, labels=c("P","P","P","G","G","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Skew
 #ggsave(file=paste("simulation_loglik_AIO_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
-  
+
+
 ###guides(color=guide_legend(override.aes=list(fill=NA)))
 
 #############Bias v skew table
