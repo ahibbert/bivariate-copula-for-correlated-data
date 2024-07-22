@@ -6,6 +6,7 @@ source("common_functions.R")
 ############## 1. Run simulations for non-GJRM models########################
 results<-list()
 datasets<-list()
+#TEST# a=NA; b=c(1);c=c(1); mu1=c(1); mu2=c(1); n=1000;dist="PO"
 #a=.1+.1*1:20; b=.1+.1*1:20; c=NA; mu1=10; mu2=12; n=1000; dist="GA"
 #a=.5*1:5; b=.5*1:5;c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9); mu1=1; mu2=2; n=1000;dist="NO"
 #a=NA; b=NA;c=c(.2,.5,1,2,5); mu1=c(.2,.5,1,2,5); mu2=c(.2,.5,1,2,5); n=1000;dist="PO"
@@ -25,7 +26,7 @@ for (type in c("non-GJRM","GJRM")) {
           for (m in 1:length(c)) {
             set.seed(1000)
             datasets[[z]]<-generateBivDist(n,a[i],b[j],c[m],mu1[k],mu2[l],dist)
-            tryCatch( {results[[z]] <- rbind(fitBivModels(datasets[[z]],dist,include=type,a[i],b[j],c[m],mu1[k],mu2[l]), c(n,a[i],b[j],c[m],mu1[k],mu2[l],NA,NA))}
+            tryCatch( {results[[z]] <- rbind(fitBivModels_Bt(datasets[[z]],dist,include=type,a[i],b[j],c[m],mu1[k],mu2[l]), c(n,a[i],b[j],c[m],mu1[k],mu2[l],NA,NA))}
                       , error = function(e) {results[[z]]<- rbind(c(NA,NA,NA,NA,NA,NA,NA,NA), c(n,a[i],b[j],c[m],mu1[k],mu2[l],NA,NA))})
             print(c(n,a[i],b[j],c[m],mu1[k],mu2[l],NA,NA))
             print(c(z

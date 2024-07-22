@@ -1,40 +1,166 @@
-source("common_functions.R")
+#source("common_functions.R")
 
-# a. Simulation parameters
+###Functions - run first
 set.seed(1000);options(scipen=999);
 
-### RAND MULTIVARIATE ###
+create_longitudinal_dataset <- function(response,covariates,labels=NA) {
+  num_time_points=ncol(response)
+  if(num_time_points <=1) {print('Not enough time points')}
+  
+  dataset<-matrix(data=NA,ncol=2+length(covariates),nrow=0) 
+  subject<-as.factor(seq(1:nrow(response)))
+  
+  for (t in 1:ncol(response)) {
+    
+    dataset_temp<-cbind(subject,t,response[,t])
+    
+    for (i in 1:length(covariates)) {
+      if (ncol(covariates[[i]]) == 1 ) {
+        covariate_for_time=covariates[[i]]
+      } else {
+        covariate_for_time=covariates[[i]][,t]
+      }
+      dataset_temp<-cbind(dataset_temp,covariate_for_time)  
+    }
+    
+    ###Add dataset temp to full table
+    dataset <- rbind(dataset,dataset_temp)
+  }
+  
+  if(!all(is.na(labels))) {
+    colnames(dataset) <- labels  
+  }
+  
+  dataset=dataset[order(dataset$subject,dataset$subject),]
+  
+  return(dataset)
+}
 
+find_best_marginal_fits <- function(margins,type) {
+  require(gamlss)
+  fits<-list()
+  for (i in 1:ncol(margins)) {
+    fits[[i]]<-fitDist(margins[,i],type = type)$fits[1:6]
+  }
+  return(fits)
+}
+
+fit_margins <- function(dataset,mu_formula,family) {
+  #i=1
+  require(gamlss)
+  fits<-list()
+  for (i in 1:max(dataset$time)) {
+    fits[[i]]<-gamlss(mu_formula,family=family,data=dataset[dataset$time==i,])
+  }
+  return(fits)
+}
+
+fit_copulas = function(margin_fits) {
+  require(gamlss)
+  require(VineCopula)
+  
+  num_margins=length(margin_fits)
+  fit_unif=matrix(0,nrow=length(margin_fits[[1]]$residuals),ncol=num_margins)
+  for (i in 1:num_margins) {
+    fit_unif[,i]=pNO(margin_fits[[i]]$residuals)    
+  }
+  
+  vinefit<-RVineStructureSelect(fit_unif)
+  summary(vinefit)
+  print(vinefit$pair.logLik)
+  
+  return(vinefit)
+}
+
+
+########### 0. Only needed once: Extract needed columns from rand_HRS dataset and save in rand_mvt ######
 library(haven)
-randFULL <- read_sas("Data/randhrs1992_2020v1.sas7bdat")
+randFULL <- read_sas("Data/randhrs1992_2020v2.sas7bdat")
 docnames<-(grep("R[0-9]+DOCTIM", colnames(randFULL),value=TRUE))
 docnames_sorted<-docnames[order(as.numeric(regmatches(docnames,regexpr("[0-9]+",docnames))))]
 
-rand_allyearsdocvisits<-randFULL[,c("HHIDPN","RABYEAR",docnames_sorted)]
+ages<-(grep("R[0-9]+AGEY_E", colnames(randFULL),value=TRUE))
+ages_sorted<-ages[order(as.numeric(regmatches(ages,regexpr("[0-9]+",ages))))]
+
+interview_year<-(grep("R[0-9]+IWENDY", colnames(randFULL),value=TRUE))
+interview_year_sorted<-interview_year[order(as.numeric(regmatches(interview_year,regexpr("[0-9]+",interview_year))))]
+
+rand_allyearsdocvisits<-randFULL[,c("HHIDPN","RABYEAR", "RAGENDER",docnames_sorted,ages_sorted,interview_year_sorted)]
 
 #1775 individuals with no missing data
 rand_mvt<-as.data.frame(na.omit(rand_allyearsdocvisits))
-#save(rand_mvt,file="rand_mvt.rds")
-load("rand_mvt.rds")
+save(rand_mvt,file="Data/rand_mvt.rds")
 
-#plot(rand_mvt[,2:17])
-#cor(rand_mvt[,2:17])
-#cor(rand_mvt[,2:17],method="kendall")
+###### 1. Load RAND data subset and transform to standard longitudinal dataset #######
 
-library(gamlss)
-fit<-fitDist(rand_mvt[,3],type = "counts")
-fit$fits
+load("Data/rand_mvt.rds")
+head(rand_mvt)
 
-patient<-as.factor(seq(1:nrow(rand_mvt)))
-dataset<-matrix(data=NA,ncol=3,nrow=0)
+###Basic data setup
+response = rand_mvt[,4:(4+4)]#[,4:18]
+covariates=list()
+covariates[[1]] = as.data.frame(rand_mvt[,19]) #Age 19:33 - changed to age at start to avoid correlation with time
+covariates[[2]] = as.data.frame(rand_mvt[,34:(34+4)]) #Time 34:48
+covariates[[3]] = as.data.frame(rand_mvt[,3]) #Gender
 
-for (t in 1:length(docnames)) {
-  dataset_temp<-cbind(patient,t,rand_mvt[,docnames[t]])
-  dataset <- rbind(dataset,dataset_temp)
+####Setup data as longitudinal file
+dataset<-create_longitudinal_dataset(response,covariates,labels=c("subject","time","response","age","year","gender"))
+head(dataset)
+
+######## 2. Get initial estimates - marginal fits for GAMLSS, VineCopula ######
+##Actually we can use this as a benchmark for all future fits anyway so that's good.
+##Maybe incorporate all the other models here too as other benchmarks? Maybe later actually
+
+#margin_dist<- find_best_marginal_fits(response,type="counts")
+mu_formula=formula(response~cs(age)+as.factor(gender))
+margin_fits<- fit_margins(dataset,mu_formula,family="ZISICHEL") ##CHANGE THIS TO TAKE IN DATASET ABOVE
+copula_fits<- fit_copulas(margin_fits)
+
+likelihood=copula_fits$logLik
+for (i in 1:length(margin_fits)) {
+  likelihood=likelihood+logLik(margin_fits[[i]])
 }
+print(paste("Overall LogLik:", as.character(round(likelihood,2))))
+print(paste("Global Deviance:", as.character(round(likelihood,2)*-2)))
 
-colnames(dataset)<-c("patient","time","random_variable")
-dataset<-dataset[order(dataset[,"patient"]),]
+df=0
+for ( i in 1:length(margin_fits)) {
+  df=df+margin_fits[[i]]$df.fit
+}
+df = df+(length(margin_fits)*(length(margin_fits)-1))
+
+print(paste("Overall LogLik:", as.character(round(likelihood,2))))
+print(paste("Global Deviance:", as.character(round(likelihood,2)*-2)))
+print(paste("Degrees of Freedom:", as.character(round(df,2))))
+
+####Global deviance: 44771.36
+
+####TEMP FOR INVESTIGATING FITS
+
+summary(margin_fits[[5]])
+plot(margin_fits[[5]])
+term.plot(margin_fits[[5]])
+contour(copula_fits)
+
+######## 3. Optimise parameters jointly somehow ######
+
+
+
+######## 4. Comparison fits
+
+  ###### Regular ZISICHEL Global Deviance: 47647.01
+margin_model_formula=formula(response~cs(age)+as.factor(gender)+as.factor(time))
+gamlss_model <- gamlss(formula = margin_model_formula,family="ZISICHEL",data=dataset)
+summary(baseline_model)
+plot(baseline_model)
+term.plot(baseline_model)
+  
+  ###### GLMM ZISICHEL Global Deviance: 47647.01
+margin_model_formula=formula(response~cs(age)+as.factor(gender)+as.factor(time)+random(as.factor(subject)))
+gamlss_glmm_model <- gamlss(formula = margin_model_formula,family="ZISICHEL",data=dataset)
+summary(gamlss_glmm_model)
+plot(gamlss_glmm_model)
+term.plot(gamlss_glmm_model)
 
 #####################################Copula fits
 
@@ -77,7 +203,6 @@ for (i in 1:(length(docnames)-1)) {
     geom_density_2d(aes(x=V1,y=V2))
 }
 
-
 ggarrange(plotlist=plots)
 
 library(VineCopula)
@@ -119,6 +244,26 @@ results$AIC4 <- results$LogLik*-2+results$EDF*4
 results$BIC <- round(results$LogLik*-2+results$EDF*log(nrow(rand_mvt)))
 
 #sum of marginal fits
+
+
+
+
+
+
+##Calculating likelihoods
+
+
+source("common_functions.R")
+data<-generateMvtDist("NO",c(1,2,3),c(1,2,3),matrix(c(0,.5,.1,.5,0,.9,.1,.9,0),nrow=3))
+plotDist(data,"NO")
+
+
+
+
+
+
+
+
 
 
 

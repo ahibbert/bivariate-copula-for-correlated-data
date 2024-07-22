@@ -11,7 +11,7 @@ set.seed(1000);options(scipen=999);
 ############### 1. Applications #############
 ####CHOOSE A DATASET
 
-#### RAND HLS ####
+#### RAND HLS
 library(haven)
 
 rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
@@ -32,7 +32,7 @@ gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,5])$`rand_doc_visi
 #gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits[,5])$`rand_doc_visits[, 5]`)
 dist="PO"
 
-####Lipids Data####
+####Lipids Data
 #require(sas7bdat)
 #lipid <- read.sas7bdat("Data/lipid.sas7bdat")
 #lipids_merged<-(merge(lipid[lipid$MONTH==0,],lipid[lipid$MONTH==24,],by="PATIENT"))
@@ -44,7 +44,7 @@ gamma_c_mu2<-lipids_merged$TRG.y
 #gamma_c_mu1<-lipids_merged$HDL.x
 #gamma_c_mu2<-lipids_merged$HDL.y
 
-####Stock prices over 10 years####
+####Stock prices over 10 years
 
 #ASX2018<-read.table("20180102.txt", header=FALSE, sep=",")
 #ASX1998<-read.table("19980102.txt", header=FALSE, sep=",")
@@ -53,13 +53,13 @@ ASX98_18<-readRDS("ASX98_18.rds")
 gamma_c_mu1<-ASX98_18$V6.x
 gamma_c_mu2<-ASX98_18$V6.y
 
-####Avocado prices####
+####Avocado prices
 #avo<-read.table("avocado prices.csv", header=T, sep=",")
 avo<-readRDS("avo.rds")
 gamma_c_mu1<-avo[avo$Date=="4/01/2015","AveragePrice"]
 gamma_c_mu2<-avo[avo$Date=="25/03/2018","AveragePrice"]
 
-############Diabetes hospitalisations########
+############Diabetes hospitalisations
 data_read<-read.csv(file="Data/diabetic_data.csv")
 
 admissions<-data.frame(table(data_read$patient_nbr))
@@ -83,7 +83,7 @@ colnames(dataset)<-c("patient","random_variable","time")
 dataset<-dataset[order(dataset$patient),]
 dist="PO"
 
-#################asthma and BMI##############
+#################asthma and BMI
 bmi_data_read<-read.csv(file="Data/BMI_IOS_SCD_Asthma.csv")
 #bmi_data<-bmi_data_read[(bmi_data_read$Observation_number==1|bmi_data_read$Observation_number==2)&!is.na(bmi_data_read$Fres_PP),]
 
@@ -98,7 +98,7 @@ gamma_c_mu1<-m_nona$X5Hz_PP.x
 gamma_c_mu2<-m_nona$X5Hz_PP.y
 
 
-##############China Health and Nutrition Study######
+##############China Health and Nutrition Study
 
 library(sas7bdat)
 
@@ -160,51 +160,63 @@ clean_results_2
 ###########Fitting individual models##############
 
 
-ggsave(file="applications_rand.jpeg",last_plot(),width=8,height=3,dpi=900)
+#ggsave(file="applications_rand.jpeg",last_plot(),width=8,height=3,dpi=900)
 
 library(gamlss)
 library(lme4)
 library(gee)
 library(gamlss.mx)
 
-dataset$random_variable[!(dataset$random_variable==round(dataset$random_variable,0))]
-
-model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=NBI()) 
+model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=GA()) 
 #model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")
 
-#model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
-model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+#model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+#model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family = Gamma())
 
-model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())
+model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
+model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)),sigma.formula = ~ as.factor(time==1), data=dataset, family=GA())
 
-model_re_nosig_ZIS <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~-1+as.factor(time==1), nu.formula=~-1+as.factor(time==1), tau.formula=~-1+as.factor(time==1), data=dataset, family=ZISICHEL(),method=RS(10))
+#model_re_nosig_ZIS <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~-1+as.factor(time==1), nu.formula=~-1+as.factor(time==1), tau.formula=~-1+as.factor(time==1), data=dataset, family=ZISICHEL(),method=RS(10))
 
-model_re_np_ZIS <- gamlssNP(formula=random_variable~-1+as.factor(time==1)
-                            , sigma.formula=~as.factor(time==1)
-                            , nu.formula=~-1+as.factor(time==1)
-                            , tau.formula=~-1+as.factor(time==1)
-                            , random=as.factor(dataset$patient), data=dataset
-                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2,family=ZISICHEL())
-
-summary(model_re_nosig_ZIS)
-
-
-model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = RS(1000))
-model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = mixed(1,1000))
-
-model_re_fullyparameterisednonu <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = CG(1000))
-model_re_fullyparameterised <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), nu.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = RS(1000))
+#model_re_np_ZIS <- gamlssNP(formula=random_variable~-1+as.factor(time==1)
+#                            , sigma.formula=~as.factor(time==1)
+#                            , nu.formula=~-1+as.factor(time==1)
+#                            , tau.formula=~-1+as.factor(time==1)
+#                            , random=as.factor(dataset$patient), data=dataset
+#                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2,family=ZISICHEL())
 
 
+#model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = RS(1000))
+#model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = mixed(1,1000))
 
-summary(model_re_nosig)
-AIC(model_re_nosig)
+#model_re_fullyparameterisednonu <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = CG(1000))
+#model_re_fullyparameterised <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), nu.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = RS(1000))
 
-summary(model_re_np)
-summary(model_glm)
-summary(model_gee)
-summary(model_lme4)
-summary(model_re_nosig)
+library(GJRM)
+
+gamma_c_mu1<-dataset[dataset$time==0,]
+gamma_c_mu2<-dataset[dataset$time==1,]
+
+#Setting up GJRM equations
+eq.mu.1 <- formula(random_variable~1)
+eq.mu.2 <- formula(random_variable.1~1)
+fl <- list(eq.mu.1, eq.mu.2)
+
+margin_dist="GA"
+
+model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
+model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+
+
+summary(model_copula)
+sqrt(solve(model_copula$He))
+
+sqrt(solve(model_copula$He)[1,1]+solve(model_copula$He)[2,2]-2*solve(model_copula$He)[1,2])
+sqrt(solve(model_copula_n$He)[1,1]+solve(model_copula_n$He)[2,2]-2*solve(model_copula_n$He)[1,2])
+
+
+
 
 
 ###########Time to run#############
