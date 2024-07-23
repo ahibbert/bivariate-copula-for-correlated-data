@@ -248,8 +248,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
-    margin_dist="PIG"
-    
+
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_j<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
@@ -384,7 +383,6 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
   
 }
 
-
 fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
   
   n=nrow(dataset[dataset$time==0,])
@@ -401,8 +399,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     if(dist=="GA"){
       actuals<-c( log(a*mu1)
                   , log(a*mu2)
-                  , NA
-                  , NA
+                  , sqrt(1/a)/sqrt(n)
+                  , (2*sqrt(1/a)-2*(log((1/(a*mu1+a*mu2)) * (sqrt(b)/(a*(a+b+1)) )+1)))/sqrt(n)
                   , NA
                   ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
                   ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
@@ -414,8 +412,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
         mu1
         , mu2
         , (a*sqrt(1-c^2))/sqrt(n)
-        , (b*sqrt(1-c^2))/sqrt(n)
         , sqrt(a^2+b^2-2*a*b*c)/sqrt(n)
+        , NA
         ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
         ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
         ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
@@ -432,11 +430,11 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
         e_x1
         , e_x2
         , sqrt(v_x1)     /sqrt(n)
-        , sqrt(v_x2)     /sqrt(n)
         , sqrt(
           (v_x2 + v_x1)
           - log((mu1*mu2*c)/(e_x1*e_x2))
         ) /sqrt(n)
+        , NA
         ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
         ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
         ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
@@ -593,7 +591,6 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
-    margin_dist="PIG"
     
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
