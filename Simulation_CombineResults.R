@@ -29,11 +29,17 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
   return(plot)
 }
 
+#B1/B2 results
+bt_mode=FALSE
 #load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
 #load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
-load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
+#load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
 
-multiplot=TRUE
+#B0/Bt results
+bt_mode=TRUE
+load("results_combined_B0_BtGA_1000_2024-07-23.RData");dist="GA"
+
+multiplot=FALSE
 
 #################################1. DATA SETUP##################################################
 
@@ -90,6 +96,9 @@ if(dist=="GA") {
   #Parameters
   mu1=parameters[,"a"]*parameters[,"mu1"]
   mu2=parameters[,"a"]*parameters[,"mu2"]
+  if(bt_mode==TRUE) {
+    mu2=parameters[,"a"]*parameters[,"mu2"]/parameters[,"a"]*parameters[,"mu1"]
+  }
   #Errors
   load(file="numDerivResults_20231127.rds")
   trueSE<-numDerivResults[,c(1,2,5)]
@@ -117,6 +126,11 @@ if(dist=="PO") {
   }
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 }
+
+if(bt_mode==TRUE) {
+  t2intercepts[,grepl("cop",colnames(t1intercepts))]= t2intercepts[,grepl("cop",colnames(t1intercepts))] - t1intercepts[,grepl("cop",colnames(t1intercepts))]   
+}
+
 
 ###################### PLOT SETUP######################
 
@@ -270,12 +284,12 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
 
 ###################PLOT FUNCTION#############################
 
-#ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Bias x Tau
+ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(3)],error_plots[c(3)],bias_plots[c(5)],error_plots[c(5)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggsave(file=paste("simulation_bias_plus_error_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew
 #ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
-#ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Tau
+ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Tau
 #ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
 #ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
