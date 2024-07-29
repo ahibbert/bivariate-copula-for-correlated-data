@@ -49,14 +49,7 @@ for (i in 1:length(a)) {
   }
 }
 
-save(mle,file="nb_mle")
-
 nb_mle<-cbind(nb_par,mle)
 colnames(nb_mle)=c("a","b","c","mu1","mu2","mean_Bt","var_Bt")
 
 save(nb_mle,file="nb_mle")
-
-hist(sqrt(mle[,2])/sqrt(1000))
-
-
-

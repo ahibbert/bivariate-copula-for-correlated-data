@@ -28,7 +28,7 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
                         , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
   return(plot)
 }
-
+s
 #B1/B2 results
 bt_mode=FALSE
 #load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
@@ -38,10 +38,10 @@ bt_mode=FALSE
 #B0/Bt results
 bt_mode=TRUE
 #load("results_combined_B0_BtNO_1000_2024-07-23.RData");dist="NO"
-#load("results_combined_B0_BtPO_1000_2024-07-24.RData");dist="PO"
-load("results_combined_B0_BtGA_1000_2024-07-23.RData");dist="GA"
+load("results_combined_B0_BtPO_1000_2024-07-24.RData");dist="PO"
+#load("results_combined_B0_BtGA_1000_2024-07-23.RData");dist="GA"
 
-multiplot=TRUE
+multiplot=FALSE
 
 #################################1. DATA SETUP##################################################
 
@@ -122,6 +122,7 @@ if(dist=="NO") {
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 }
 if(dist=="PO") {
+  load("nb_mle")
   trueSE<-matrix(ncol=3,nrow=length(results))
   
   for (i in 1:length(results)) {
@@ -131,7 +132,8 @@ if(dist=="PO") {
     skew[i]=results[[i]][(nrow(results[[i]])-1),8]/10000
   }
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
-  trueSE[,3]=trueSE[,2]
+  
+  trueSE[,3]=sqrt(merge(parameters,nb_mle,by=c("a","b","c","mu1","mu2"))[,"var_Bt"])
   
   if(bt_mode==TRUE) {mu2=log(mu2/mu1)}
     
@@ -189,21 +191,21 @@ bias_plots[[plotcount]]<- plotVersusTrue(limits_bias
                ,mu2
                ,tau
                ,xlab
-               ,ylab=TeX("$(\\hat{\\beta_2}/\\beta_2)-1$")
+               ,ylab=TeX("$(\\hat{\\beta_t}/\\beta_t)-1$")
                ,scaled=TRUE)
 error_plots[[plotcount]]<- plotVersusTrue(limits_error
                                           ,t2error
                                           ,if(bt_mode==TRUE){trueSE[,"mu2_se_Bt"]}else{trueSE[,"mu2_se_B2"]}
                                           ,tau
                                           ,xlab
-                                          ,ylab=TeX("$SE(\\hat{\\beta_{2}})$")
+                                          ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
                                           ,scaled=FALSE)
 skew_error_plots[[plotcount]]<- plotVersusTrue(limits_error_skew
                                           ,t2error
                                           ,if(bt_mode==TRUE){trueSE[,"mu2_se_Bt"]}else{trueSE[,"mu2_se_B2"]}
                                           ,skew
                                           ,xlabskew
-                                          ,ylab=TeX("$SE(\\hat{\\beta_{2}})$")
+                                          ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
                                           ,scaled=FALSE)
 
 skew_bias_plots[[plotcount]]<- plotVersusTrue(limits_bias_skew
@@ -294,14 +296,14 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
 
 ###################PLOT FUNCTION#############################
 
-#ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G")) + bgcolor("white") + border(color = "white") # Bias x Tau
+#ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.01) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggsave(file=paste("simulation_bias_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(3)],error_plots[c(3)],bias_plots[c(5)],error_plots[c(5)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggsave(file=paste("simulation_bias_plus_error_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew
 #ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
-ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G")) + bgcolor("white") + border(color = "white") # Error x Tau
-ggsave(file=paste("simulation_error_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
+ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
+#ggsave(file=paste("simulation_error_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
 #ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
