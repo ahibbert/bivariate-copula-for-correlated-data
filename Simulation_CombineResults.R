@@ -17,7 +17,7 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
     {if(!(is.na(limits[1])||is.na(limits[2]))){xlim(limits[1],limits[2])}} +
     {if(!(is.na(limits[3])||is.na(limits[4]))){ylim(limits[3],limits[4])}} +
     geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE) + 
-    geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE) +
+    geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter()) + #
     geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE) + 
     geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE) +
     geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE) +
@@ -28,17 +28,18 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
                         , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
   return(plot)
 }
-s
+
 #B1/B2 results
-bt_mode=FALSE
+#bt_mode=FALSE
 #load("results_combined_nointNO_1000_2024-03-15.RData"); dist="NO" ####NO
-#load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
+#load("results_combined_B1_B2_PO_1000_2024-08-27.RData");dist="PO" #load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
 #load("results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
+
 
 #B0/Bt results
 bt_mode=TRUE
 #load("results_combined_B0_BtNO_1000_2024-07-23.RData");dist="NO"
-load("results_combined_B0_BtPO_1000_2024-07-24.RData");dist="PO"
+load("results_combined_B0_Bt_PO_1000_2024-08-28.RData");dist="PO" #load("results_combined_B0_BtPO_1000_2024-07-24.RData");dist="PO"
 #load("results_combined_B0_BtGA_1000_2024-07-23.RData");dist="GA"
 
 multiplot=FALSE
@@ -300,15 +301,14 @@ lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_
 #ggsave(file=paste("simulation_bias_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(3)],error_plots[c(3)],bias_plots[c(5)],error_plots[c(5)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
 #ggsave(file=paste("simulation_bias_plus_error_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-#ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew
-#ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
+#ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)])  ,common.legend=TRUE, ncol=2, nrow=plotcount/4,      labels=c("NB","G"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew#ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
 ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
 #ggsave(file=paste("simulation_error_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
 #ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
 #ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=6,dpi=900)
-ggarrange(plotlist=lik_plots[c(1,5,9,2,6,10,3,7,11,4,8,12)]     ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels=c("N","NB","G","N","NB","G","N","NB","G","N","NB","G"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
-ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=10,dpi=900)
+#ggarrange(plotlist=lik_plots[c(1,5,9,2,6,10,3,7,11,4,8,12)]     ,common.legend=TRUE, ncol=3, nrow=plot_count_lik/3, labels=c("N","NB","G","N","NB","G","N","NB","G","N","NB","G"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+#ggsave(file=paste("simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=10,dpi=900)
 #ggarrange(plotlist=lik_plots_skew   ,common.legend=TRUE, ncol=4, nrow=plot_count_lik/4, labels=c("P","P","P","G","G","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Skew
 #ggsave(file=paste("simulation_loglik_AIO_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
 

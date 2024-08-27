@@ -168,12 +168,14 @@ library(gamlss.mx)
 library(geeM)
 library(MASS)
 
-model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=NBI()) 
-
-model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")
-model_geem<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, family=neg.bin(theta=(.814)),corstr = "exchangeable")
-
-summary(model_geem)[2]
+if (dist=="PO" || dist =="NB") {
+  invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1), data=dataset, maxit=1000)))
+  model_gee<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, init.beta=model_glm$coefficients,
+                  family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+} else {
+  model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=NBI()) 
+  model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")  
+}
 
 #model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
 model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
