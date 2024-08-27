@@ -132,9 +132,13 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     }
     
     if(dist=="PO"||dist=="NB") {
+      
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1), data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
-      
+      library(geeM)
+      model_gee<-geem(random_variable~-1+as.factor(time==1), id=patient, data=dataset, init.beta=model_glm$coefficients,
+                       family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
@@ -153,7 +157,16 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                     , BIC(model_glm)
                     , 3
     )
-    if(dist=="PO"||dist=="NB"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
+    if(dist=="PO"||dist=="NB"){model_sum_gee=summary(model_gee)
+                                summary_gee<-c( 
+                                 model_sum_gee$beta[1]
+                               , model_sum_gee$beta[2]
+                               , model_sum_gee$se.model[1]#### 
+                               , model_sum_gee$se.model[2]####
+                               , NA
+                               , NA
+                               , NA
+                               , 4)} else{
     summary_gee<-c( summary(model_gee)$coeff[1]
                     , summary(model_gee)$coeff[2]
                     , summary(model_gee)$coeff[7]#### 
@@ -477,6 +490,9 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     if(dist=="PO"||dist=="NB") {
       invisible(capture.output(model_glm <- glm.nb(random_variable~as.factor(time==1), data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
+      library(geeM)
+      model_gee<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, init.beta=model_glm$coefficients,
+                      family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
       
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
@@ -496,16 +512,26 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                     , BIC(model_glm)
                     , 3
     )
-    if(dist=="PO"||dist=="NB"){summary_gee<-c(NA,NA,NA,NA,NA,NA,NA)} else{
-      summary_gee<-c( summary(model_gee)$coeff[1]
-                      , summary(model_gee)$coeff[2]
-                      , summary(model_gee)$coeff[7]#### 
-                      , summary(model_gee)$coeff[8]####
-                      , NA
-                      , NA
-                      , NA
-                      , 4
-      )}
+    
+    if(dist=="PO"||dist=="NB"){model_sum_gee=summary(model_gee)
+    summary_gee<-c( 
+      model_sum_gee$beta[1]
+      , model_sum_gee$beta[2]
+      , model_sum_gee$se.model[1]#### 
+      , model_sum_gee$se.model[2]####
+      , NA
+      , NA
+      , NA
+      , 4)} else{
+        summary_gee<-c( summary(model_gee)$coeff[1]
+                        , summary(model_gee)$coeff[2]
+                        , summary(model_gee)$coeff[7]#### 
+                        , summary(model_gee)$coeff[8]####
+                        , NA
+                        , NA
+                        , NA
+                        , 4
+        )}
     
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]

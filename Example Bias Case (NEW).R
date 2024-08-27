@@ -12,9 +12,10 @@ set.seed(1000);options(scipen=999);
 ####CHOOSE A DATASET
 
 #### RAND HLS
+
 library(haven)
 
-rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
+rand <- read_sas("./Data/randhrs1992_2020v2_SAS/randhrs1992_2020v2.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
                                                                  ,"R14DOCTIM" #Doctor visits last 2 years
                                                                  ,"R15DOCTIM" #Doctor visits last 2 years
 ))
@@ -22,11 +23,9 @@ rand <- read_sas("Data/randhrs1992_2020v1.sas7bdat",col_select=c("HHIDPN","R14IW
 head(rand)
 rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>=0&rand$R15DOCTIM>=0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
 
-
 rand_doc_visits_SAMPLED<-rand_doc_visits[runif(nrow(rand_doc_visits))<0.1,]
 gamma_c_mu1<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,4])$`rand_doc_visits_SAMPLED[, 4]`)
 gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,5])$`rand_doc_visits_SAMPLED[, 5]`)
-
 
 #gamma_c_mu1<-as.vector(as.data.frame(rand_doc_visits[,4])$`rand_doc_visits[, 4]`)
 #gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits[,5])$`rand_doc_visits[, 5]`)
@@ -166,30 +165,48 @@ library(gamlss)
 library(lme4)
 library(gee)
 library(gamlss.mx)
+library(geeM)
+library(MASS)
 
-model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=GA()) 
-#model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")
+model_glm <- gamlss(formula=random_variable~as.factor(time==1), data=dataset, family=NBI()) 
 
-model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
-#model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=poisson(link = "log"), maxiter=25, corstr = "exchangeable")
+model_geem<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, family=neg.bin(theta=(.814)),corstr = "exchangeable")
+
+summary(model_geem)[2]
+
+#model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
+model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
 #model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family = Gamma())
 
-model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA())
-model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)),sigma.formula = ~ as.factor(time==1), data=dataset, family=GA())
+model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())
 
-#model_re_nosig_ZIS <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~-1+as.factor(time==1), nu.formula=~-1+as.factor(time==1), tau.formula=~-1+as.factor(time==1), data=dataset, family=ZISICHEL(),method=RS(10))
+model_re_np_NBI <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NBI()
+                                                 , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)
 
-#model_re_np_ZIS <- gamlssNP(formula=random_variable~-1+as.factor(time==1)
-#                            , sigma.formula=~as.factor(time==1)
-#                            , nu.formula=~-1+as.factor(time==1)
-#                            , tau.formula=~-1+as.factor(time==1)
-#                            , random=as.factor(dataset$patient), data=dataset
-#                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2,family=ZISICHEL())
+model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= ZISICHEL()
+                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)
 
 
-#model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = RS(1000))
-#model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=ZAPIG(),method = mixed(1,1000))
+#model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)),sigma.formula = ~ as.factor(time==1), data=dataset, family=GA())
+model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
+                         , data=dataset, family=ZISICHEL(),method=RS(5))
 
+summary(model_re_nosig)
+model_re_nosig_ZIS <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient))
+                             , sigma.formula=~as.factor(time==1)
+                             , nu.formula=~as.factor(time==1)
+                             , tau.formula=~as.factor(time==1)
+                             , data=dataset, family=ZISICHEL(),method=RS(10))
+
+model_re_np_ZIS <- gamlssNP(formula=random_variable~-1+as.factor(time==1)
+                            , sigma.formula=~as.factor(time==1)
+                            , nu.formula=~-1+as.factor(time==1)
+                            , tau.formula=~-1+as.factor(time==1)
+                            , random=as.factor(dataset$patient), data=dataset
+                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2,family=ZISICHEL())
+
+summary(model_lme4)
 #model_re_fullyparameterisednonu <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = CG(1000))
 #model_re_fullyparameterised <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula = ~as.factor(time==1), nu.formula = ~as.factor(time==1), data=dataset, family=ZAPIG(),method = RS(1000))
 
@@ -203,21 +220,47 @@ eq.mu.1 <- formula(random_variable~1)
 eq.mu.2 <- formula(random_variable.1~1)
 fl <- list(eq.mu.1, eq.mu.2)
 
-margin_dist="GA"
+dist="PO"
+
+if(dist=="NO"){margin_dist="N"}
+if(dist=="GA"){margin_dist="GA"}
+if(dist=="PO"){margin_dist="NBI"}
+
+margin_dist="PIG"
 
 model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
 model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_j<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_g<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "G0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_f<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "F",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_amh<-gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "AMH",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_fgm<-gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "FGM",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_pl<- gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_h<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
+model_copula_t<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
+
+c(sqrt(solve(model_copula$He)[1,1]+solve(model_copula$He)[2,2]-2*solve(model_copula$He)[1,2])
+,sqrt(solve(model_copula_n$He)[1,1]+solve(model_copula_n$He)[2,2]-2*solve(model_copula_n$He)[1,2])
+,sqrt(solve(model_copula_j$He)[1,1]+solve(model_copula_j$He)[2,2]-2*solve(model_copula_j$He)[1,2])
+,sqrt(solve(model_copula_g$He)[1,1]+solve(model_copula_g$He)[2,2]-2*solve(model_copula_g$He)[1,2])
+,sqrt(solve(model_copula_f$He)[1,1]+solve(model_copula_f$He)[2,2]-2*solve(model_copula_f$He)[1,2])
+,sqrt(solve(model_copula_amh$He)[1,1]+solve(model_copula_amh$He)[2,2]-2*solve(model_copula_amh$He)[1,2])
+,sqrt(solve(model_copula_fgm$He)[1,1]+solve(model_copula_fgm$He)[2,2]-2*solve(model_copula_fgm$He)[1,2])
+,sqrt(solve(model_copula_pl$He)[1,1]+solve(model_copula_pl$He)[2,2]-2*solve(model_copula_pl$He)[1,2])
+,sqrt(solve(model_copula_h$He)[1,1]+solve(model_copula_h$He)[2,2]-2*solve(model_copula_h$He)[1,2])
+,sqrt(solve(model_copula_t$He)[1,1]+solve(model_copula_t$He)[2,2]-2*solve(model_copula_t$He)[1,2]))
 
 
-summary(model_copula)
-sqrt(solve(model_copula$He))
-
-sqrt(solve(model_copula$He)[1,1]+solve(model_copula$He)[2,2]-2*solve(model_copula$He)[1,2])
-sqrt(solve(model_copula_n$He)[1,1]+solve(model_copula_n$He)[2,2]-2*solve(model_copula_n$He)[1,2])
-
-
-
-
+c(model_copula$coefficients[2]-model_copula$coefficients[1]  
+,model_copula_n$coefficients[2]-model_copula_n$coefficients[1]
+,model_copula_j$coefficients[2]-model_copula_j$coefficients[1]
+,model_copula_g$coefficients[2]-model_copula_g$coefficients[1]
+,model_copula_f$coefficients[2]-model_copula_f$coefficients[1]
+,model_copula_amh$coefficients[2]-model_copula_amh$coefficients[1]
+,model_copula_fgm$coefficients[2]-model_copula_fgm$coefficients[1]
+,model_copula_pl$coefficients[2]-model_copula_pl$coefficients[1]
+,model_copula_h$coefficients[2]-model_copula_h$coefficients[1]
+,model_copula_t$coefficients[2]-model_copula_t$coefficients[1])
 
 ###########Time to run#############
 source("common_functions.R")
@@ -330,8 +373,6 @@ sumtime_summary_avg
 
 
 #########Estimating marginal means from predictions ################
-
-
 
 model_glm <- gamlss(formula=random_variable~-1+as.factor(time==1), data=dataset, family=GA()) 
 model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
@@ -1027,7 +1068,7 @@ gamlss_fit_WEI$aic
 
 library(gamlss)
 
-links<-ZASICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
+links<-ZISICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
                 tau.link = "logit")
 
 fit1<-gamlss(gamma_c_mu1~1,family=ZISICHEL())
@@ -1045,14 +1086,35 @@ plot(dMargin1,dMargin2)
 library(VineCopula)
 copFits<-BiCopSelect(dMargin1,dMargin2)
 
+copula_model<-BiCopEst(dMargin1,dMargin2,family=copFits$family)
+
 ll_m1<--1*fit1$G.deviance/2
 ll_m2<--1*fit2$G.deviance/2
-ll_cop<-copFits$logLik
+ll_cop<-copula_model$logLik
 
 ll_combined<-ll_m1+ll_m2+ll_cop
 df_fit<-fit1$df.fit+fit2$df.fit+2
 
 -2*ll_combined+2*df_fit
+
+mean_margins=matrix(NA,ncol=2,nrow=0)
+set.seed(100)
+for (i in 1:1000) {
+  bicop_sim<-BiCopSim(length(gamma_c_mu1),copula_model)
+  qMargin1<-qZISICHEL(bicop_sim[,1],links$mu.linkinv(fit1$mu.coefficients),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
+  qMargin2<-qZISICHEL(bicop_sim[,2],links$mu.linkinv(fit2$mu.coefficients),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
+  mean_margins=rbind(mean_margins,c(log(mean(qMargin1)),log(mean(qMargin2))))
+}
+
+
+summary(fit2)[1]-summary(fit1)[1]
+
+sqrt(vcov(fit1)[1,1]+vcov(fit2)[1,1]-2*cov(mean_margins)[1,2])
+
+
+
+
+
 
 
 
