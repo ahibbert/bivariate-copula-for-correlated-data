@@ -14,6 +14,16 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
     margin_2<-normData[,2]
   }
   
+  if(dist=="LO") {
+    
+    require(MASS)
+    a=1;b=1
+    normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
+    margin_1<-as.numeric(pnorm(normData[,1])<=mu1)
+    margin_2<-as.numeric(pnorm(normData[,2])<=mu2)
+    
+  }
+  
   if(dist=="PO") {
     
     #Compound multiple poisson of Stein & Juritz, 1987
@@ -64,6 +74,17 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                   ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
       )
     }
+    if(dist=="LO"){
+      actuals<-c( log(mu1/(1-mu1))
+                  , log(mu2/(1-mu2))
+                  , NA
+                  , NA
+                  , NA
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+                  ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
+      )
+    }
     if(dist=="NO"){
       actuals<-c( 
         mu1
@@ -101,12 +122,11 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
   }
   
   if(include=="ALL" || include=="non-GJRM" ) {
-  
-    require(gamlss)
-    require(gee)
-    require(lme4)
-    require(MASS)
-    require(gamlss.mx)
+
+    library(gee)
+    library(gamlss)
+    library(lme4)
+    library(gamlss.mx)
     
     ###Non-GJRM models first as GJRM breaks base gamlss
     
@@ -119,6 +139,16 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                               , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
+    }
+    if(dist=="LO") {
+      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
+      invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), data=dataset, family=BI())))
+      #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+                              , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+      
+      model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family=binomial)
     }
     if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=gaussian, maxit=1000)))
@@ -261,6 +291,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
+    if(dist=="LO"){margin_dist="logit"}
 
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
@@ -420,6 +451,17 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                   ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
       )
     }
+    if(dist=="LO"){
+      actuals<-c( log(mu1/(1-mu1))
+                  , log(mu2/(1-mu2))
+                  , NA
+                  , NA
+                  , NA
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="kendall")[1,2]*100
+                  ,cor(cbind(gamma_c_mu1$random_variable,gamma_c_mu2$random_variable),method="pearson")[1,2]*100
+                  ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
+      )
+    }
     if(dist=="NO"){
       actuals<-c( 
         mu1
@@ -485,6 +527,17 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
+    }
+    
+    if(dist=="LO") {
+      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
+      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=BI())))
+      #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+      
+      model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family=binomial)
     }
     
     if(dist=="PO"||dist=="NB") {
@@ -617,6 +670,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
+    if(dist=="LO"){margin_dist="logit"}
     
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
