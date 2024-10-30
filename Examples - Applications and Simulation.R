@@ -126,10 +126,11 @@ a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
 
 ############## 2. Simulation ##################
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
-dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
+#dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 #dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
 #dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
 #dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
+dist="LO";a=NA; b=NA; c=.5; mu1=.1; mu2=.4; n=1000
 
 dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
