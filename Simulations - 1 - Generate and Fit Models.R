@@ -6,7 +6,7 @@ source("common_functions.R")
 ############## 1. Run simulations for non-GJRM models########################
 results<-list()
 datasets<-list()
-model_struct_FUN=fitBivModels_Bt
+model_struct_FUN=fitBivModels
 
 #a=c(0.25,1); b=c(1.75);c=NA; mu1=c(10); mu2=c(12); n=1000;dist="GA" #TESTPAR
 
@@ -58,5 +58,5 @@ for(i in 1:(length(results)/2)) {
 }
 results_combined <- results_combined[na_check==FALSE]
 
-save(results_combined,file=paste("Data/results_combined_B1_Bt_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
+save(results_combined,file=paste("Data/results_combined_B1_B2_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
 

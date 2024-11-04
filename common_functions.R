@@ -210,8 +210,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]
                            ,summary(model_re_nosig)[2]
-                           ,if(dist=="PO"){summary(model_re_nosig)[4]}else{summary(model_re_nosig)[4]}
-                           ,if(dist=="PO"){summary(model_re_nosig)[5]}else{summary(model_re_nosig)[5]}
+                           ,if(dist=="LO"){summary(model_re_nosig)[3]}else{summary(model_re_nosig)[4]}
+                           ,if(dist=="LO"){summary(model_re_nosig)[4]}else{summary(model_re_nosig)[5]}
                            ,logLik(model_re_nosig)
                            ,AIC(model_re_nosig)
                            ,BIC(model_re_nosig)
@@ -233,8 +233,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     invisible(capture.output(
       summary_re_np<-c( summary(model_re_np)[1]
                      ,summary(model_re_np)[2]
-                     ,if(dist=="PO"){summary(model_re_np)[6]}else{summary(model_re_np)[6]}
-                     ,if(dist=="PO"){summary(model_re_np)[7]}else{summary(model_re_np)[7]}
+                     ,if(dist=="LO"){summary(model_re_np)[5]}else{summary(model_re_np)[6]}
+                     ,if(dist=="LO"){summary(model_re_np)[6]}else{summary(model_re_np)[7]}
                      ,logLik(model_re_np)
                      , AIC(model_re_np)
                      , BIC(model_re_np)
@@ -589,8 +589,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]
                            ,summary(model_re_nosig)[2]
-                           ,if(dist=="PO"){summary(model_re_nosig)[4]}else{summary(model_re_nosig)[4]}
-                           ,if(dist=="PO"){summary(model_re_nosig)[5]}else{summary(model_re_nosig)[5]}
+                           ,if(dist=="LO"){summary(model_re_nosig)[3]}else{summary(model_re_nosig)[4]}
+                           ,if(dist=="LO"){summary(model_re_nosig)[4]}else{summary(model_re_nosig)[5]}
                            ,logLik(model_re_nosig)
                            ,AIC(model_re_nosig)
                            ,BIC(model_re_nosig)
@@ -612,8 +612,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     invisible(capture.output(
       summary_re_np<-c( summary(model_re_np)[1]
                         ,summary(model_re_np)[2]
-                        ,if(dist=="PO"){summary(model_re_np)[6]}else{summary(model_re_np)[6]}
-                        ,if(dist=="PO"){summary(model_re_np)[7]}else{summary(model_re_np)[7]}
+                        ,if(dist=="LO"){summary(model_re_np)[5]}else{summary(model_re_np)[6]}
+                        ,if(dist=="LO"){summary(model_re_np)[6]}else{summary(model_re_np)[7]}
                         ,logLik(model_re_np)
                         , AIC(model_re_np)
                         , BIC(model_re_np)
