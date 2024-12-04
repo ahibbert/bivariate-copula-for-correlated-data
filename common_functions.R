@@ -127,6 +127,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     library(gamlss)
     library(lme4)
     library(gamlss.mx)
+    library(mgcv)
+    library(MASS)
     
     ###Non-GJRM models first as GJRM breaks base gamlss
     
@@ -139,6 +141,9 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                               , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
+    
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+      
     }
     if(dist=="LO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
@@ -149,6 +154,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family=binomial)
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
     }
     if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=gaussian, maxit=1000)))
@@ -159,6 +165,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=gaussian)
     }
     
     if(dist=="PO"||dist=="NB") {
@@ -175,6 +182,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+      
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
     }
     
     ###Capturing coefficient values and errors from each model
@@ -277,6 +286,16 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , BIC(model_lme4)
                       ,lme_EDF)
     
+    summary_gamm<-c( summary(model_gamm$lme)$coefficients[[1]][1]
+                     , summary(model_gamm$lme)$coefficients[[1]][2]
+                     , sqrt(diag(model_gamm$lme$varFix))[1]
+                     , sqrt(diag(model_gamm$lme$varFix))[2]
+                     ,logLik(model_gamm$lme)
+                     ,AIC(model_gamm$lme)
+                     ,BIC(model_gamm$lme)
+                     ,lme_EDF
+    )
+    
   }
   
   if(include=="ALL" || include=="GJRM" ) {
@@ -409,13 +428,13 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
   ########### 4. Combining results #########
   
   if(include=="ALL") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
   }
   if(include=="GJRM") {
     results_exbias<- rbind(summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
   }
   if(include=="non-GJRM") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,actuals)
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,actuals)
   }
   
   results_exbias[,1:4]<- round(results_exbias[,1:4],4)
@@ -505,6 +524,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     require(lme4)
     require(MASS)
     require(gamlss.mx)
+    library(mgcv)
     
     ###Non-GJRM models first as GJRM breaks base gamlss
     
@@ -517,6 +537,9 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
+      
+      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+      
     }
     if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=gaussian, maxit=1000)))
@@ -527,6 +550,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
+      
+      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=gaussian)
     }
     
     if(dist=="LO") {
@@ -538,6 +563,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family=binomial)
+      
+      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
     }
     
     if(dist=="PO"||dist=="NB") {
@@ -553,6 +580,9 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
+      
+      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
+      
     }
     
     ###Capturing coefficient values and errors from each model
@@ -631,6 +661,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , BIC(model_lme4)
                       , 4)
     
+    
     ###Calculating effective degrees of freedom from Donohue
     X<-getME(model_lme4,name="X")
     Z<-getME(model_lme4,name="Z")
@@ -656,7 +687,20 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , BIC(model_lme4)
                       ,lme_EDF)
     
+  
+    summary_gamm<-c( summary(model_gamm$lme)$coefficients[[1]][1]
+                     , summary(model_gamm$lme)$coefficients[[1]][2]
+                     , sqrt(diag(model_gamm$lme$varFix))[1]
+                     , sqrt(diag(model_gamm$lme$varFix))[2]
+                     ,logLik(model_gamm$lme)
+                     ,AIC(model_gamm$lme)
+                     ,BIC(model_gamm$lme)
+                     ,lme_EDF
+    )
+    
   }
+  
+  
   
   if(include=="ALL" || include=="GJRM" ) {
     
@@ -788,13 +832,13 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
   ########### 4. Combining results #########
   
   if(include=="ALL") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
   }
   if(include=="GJRM") {
     results_exbias<- rbind(summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
   }
   if(include=="non-GJRM") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,actuals)
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,actuals)
   }
   
   results_exbias[,1:4]<- round(results_exbias[,1:4],4)

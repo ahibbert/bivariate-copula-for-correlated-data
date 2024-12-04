@@ -128,9 +128,9 @@ a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 #dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 #dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
-#dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
+dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
 #dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
-dist="LO";a=NA; b=NA; c=.5; mu1=.25; mu2=.75; n=1000
+#dist="LO";a=NA; b=NA; c=.5; mu1=.25; mu2=.75; n=1000
 
 dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
@@ -144,12 +144,12 @@ skewness(dataset$random_variable[dataset$time==1])
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="kendall")
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="pearson")
 
-results<-fitBivModels_Bt(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
+results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
 if(dist=="NO"){clean_results<-results} else 
   if(dist=="LO"){clean_results<-cbind(results,round(logit_inv(results[,c(1,2)]),4));} else
     {clean_results<-cbind(results,round(exp(results[,c(1,2)]),4));}
 clean_results<-cbind(clean_results[,c(9,10)],clean_results[,1:8]);colnames(clean_results)<-c("mu_1","mu_2",colnames(clean_results[,c(3:10)]))
-rownames(clean_results)<-c("GLM","GEE","GAMLSS (4)","GAMLSS NP (5)","LME4","GJRM (Clayton)","GJRM (Normal)","GJRM (Joe)"    ,"GJRM (Gumbel)","GJRM (Frank)" ,"GJRM (AMH)"   ,"GJRM (FGM)"    ,"GJRM (Plackett)","GJRM (Hougaard)","GJRM (T)","Actual")
+rownames(clean_results)<-c("GLM","GEE","GAMLSS (4)","GAMLSS NP (5)","LME4","GAMM","GJRM (Clayton)","GJRM (Normal)","GJRM (Joe)"    ,"GJRM (Gumbel)","GJRM (Frank)" ,"GJRM (AMH)"   ,"GJRM (FGM)"    ,"GJRM (Plackett)","GJRM (Hougaard)","GJRM (T)","Actual")
 
 clean_results_2<-cbind(clean_results,clean_results[,"EDF"])
 clean_results_2[,8]<--2*clean_results[,"LogLik"]+2*clean_results[,"EDF"]
@@ -161,15 +161,27 @@ clean_results_2
 
 ###########Fitting individual models##############
 
-
-#ggsave(file="applications_rand.jpeg",last_plot(),width=8,height=3,dpi=900)
-
 library(gamlss)
 library(lme4)
 library(gee)
 library(gamlss.mx)
 library(geeM)
 library(MASS)
+library(mgcv)
+
+
+model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=negbin(link="log"))
+model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
+
+model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb)
+
+
+model_gamm4 = gamm4(formula=random_variable~as.factor(time==1), random=~(1|patient), data=dataset, family=binomial)
+
+model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
+model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family = Gamma(link="log"))
+model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family = binomial)
 
 if (dist=="PO" || dist =="NB") {
   invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1), data=dataset, maxit=1000)))
@@ -181,8 +193,8 @@ if (dist=="PO" || dist =="NB") {
 }
 
 #model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")
-model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
-#model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family = Gamma())
+#model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
+model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family = Gamma(link="log"))
 
 model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())
 

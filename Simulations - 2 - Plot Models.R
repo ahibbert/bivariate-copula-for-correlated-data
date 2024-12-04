@@ -20,13 +20,14 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
     geom_smooth(data=inputs, aes(x=tau, y=summary_glm, color="GLM"),linetype = "dashed",se=FALSE) + 
     geom_smooth(data=inputs, aes(x=tau, y=summary_gee, color="GEE"),linetype = "dashed",se=FALSE,position=position_jitter()) + #
     geom_smooth(data=inputs, aes(x=tau, y=summary_lme4, color="LME4"),linetype = "dashed",se=FALSE) + 
+    geom_smooth(data=inputs, aes(x=tau, y=summary_gamm, color="GAMM"),linetype = "dashed",se=FALSE) +
     geom_smooth(data=inputs, aes(x=tau, y=summary_re_nosig, color="GAMLSS (4)"),linetype = "dashed",se=FALSE) +
     geom_smooth(data=inputs, aes(x=tau, y=summary_re_np, color="GAMLSS NP (5)"),linetype = "dashed",se=FALSE) +
     geom_smooth(data=inputs, aes(x=tau, y=summary_cop, color="GJRM (C)"),linetype = "dashed",se=FALSE) +
     geom_smooth(data=inputs, aes(x=tau, y=summary_cop_n, color="GJRM (N)"),linetype = "dashed",se=FALSE) +
     {if(plotTrue==TRUE){geom_smooth(data=inputs, aes(x=tau, y=true, color="True"), span=1,se=FALSE)}} +
-    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
-                        , values=c(brewer.pal(n = 7, name = "Dark2"),"#000000"))
+    scale_colour_manual(name="Model", breaks=c("GLM","GEE","LME4","GAMM","GAMLSS (4)","GAMLSS NP (5)","GJRM (C)","GJRM (N)","True")
+                        , values=c(brewer.pal(n = 8, name = "Dark2"),"#000000"))
   return(plot)
 }
 
@@ -36,15 +37,20 @@ plotVersusTrue <- function (limits,inputs,true,tau,xlab,ylab,scaled=FALSE,type="
 #load("Data/results_combined_B1_B2_PO_1000_2024-08-27.RData");dist="PO" #load("results_combined_noint_rangeupPO_1000_2024-03-19.RData"); dist="PO"
 #load("Data/results_combined_nointGA_1000_2024-03-15.RData"); dist="GA" ####GA
 #load("Data/results_combined_B1_B2_LO_1000_2024-10-30.RData");dist="LO"
+#load("Data/results_combined_B1_B2_LO_1000_2024-11-27.RData");dist="LO"
+
 
 #B0/Bt results
 bt_mode=TRUE
 #load("Data/results_combined_B0_BtNO_1000_2024-07-23.RData");dist="NO"
 #load("Data/results_combined_B0_Bt_PO_1000_2024-08-28.RData");dist="PO" #load("results_combined_B0_BtPO_1000_2024-07-24.RData");dist="PO"
 #load("Data/results_combined_B0_BtGA_1000_2024-07-23.RData");dist="GA"
-load("Data/results_combined_B1_Bt_LO_1000_2024-10-30.RData");dist="LO"
+#load("Data/results_combined_B1_Bt_LO_1000_2024-10-30.RData");dist="LO"
+#load("Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData");dist="LO"
+#load("Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData"); dist="GA"
+load("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData"); dist="GA"
 
-multiplot=TRUE
+multiplot=FALSE
 
 #################################1. DATA SETUP##################################################
 
@@ -109,7 +115,6 @@ if(dist=="GA") {
   trueSE<-numDerivResults[,c(1,2,5)]
   skew=2/sqrt(parameters[,"a"])
 }
-
 if(dist=="LO") {
   #Parameters
   mu1=parameters[,"mu1"]
@@ -130,7 +135,6 @@ if(dist=="LO") {
   colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
   
 }
-
 if(dist=="NO") {
   #Parameters
   mu1=parameters[,"mu1"]
@@ -345,14 +349,16 @@ ggsave(file=paste("Charts/simulation_bias_plus_error_Bt",parameters[1,"n"],"_",S
 
 #One at a time
 #B1/B2 mode
-ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-ggsave(file=paste("simulation_bias_plus_error_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
+ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(2)],error_plots[c(2)])       
+          ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
+#ggsave(file=paste("simulation_bias_plus_error_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
+#ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
 
 #B0/Bt mode
-ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("LO","LO"),hjust=-.01) + bgcolor("white") + border(color = "white") # Bias x Tau
-ggsave(file=paste("Charts/simulation_bias_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
-ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("LO","LO"),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
-ggsave(file=paste("Charts/simulation_error_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
+ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.01) + bgcolor("white") + border(color = "white") # Bias x Tau
+#ggsave(file=paste("Charts/simulation_bias_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
+ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
+#ggsave(file=paste("Charts/simulation_error_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
 
 ggarrange(plotlist=lik_plots,common.legend=TRUE, ncol=4, nrow=1, labels=c("LO","LO","LO","LO"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
 ggsave(file=paste("Charts/simulation_loglik_AIO_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=3,dpi=900)
