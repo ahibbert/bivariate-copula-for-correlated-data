@@ -1,21 +1,28 @@
-############## 0. Required functions ################### 
+###INPUTS##
 
+Bt_mode=TRUE
+#Final paper parameters
+a=.5*1:5; b=.5*1:5;c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9); mu1=1; mu2=2; n=1000;dist="NO"
+#a=NA; b=c(.2,.5,1,2,5);c=c(.2,.5,1,2,5); mu1=c(.5,1,2,5); mu2=c(.5,1,2,5); n=1000;dist="PO"
+#a=.1+.1*1:20; b=.1+.1*1:20; c=NA; mu1=10; mu2=12; n=1000; dist="GA"
+#a=NA; b=NA;c=c(.1,.25,.5,.75,.9); mu1=c(.1,.25,.5,.75,.9); mu2=c(.1,.25,.5,.75,.9); n=1000;dist="LO"
+
+### THE REST IS AUTOMATIC: Saves into paste("Data/results_combined_B1_B2_",dist,"_",n,"_",Sys.Date(),".RData",sep="") ###
+
+############## 0. Required functions ################### 
 options(scipen=999)
 source("common_functions.R")
 
 ############## 1. Run simulations for non-GJRM models########################
 results<-list()
 datasets<-list()
-model_struct_FUN=fitBivModels
 
-#a=c(0.25,1); b=c(1.75);c=NA; mu1=c(10); mu2=c(12); n=1000;dist="GA" #TESTPAR
+if(Bt_mode==TRUE) {
+  model_struct_FUN=fitBivModels_Bt  
+} else {
+  model_struct_FUN=fitBivModels
+}
 
-#Final paper parameters
-#a=.1+.1*1:20; b=.1+.1*1:20; c=NA; mu1=10; mu2=12; n=1000; dist="GA"
-#a=.5*1:5; b=.5*1:5;c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9); mu1=1; mu2=2; n=1000;dist="NO"
-#a=NA; b=c(.2,.5,1,2,5);c=c(.2,.5,1,2,5); mu1=c(.5,1,2,5); mu2=c(.5,1,2,5); n=1000;dist="PO"
-a=NA; b=c(.2,.5,1,2,5);c=c(.2,.5,1,2,5); mu1=c(.5,1,2,5); mu2=c(.5,1,2,5); n=1000;dist="PO"
-#a=NA; b=NA;c=c(.1,.25,.5,.75,.9); mu1=c(.1,.25,.5,.75,.9); mu2=c(.1,.25,.5,.75,.9); n=1000;dist="LO"
 
 #Code to iterate through various shapes of the bivariate distribution and fit the non-GJRM models
 i=1; j=1; k=1; l=1; z=1
@@ -57,5 +64,10 @@ for(i in 1:(length(results)/2)) {
 }
 results_combined <- results_combined[na_check==FALSE]
 
-save(results_combined,file=paste("Data/results_combined_B1_B2_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
+##### SAVE LOCATION
+if(Bt_mode==TRUE) {
+  save(results_combined,file=paste("Data/results_combined_B1_Bt_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
+} else {
+  save(results_combined,file=paste("Data/results_combined_B1_B2_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
+}
 
