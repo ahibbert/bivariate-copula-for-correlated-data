@@ -1,13 +1,15 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
+#Remove outliers for PO, LO SE calc for GAMLSS (4) ? ##############
+
 require(latex2exp)
 require(ggplot2)
 require(ggpubr)
 require(RColorBrewer)
 source("link_functions.R")
-plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE) {
+plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,type="ALL",plotTrue=TRUE,remove_outliers=FALSE) {
   
-  #inputs=t1intercepts; true=mu1;tau; xlab=NA; ylab=NA; scaled=FALSE; limits=NA
+  #inputs=t1intercepts; true=mu1;x_input=tau; xlab=NA; ylab=NA; scaled=FALSE; limits=NA
   
   if (scaled==TRUE) {
     inputs = inputs / true - 1
@@ -20,8 +22,13 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
   
   for (col_name in colnames(inputs)) {
     y=inputs[,col_name]
+    weights=rep(1,length(y))
+    if((col_name=="summary_re_nosig" | col_name=="summary_re_np") & remove_outliers==TRUE) {
+      weights=as.numeric(y<mean(y,trim=0.2)+abs(mean(y,trim=0.2)*10) & y>mean(y,trim=0.2)-abs(mean(y,trim=0.2)*10))
+    }
+    
     if(all(is.na(y))) {smooth_fit[,col_name]=y} else {
-      lo <- loess(y~x_input)  
+      lo <- loess(y~x_input,weights=weights)  
       smooth_fit[,col_name]=predict(lo)
     }
   }
@@ -33,12 +40,12 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
   plot<-ggplot() + labs(x = xlab, y=ylab) +
     {if(!(is.na(limits[1])||is.na(limits[2]))){xlim(limits[1],limits[2])}} +
     {if(!(is.na(limits[3])||is.na(limits[4]))){ylim(limits[3],limits[4])}} +
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_glm'], color="GLM"),linetype = 2) + 
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gee'], color="GEE"),linetype = 2,position=position_jitter()) + #
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_lme4'], color="LME4"),linetype = 3) + 
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gamm'], color="GAMM"),linetype = 3) +
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_nosig'], color="GAMLSS (4)"),linetype = 3) +
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_np'], color="GAMLSS NP (5)"),linetype = 3) +
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_glm'], color="GLM"),linetype = 3) + 
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gee'], color="GEE"),linetype = 3,position=position_jitter()) + #
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_lme4'], color="LME4"),linetype = 5) + 
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gamm'], color="GAMM"),linetype = 5) +
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_nosig'], color="GAMLSS (4)"),linetype = 5) +
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_np'], color="GAMLSS NP (5)"),linetype = 5) +
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_cop'], color="GJRM (C)"),linetype = 4) +
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_cop_n'], color="GJRM (N)"),linetype = 4) +
     {if(plotTrue==TRUE){geom_line(data=inputs, aes(x=x_input, y=true_smooth, color="True"))}} +
@@ -47,17 +54,17 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
   return(plot)
 }
 
-bt_mode=FALSE;files_in=c("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData","Data/results_combined_B1_B2_PO_1000_2024-12-04.RData","Data/results_combined_B1_B2_GA_1000_2024-11-28.RData","Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
-bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-11-27.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData","Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
+#bt_mode=FALSE;files_in=c("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData","Data/results_combined_B1_B2_PO_1000_2024-12-04.RData","Data/results_combined_B1_B2_GA_1000_2024-11-28.RData","Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
+bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData","Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
 
 files=files_in
 multiplot=TRUE; plotcount=plot_count_lik=0
 for (filename in files)
 {
-  #filename=files[1]
+  #filename=files[2]
   load(filename); print(filename)
   dist=substr(filename,29,30); print(dist)
-  #################################1. DATA SETUP##################################################
+  ###################### 1. DATA SETUP##################################################
   print("DATA SETUP STAGE")
   
   if ( (multiplot==FALSE) || (multiplot==TRUE && (!exists("first_run"))) ) {
@@ -95,6 +102,7 @@ for (filename in files)
     t2error[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"se_b2"])
     
     loglik[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])
+    
     aic[i,]=t(results[[i]][1:(nrow(results[[i]])-2),"AIC"])
     aic_4[i,]=-2*t(results[[i]][1:(nrow(results[[i]])-2),"LogLik"])+4*t(results[[i]][1:(nrow(results[[i]])-2),"EDF"])
     
@@ -108,6 +116,9 @@ for (filename in files)
     colnames(t1intercepts)<-colnames(t2intercepts)<-colnames(aic_4)<-colnames(t1error)<-colnames(t2error)<-colnames(loglik)<-colnames(aic)<-colnames(adj_bic)<-colnames(bic)<-colnames(t(results[[i]][1:(nrow(results[[i]])-2),"b_1"]))
   }
   
+  loglik[,"summary_gamm"]=aic[,"summary_gamm"]=bic[,"summary_gamm"]=aic_4[,"summary_gamm"]=adj_bic[,"summary_gamm"]=NA #Temporary until we fix this in calculations
+  
+  
   #Theoretical errors
   if(dist=="GA") {
     #Parameters
@@ -120,7 +131,7 @@ for (filename in files)
     load(file="Data/numDerivResults_20231127.rds")
     load("Data/se_mles_20231127_n100sims20_ALL.rds") #se_mles
     
-    se_sim=se_mles[,c(1,2,3)]
+    se_sim=se_mles[,c(1,2,3)]/sqrt(10)
     se_nd=numDerivResults[,c(1,2,5)]
     
     se_final=se_nd
@@ -164,8 +175,8 @@ for (filename in files)
     }
     skew=mu1*0
     #Errors
-    trueSE<-t(rbind((parameters[,"a"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(parameters[,"n"])
-                    ,(parameters[,"b"]*sqrt(1-(parameters[,"c"]^2)))/sqrt(parameters[,"n"])
+    trueSE<-t(rbind((parameters[,"a"]/sqrt(parameters[,"n"]))
+                    ,(parameters[,"b"]/sqrt(parameters[,"n"]))
                     ,sqrt((parameters[,"a"]^2)+(parameters[,"b"]^2)-2*parameters[,"a"]*parameters[,"b"]*parameters[,"c"])/sqrt(parameters[,"n"])))
     colnames(trueSE)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
   }
@@ -192,9 +203,9 @@ for (filename in files)
   }
   
   
-  ###################### PLOT SETUP######################
+  ###################### 2.PLOT SETUP######################
   
-  print("BIAS AND ERROR PLOTS STAGE")
+  print("--BIAS AND ERROR PLOTS STAGE")
   
   library(latex2exp)
   limits_bias = c(.1,0.7,-1,if(dist=="LO"&bt_mode==TRUE) {2} else {1}); xlab=TeX("Kendall's \\tau")
@@ -202,7 +213,7 @@ for (filename in files)
   limits_bias_skew = c(min(skew),max(skew),-1,1); xlabskew=TeX("Skewness")
   limits_error_skew <- c(limits_bias_skew[1:2],0,if(dist=="PO"){.25}else{.125})
   
-  limits_bias=limits_error=limits_bias_skew=limits_error_skew=NA
+  limits_bias=limits_error=c(.2,.8,NA,NA)
   #if(dist=="NO") {tau=parameters[,"c"]; xlab="Pearson Correlation"}
   
   plotcount=plotcount+1
@@ -219,7 +230,8 @@ for (filename in files)
                                             ,tau
                                             ,xlab
                                             ,ylab=TeX("$SE(\\hat{\\beta_{1}})$")
-                                            ,scaled=FALSE)
+                                            ,scaled=FALSE
+                                            ,remove_outliers=TRUE)
   
   skew_bias_plots[[plotcount]]<- plotVersusTrue(limits_bias_skew
                                            ,if(dist=="NO"){t1intercepts}else if(dist=="LO") {logit_inv(t1intercepts)} else{exp(t1intercepts)}
@@ -234,7 +246,8 @@ for (filename in files)
                                             ,skew
                                             ,xlabskew
                                             ,ylab=TeX("$SE(\\hat{\\beta_{1}})$")
-                                            ,scaled=FALSE)
+                                            ,scaled=FALSE
+                                            ,remove_outliers=TRUE)
   
   plotcount=plotcount+1
   bias_plots[[plotcount]]<- plotVersusTrue(limits_bias
@@ -251,14 +264,16 @@ for (filename in files)
                                             ,tau
                                             ,xlab
                                             ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
-                                            ,scaled=FALSE)
+                                            ,scaled=FALSE
+                                            ,remove_outliers=TRUE)
   skew_error_plots[[plotcount]]<- plotVersusTrue(limits_error_skew
                                             ,t2error
                                             ,if(bt_mode==TRUE){trueSE[,"mu2_se_Bt"]}else{trueSE[,"mu2_se_B2"]}
                                             ,skew
                                             ,xlabskew
                                             ,ylab=TeX("$SE(\\hat{\\beta_{t}})$")
-                                            ,scaled=FALSE)
+                                            ,scaled=FALSE
+                                            ,remove_outliers=TRUE)
   
   skew_bias_plots[[plotcount]]<- plotVersusTrue(limits_bias_skew
                                            ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
@@ -272,9 +287,10 @@ for (filename in files)
   
   print("LIKELIHOOD PLOTS")
   ########Likelihoods
-  limits_lik <- c(limits_bias[1:2],NA,NA)
-  limits_lik_skew <- c(limits_bias_skew[1:2],NA,NA)
-  if (dist=="PO") {limits_lik <- c(limits_bias[1:2],-5000,1000);limits_lik_skew<-c(limits_bias_skew[1:2],-5000,1000)}
+  limits_lik <- c(.2,.8,NA,NA)
+  limits_lik_skew <- c(.2,.8,NA,NA)
+
+  #if (dist=="PO") {limits_lik <- c(limits_bias[1:2],-5000,1000);limits_lik_skew<-c(limits_bias_skew[1:2],-5000,1000)}
   
   plot_count_lik=plot_count_lik+1
   lik_plots[[plot_count_lik]]<- plotVersusTrue(limits_lik
@@ -284,7 +300,8 @@ for (filename in files)
                                                ,xlab
                                                ,ylab="LogLik"
                                                ,scaled=FALSE
-                                               ,plotTrue = FALSE)
+                                               ,plotTrue = FALSE
+                                               ,remove_outliers = TRUE)
   lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(limits_lik_skew
                                                ,loglik
                                                ,NA
@@ -292,7 +309,8 @@ for (filename in files)
                                                ,xlabskew
                                                ,ylab="LogLik"
                                                ,scaled=FALSE
-                                               ,plotTrue = FALSE)
+                                               ,plotTrue = FALSE
+                                               ,remove_outliers = TRUE)
   plot_count_lik=plot_count_lik+1
   lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
                                                ,aic
@@ -301,7 +319,8 @@ for (filename in files)
                                                ,xlab
                                                ,ylab="AIC"
                                                ,scaled=FALSE
-                                               ,plotTrue = FALSE)
+                                               ,plotTrue = FALSE
+                                               ,remove_outliers = TRUE)
   lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
                                                     ,aic
                                                     ,NA
@@ -309,7 +328,8 @@ for (filename in files)
                                                     ,xlabskew
                                                     ,ylab="AIC"
                                                     ,scaled=FALSE
-                                                    ,plotTrue = FALSE)
+                                                    ,plotTrue = FALSE
+                                                    ,remove_outliers = TRUE)
   
   plot_count_lik=plot_count_lik+1
   lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
@@ -319,7 +339,8 @@ for (filename in files)
                                                ,xlab
                                                ,ylab="GAIC (4)"
                                                ,scaled=FALSE
-                                               ,plotTrue = FALSE)
+                                               ,plotTrue = FALSE
+                                               ,remove_outliers = TRUE)
   
   lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
                                                     ,aic_4#bic
@@ -328,7 +349,8 @@ for (filename in files)
                                                     ,xlabskew
                                                     ,ylab="GAIC (4)"
                                                     ,scaled=FALSE
-                                                    ,plotTrue = FALSE)
+                                                    ,plotTrue = FALSE
+                                                    ,remove_outliers = TRUE)
   plot_count_lik=plot_count_lik+1
   lik_plots[[plot_count_lik]]<- plotVersusTrue(c(limits_lik[1:2],limits_lik[c(4,3)]*-2)
                                                ,adj_bic#bic
@@ -337,7 +359,8 @@ for (filename in files)
                                                ,xlab
                                                ,ylab="BIC"
                                                ,scaled=FALSE
-                                               ,plotTrue = FALSE)
+                                               ,plotTrue = FALSE
+                                               ,remove_outliers = TRUE)
   
   lik_plots_skew[[plot_count_lik]]<- plotVersusTrue(c(limits_lik_skew[1:2],limits_lik_skew[c(4,3)]*-2)
                                                     ,adj_bic#bic
@@ -346,67 +369,40 @@ for (filename in files)
                                                     ,xlabskew
                                                     ,ylab="BIC"
                                                     ,scaled=FALSE
-                                                    ,plotTrue = FALSE)
+                                                    ,plotTrue = FALSE
+                                                    ,remove_outliers = TRUE)
   
 }
 
 
-###Time 1 bias / error
-ggarrange(bias_plots[[1]],error_plots[[1]]
-          ,bias_plots[[3]],error_plots[[3]]
-          ,bias_plots[[5]],error_plots[[5]]
-          ,bias_plots[[7]],error_plots[[7]]
-          ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("NO","NO","PO","PO","GA","GA","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-
-ggarrange(bias_plots[[2]],error_plots[[2]]
-          ,bias_plots[[4]],error_plots[[4]]
-          ,bias_plots[[6]],error_plots[[6]]
-          ,bias_plots[[8]],error_plots[[8]]
-          ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("NO","NO","PO","PO","GA","GA","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-
-
-
-###################PLOT FUNCTION#############################
-#ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-.01) + bgcolor("white") + border(color = "white") # Bias x Tau
-#ggsave(file=paste("simulation_bias_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-#ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(3)],error_plots[c(3)],bias_plots[c(5)],error_plots[c(5)],bias_plots[c(7)],error_plots[c(7)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-#ggsave(file=paste("Charts/simulation_bias_plus_error_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=11,dpi=900)
-
-ggarrange(plotlist=c(bias_plots[c(2)],error_plots[c(2)],bias_plots[c(4)],error_plots[c(4)],bias_plots[c(6)],error_plots[c(6)],bias_plots[c(8)],error_plots[c(8)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-ggsave(file=paste("Charts/simulation_bias_plus_error_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=11,dpi=900)
-
-
-
-#ggarrange(plotlist=c(skew_bias_plots[c(1)],skew_bias_plots[c(3)],skew_bias_plots[c(5)])  ,common.legend=TRUE, ncol=3, nrow=1,      labels=c("NB","G","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Skew#ggsave(file=paste("simulation_bias_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.5,dpi=900)
-#ggsave(file=paste("Charts/simulation_bias_by_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=4,dpi=900)
-#ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("N","N","NB","NB","G","G"),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
-#ggsave(file=paste("simulation_error_B0_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-#ggsave(file=paste("simulation_error_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=9,dpi=900)
-#ggarrange(plotlist=skew_error_plots ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("P","P","G","G")) + bgcolor("white") + border(color = "white") # Error x Skew
-#ggsave(file=paste("simulation_error_skew_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=6,dpi=900)
-#ggarrange(plotlist=lik_plots[c(1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16)]     ,common.legend=TRUE, ncol=4, nrow=plot_count_lik/4, labels=c("N","NB","G","LO","N","NB","G","LO","N","NB","G","LO","N","NB","G","LO"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
-#ggsave(file=paste("Charts/simulation_loglik_AIO_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=15,dpi=900)
-#ggarrange(plotlist=lik_plots_skew   ,common.legend=TRUE, ncol=4, nrow=plot_count_lik/4, labels=c("P","P","P","G","G","G")) + bgcolor("white") + border(color = "white") # Likelihoods x Skew
-#ggsave(file=paste("simulation_loglik_AIO_skew_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
-
-#One at a time
-#B1/B2 mode
-ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)],bias_plots[c(2)],error_plots[c(2)])       
-          ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-#ggsave(file=paste("simulation_bias_plus_error_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
-#ggarrange(plotlist=c(bias_plots[c(1)],error_plots[c(1)])       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
-
-#B0/Bt mode
-ggarrange(plotlist=bias_plots       ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-.01) + bgcolor("white") + border(color = "white") # Bias x Tau
-#ggsave(file=paste("Charts/simulation_bias_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
-ggarrange(plotlist=error_plots      ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c(dist,dist),hjust=-0.01) + bgcolor("white") + border(color = "white") # Error x Tau
-#ggsave(file=paste("Charts/simulation_error_B0_Bt_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=8,height=3.45,dpi=900)
-
-ggarrange(plotlist=lik_plots,common.legend=TRUE, ncol=4, nrow=1, labels=c("LO","LO","LO","LO"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
-ggsave(file=paste("Charts/simulation_loglik_AIO_SINGLE_",dist,parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=3,dpi=900)
-
-
-###guides(color=guide_legend(override.aes=list(fill=NA)))
+###Bias / Error
+if(bt_mode==TRUE) {
+  ggarrange(bias_plots[[2]],error_plots[[2]]
+            ,bias_plots[[4]],error_plots[[4]]
+            ,bias_plots[[6]],error_plots[[6]]
+            ,bias_plots[[8]],error_plots[[8]]
+            ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("NO","NO","NB","NB","GA","GA","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
+  ggsave(file=paste("Charts/simulation_bias_plus_error_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=11,dpi=900)
+  
+} else {
+  ggarrange(bias_plots[[1]],error_plots[[1]]
+            ,bias_plots[[3]],error_plots[[3]]
+            ,bias_plots[[5]],error_plots[[5]]
+            ,bias_plots[[7]],error_plots[[7]]
+            ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("NO","NO","NB","NB","GA","GA","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
+  ggsave(file=paste("Charts/simulation_bias_plus_error_B2",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=11,dpi=900)
+  
+  ggarrange(plotlist=skew_bias_plots[c(3,5,7)],ncol=3,nrow=1,labels=c("NB","GA","LO"),common.legend = TRUE,hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+  ggsave(file=paste("Charts/simulation_bias_skew",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=4,dpi=900)
+ 
+  ggarrange(plotlist=lik_plots[c(1,5,9,13,4,8,12,16)]
+            ,common.legend=TRUE, ncol=4, nrow=2, labels=c("NO","NB","GA","LO","NO","NB","GA","LO"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+  ggsave(file=paste("Charts/simulation_loglik_BIC_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
+  
+  ggarrange(plotlist=lik_plots[c(2,6,10,14,3,7,11,15)]
+            ,common.legend=TRUE, ncol=4,nrow=2, labels=c("NO","NB","GA","LO","NO","NB","GA","LO"),hjust=0.1,font.label = list(size = 12)) + bgcolor("white") + border(color = "white") # Likelihoods x Tau
+  ggsave(file=paste("Charts/simulation_AIC_GAIC_",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=12,height=6,dpi=900)
+}
 
 #############Bias v skew table
 
