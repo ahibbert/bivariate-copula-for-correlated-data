@@ -700,8 +700,6 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     
   }
   
-  
-  
   if(include=="ALL" || include=="GJRM" ) {
     
     require(GJRM)
@@ -727,100 +725,109 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     model_copula_h<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_t<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     
+    slv_cop_He=solve(model_copula$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop<-c( model_copula$coefficients[1]
                     , model_copula$coefficients[2]
                     , summary(model_copula)$tableP1[2] #SE for time 0
-                    , summary(model_copula)$tableP2[2] #SE for time 1
+                    , se_2
                     ,logLik(model_copula)
                     , 2*5-2*logLik(model_copula)
                     ,BIC(model_copula)
                     , 5
     )
-    
+    slv_cop_He=solve(model_copula_n$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_n<-c( model_copula_n$coefficients[1]
                       , model_copula_n$coefficients[2] 
                       , summary(model_copula_n)$tableP1[2] #SE for time 0
-                      , summary(model_copula_n)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_n)
                       , 2*5-2*logLik(model_copula_n)
                       ,BIC(model_copula_n)
                       , 5
                       
     )
+    slv_cop_He=solve(model_copula_j$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_j<-c( model_copula_j$coefficients[1]
                       , model_copula_j$coefficients[2]
                       , summary(model_copula_j)$tableP1[2] #SE for time 0
-                      , summary(model_copula_j)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_j)
                       , 2*5-2*logLik(model_copula_j)
                       ,BIC(model_copula_j)
                       , 5
                       
     )
+    slv_cop_He=solve(model_copula_g$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_g<-c( model_copula_g$coefficients[1]
                       , model_copula_g$coefficients[2] 
                       , summary(model_copula_g)$tableP1[2] #SE for time 0
-                      , summary(model_copula_g)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_g)
                       , 2*5-2*logLik(model_copula_g)
                       ,BIC(model_copula_g)
                       , 5
                       
     )
+    slv_cop_He=solve(model_copula_f$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_f<-c( model_copula_f$coefficients[1]
                       , model_copula_f$coefficients[2]
                       , summary(model_copula_f)$tableP1[2] #SE for time 0
-                      , summary(model_copula_f)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_f)
                       , 2*5-2*logLik(model_copula_f)
                       ,BIC(model_copula_f)
                       , 5
                       
     )
+    slv_cop_He=solve(model_copula_amh$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_amh<-c( model_copula_amh$coefficients[1]
                         , model_copula_amh$coefficients[2]
                         , summary(model_copula_amh)$tableP1[2] #SE for time 0
-                        , summary(model_copula_amh)$tableP2[2] #SE for time 1
+                        , se_2
                         , logLik(model_copula_amh)
                         , 2*5-2*logLik(model_copula_amh)
                         ,BIC(model_copula_amh)
                         , 5
                         
     )
+    slv_cop_He=solve(model_copula_fgm$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
                         , model_copula_fgm$coefficients[2]
                         , summary(model_copula_fgm)$tableP1[2] #SE for time 0
-                        , summary(model_copula_fgm)$tableP2[2] #SE for time 1
+                        , se_2
                         , logLik(model_copula_fgm)
                         , 2*5-2*logLik(model_copula_fgm)
                         ,BIC(model_copula_fgm)
                         , 5
                         
     )
+    slv_cop_He=solve(model_copula_pl$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_pl<-c( model_copula_pl$coefficients[1]
                        , model_copula_pl$coefficients[2]
                        , summary(model_copula_pl)$tableP1[2] #SE for time 0
-                       , summary(model_copula_pl)$tableP2[2] #SE for time 1
+                       , se_2
                        , logLik(model_copula_pl)
                        , 2*5-2*logLik(model_copula_pl)
                        ,BIC(model_copula_pl)
                        , 5
                        
     )
+    slv_cop_He=solve(model_copula_h$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_h<-c( model_copula_h$coefficients[1]
                       , model_copula_h$coefficients[2]
                       , summary(model_copula_h)$tableP1[2] #SE for time 0
-                      , summary(model_copula_h)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_h)
                       , 2*5-2*logLik(model_copula_h)
                       ,BIC(model_copula_h)
                       , 5
                       
     )
+    slv_cop_He=solve(model_copula_t$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_t<-c( model_copula_t$coefficients[1]
                       , model_copula_t$coefficients[2]
                       , summary(model_copula_t)$tableP1[2] #SE for time 0
-                      , summary(model_copula_t)$tableP2[2] #SE for time 1
+                      , se_2
                       , logLik(model_copula_t)
                       , AIC(model_copula_t)
                       ,BIC(model_copula_t)
