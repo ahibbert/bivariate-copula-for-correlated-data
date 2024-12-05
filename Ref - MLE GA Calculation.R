@@ -92,7 +92,6 @@ bivGammaPDFRE_TEST <- function(par,output) {
   }
 }
 
-
 ######TEST
 #par=c(10,12,1,1,1/10,1/12)
 #bivGammaPDFRE(par,output="ll")
@@ -209,7 +208,7 @@ mle_simulation <- function(par,n,sims,parameterisation) {
 ######Finding MLE for parameters across range of values of alpha, beta to estimate MLE SE
 set.seed(100)
 n=100; sims=20;
-origmu1=10; origmu2=12; a=1; b=1
+origmu1=10; origmu2=12#; a=1; b=1
 se_mles <- matrix(ncol=7,nrow=400)
 i=1
 start=Sys.time()
