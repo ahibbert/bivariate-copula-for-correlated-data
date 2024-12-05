@@ -127,8 +127,8 @@ a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
 ############## 2. Simulation ##################
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 #dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
-#dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
-dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
+dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
+#dist="PO";a=NA; b=1; c=.1; mu1=5; mu2=5; n=1000 ## Highly skewed
 #dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
 #dist="LO";a=NA; b=NA; c=.5; mu1=.25; mu2=.75; n=1000
 
@@ -144,7 +144,7 @@ skewness(dataset$random_variable[dataset$time==1])
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="kendall")
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="pearson")
 
-results<-fitBivModels(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
+results<-fitBivModels_Bt(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
 if(dist=="NO"){clean_results<-results} else 
   if(dist=="LO"){clean_results<-cbind(results,round(logit_inv(results[,c(1,2)]),4));} else
     {clean_results<-cbind(results,round(exp(results[,c(1,2)]),4));}
@@ -172,11 +172,22 @@ library(mgcv)
 
 model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
 model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
+
+model_gamm1 = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
+model_gamm2 = gamm(formula=random_variable~as.factor(time==1)+s(patient,bs="re"), data=dataset, family=binomial)
+
+model_gamm2$gam
+
+AIC(model_gamm1$lme)
+AIC(model_gamm2$lme)
+
+model_gamm2$gam
+
+
 
 model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb)
 
-
+library("gamm4")
 model_gamm4 = gamm4(formula=random_variable~as.factor(time==1), random=~(1|patient), data=dataset, family=binomial)
 
 model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
@@ -203,7 +214,6 @@ model_re_np_NBI <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.fo
 
 model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= ZISICHEL()
                         , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)
-
 
 #model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)),sigma.formula = ~ as.factor(time==1), data=dataset, family=GA())
 model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient))
