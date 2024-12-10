@@ -13,3 +13,5 @@ Data/trk2020v1/trk2020tr_r.dta
 Data/trk2020v1/TRK2020TR_R.do
 Data/trk2020v1/TRK2020TR_R.dct
 Data/trk2020v1/TRK2020TR_R.da
+rand_doc_visits
+rand_doc_visits_SAMPLED
