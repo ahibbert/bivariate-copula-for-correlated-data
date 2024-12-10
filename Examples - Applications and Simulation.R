@@ -16,30 +16,33 @@ set.seed(1000);options(scipen=999);
 
 library(haven)
 
+#Load dataset with only required columns from base randHRS file available at link above
 rand <- read_sas("Data/randhrs1992_2020v2.sas7bdat",col_select=c("HHIDPN","R14IWENDY","R15IWENDY"
                                                                  ,"R14DOCTIM" #Doctor visits last 2 years
                                                                  ,"R15DOCTIM" #Doctor visits last 2 years
 ))
 
-head(rand)
 rand_doc_visits <-as.data.frame(rand[!(is.na(rand$R14DOCTIM))&!(is.na(rand$R15DOCTIM))&rand$R14DOCTIM>=0&rand$R15DOCTIM>=0, c("HHIDPN","R14IWENDY","R15IWENDY","R14DOCTIM","R15DOCTIM")])
-
 rand_doc_visits_SAMPLED<-rand_doc_visits[runif(nrow(rand_doc_visits))<0.2,]
 
 #save(rand_doc_visits_SAMPLED,file="rand_doc_visits_SAMPLED")
 #load("rand_doc_visits_SAMPLED") ; dist="PO" #Used once the data is sampled once to ensure the same sample across models. 
+dist="PO"
 gamma_c_mu1<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,4])$`rand_doc_visits_SAMPLED[, 4]`)
 gamma_c_mu2<-as.vector(as.data.frame(rand_doc_visits_SAMPLED[,5])$`rand_doc_visits_SAMPLED[, 5]`)
 
-###### c.Setting up as longitudinal structured data - MUST DO THIS STEP TO SETUP APPLICATIONS DATA CORRECTLY FOR MODEL FITTING 
+# Set up as longitudinal structured data - MUST DO THIS STEP TO SETUP APPLICATIONS DATA CORRECTLY FOR MODEL FITTING 
 patient<-as.factor(seq(1:length(gamma_c_mu1)))
 dataset<-as.data.frame(rbind(cbind(patient,gamma_c_mu1,0),cbind(patient,gamma_c_mu2,1)))
 colnames(dataset)<-c("patient","random_variable","time")
 dataset<-dataset[order(dataset$patient),]
-#dist="GA"
+
 a=NA; b=NA; c=NA; mu1=NA; mu2=NA; n=NA #Dummy values to pass to function
 
 ####### 2) Simulation ##################
+
+#Bivariate distribution parameters to simulate
+
 #dist="NO";a=1; b=2; c=0.75; mu1=1; mu2=2; n=1000
 #dist="GA";a=.25; b=1.75; c=NA; mu1=10; mu2=12; n=1000
 dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
@@ -47,23 +50,25 @@ dist="GA";a=.2; b=.2; c=NA; mu1=10; mu2=12; n=1000
 #dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
 #dist="LO";a=NA; b=NA; c=.5; mu1=.25; mu2=.75; n=1000
 
+# Generate a realisation of the bivariate distribution
 dataset <- generateBivDist(n,a,b,c,mu1,mu2,dist)
 
 ####### 3) Plot and fit data ###########################################################
 
+# Plot margins and correlation structure
 plotDist(dataset,dist)
 
+# Print basic dataset info: mean, skewness, correlation
 library(e1071)
 mean(dataset$random_variable[dataset$time==0])
 mean(dataset$random_variable[dataset$time==1])
-
 log(mean(dataset$random_variable[dataset$time==1])/mean(dataset$random_variable[dataset$time==0]))
-
 skewness(dataset$random_variable[dataset$time==0])
 skewness(dataset$random_variable[dataset$time==1])
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="kendall")
 cor(dataset$random_variable[dataset$time==0],dataset$random_variable[dataset$time==1],method="pearson")
 
+# Fit models to the dataset and cleanup results 
 results<-fitBivModels_Bt(data=dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE)
 if(dist=="NO"){clean_results<-results} else 
   if(dist=="LO"){clean_results<-cbind(results,round(logit_inv(results[,c(1,2)]),4));} else
@@ -87,6 +92,8 @@ source("common_functions.R")
 #dist="PO";a=NA; b=.5; c=9; mu1=5; mu2=5; n=1000 ## Not highly skewed
 
 dist="GA";a=.5; b=1; c=NA; mu1=10; mu2=12; n=1000
+
+# Functions for fitting models and timing runs
 timer <- function(dataset) {
   
   require(gamlss)
@@ -153,6 +160,7 @@ timerGJRM <- function(dataset) {
   return(times)
 }
 
+# Fitting LM models for each sample size
 samplesizes=c(100,500,1000,5000)
 sumtime_lms<-matrix(nrow=length(samplesizes)*10,ncol=7)
 z=1
@@ -165,7 +173,7 @@ for (n in 1:length(samplesizes)) {
   }
 }
 
-
+#Fitting GJRM models for each sample size (this has to be separate as loading GJRM breaks GAMLSS functionality)
 sumtimeGJRM<-matrix(nrow=length(samplesizes)*10,ncol=3)
 z=1
 for (n in 1:length(samplesizes)) {
@@ -178,6 +186,7 @@ for (n in 1:length(samplesizes)) {
   }
 }
 
+# Calculate summary of runtimes
 sumtime_lm_diff<-cbind(sumtime_lms[,c(1:2)],sumtime_lms[,3:ncol(sumtime_lms)]-sumtime_lms[,2:(ncol(sumtime_lms)-1)])
 sumtime_gjrm_diff<-cbind(sumtimeGJRM[,c(1:2)],sumtimeGJRM[,3:ncol(sumtimeGJRM)]-sumtimeGJRM[,2:(ncol(sumtimeGJRM)-1)])
 sumtime_summary<-cbind(sumtime_lm_diff,sumtime_gjrm_diff[,c(2,3)])
@@ -193,12 +202,12 @@ sumtime_summary_avg
 
 ####### 5) Manual fitting of ZIS for GJRM #############
 
-
 library(gamlss)
 
 links<-ZISICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
                 tau.link = "logit")
 
+# Fit margins
 fit1<-gamlss(gamma_c_mu1~1,family=ZISICHEL(),method=RS(100))
 fit2<-gamlss(gamma_c_mu2~1,family=ZISICHEL(),method=RS(100))
 
@@ -211,6 +220,7 @@ hist(dMargin2)
 
 plot(dMargin1,dMargin2)
 
+# Choose and fit best copula
 library(VineCopula)
 copFits<-BiCopSelect(dMargin1,dMargin2)
 
@@ -225,6 +235,7 @@ df_fit<-fit1$df.fit+fit2$df.fit+2
 
 c(ll_combined,-2*ll_combined+2*df_fit,-2*ll_combined+4*df_fit,-2*ll_combined+(log(nrow(dataset))*df_fit))
 
+# Estimate standard error for beta_t via simulation of fitted model
 mean_margins=matrix(NA,ncol=2,nrow=0)
 set.seed(100)
 for (i in 1:1000) {
@@ -234,18 +245,6 @@ for (i in 1:1000) {
   mean_margins=rbind(mean_margins,c(log(mean(qMargin1)),log(mean(qMargin2))))
 }
 
-
 summary(fit2)[1]-summary(fit1)[1]
-
-
 sqrt(var(mean_margins[,1])+var(mean_margins[,2])-2*cov(mean_margins)[1,2])
-
 sqrt(vcov(fit1)[1,1]+vcov(fit2)[1,1]-2*cov(mean_margins)[1,2])
-
-
-
-
-
-
-
-
