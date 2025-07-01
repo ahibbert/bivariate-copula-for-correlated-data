@@ -9,12 +9,12 @@ input_list <- list(
                   ,"Data/results_combined_B1_B2_PO_1000_2024-12-04.RData"
                   ,"Data/results_combined_B1_B2_GA_1000_2024-11-28.RData"
                   ,"Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
-       , bt_mode = TRUE),
+       , bt_mode = FALSE),
   list(files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData"
                   ,"Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData"
                   ,"Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData"
                   ,"Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
-       , bt_mode = FALSE)
+       , bt_mode = TRUE)
 )
 
 # Read the plotting script
