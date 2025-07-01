@@ -1,7 +1,5 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
-#Remove outliers for PO, LO SE calc for GAMLSS (4) ? ##############
-
 require(latex2exp)
 require(ggplot2)
 require(ggpubr)
@@ -55,7 +53,7 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
 }
 
 #bt_mode=FALSE;files_in=c("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData","Data/results_combined_B1_B2_PO_1000_2024-12-04.RData","Data/results_combined_B1_B2_GA_1000_2024-11-28.RData","Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
-bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData","Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
+#bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData","Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
 
 files=files_in
 multiplot=TRUE; plotcount=plot_count_lik=0
@@ -406,17 +404,17 @@ if(bt_mode==TRUE) {
 
 #############Bias v skew table
 
-bias_all[[plotcount/2]]<-cbind(trunc(tau*10,1)*10,trunc(skew),(if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}/mu1)-1)
+#bias_all[[plotcount/2]]<-cbind(trunc(tau*10,1)*10,trunc(skew),(if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}/mu1)-1)
 
 #bias_all_combined<-rbind(bias_all[[1]],bias_all[[2]])
 #bias_all<-bias_all_combined
 
-bias_table_list<-list()
-for (i in 1:3) {
-  dataset<- bias_all[[plotcount/2]][,c(1,2,4+i)]
-  colnames(dataset)<-c("tau","skew","bias")
-  summary<-aggregate(dataset[,"bias"] ~ dataset[,"tau"] + dataset[,"skew"], data = dataset, mean, na.rm = TRUE)
-  colnames(summary)<-c("tau","skew","bias")
-  bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
-}
+#bias_table_list<-list()
+#for (i in 1:3) {
+#  dataset<- bias_all[[plotcount/2]][,c(1,2,4+i)]
+#  colnames(dataset)<-c("tau","skew","bias")
+#  summary<-aggregate(dataset[,"bias"] ~ dataset[,"tau"] + dataset[,"skew"], data = dataset, mean, na.rm = TRUE)
+#  colnames(summary)<-c("tau","skew","bias")
+#  bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
+#}
 
