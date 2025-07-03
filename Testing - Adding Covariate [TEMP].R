@@ -2,11 +2,19 @@
 
 generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   
+  sex <- sample(0:1, n, replace=TRUE)
+  age <- runif(n, min=-1, max=1)
+  
   if(dist=="GA") {
     #Simulating bivariate random variable according to functional input
+    #n=1000;a=1;b=1;c=0.5;mu1=2;mu2=3;dist="GA";x1=1;x2=1
     w<-rbeta(n,a,b)
-    margin_1<-w*rgamma(n,shape=a+b,scale=mu1)
-    margin_2<-w*rgamma(n,shape=a+b,scale=mu2)
+    
+    mu1_long=mu1+sex*x1+age*x2
+    mu2_long=mu2+sex*x1+age*x2
+    
+    time_1<-w*rgamma(n,shape=a+b,scale=mu1_long)
+    time_2<-w*rgamma(n,shape=a+b,scale=mu2_long)
     
   }
   if(dist=="NO") {
@@ -15,8 +23,6 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     margin_1<-normData[,1]
     margin_2<-normData[,2]
     
-    sex <- sample(0:1, length(margin_1), replace=TRUE)
-    age <- runif(length(margin_1), min=-1, max=1)
     #trt <- sample(0:1, length(margin_1), replace=TRUE)
     
     time_1=margin_1 + x1*sex + x2*age
@@ -28,9 +34,14 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     
     require(MASS)
     a=1;b=1
+    #c=0.5;n=1000 
     normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
-    margin_1<-as.numeric(pnorm(normData[,1])<=mu1)
-    margin_2<-as.numeric(pnorm(normData[,2])<=mu2)
+    
+    margin_1<-normData[,1] + x1*sex + x2*age
+    margin_2<-normData[,2] + x1*sex + x2*age
+    
+    time_1<-as.numeric(pnorm(margin_1,mean=mean(margin_1),sd=sd(margin_1))<=mu1)
+    time_2<-as.numeric(pnorm(margin_2,mean=mean(margin_2),sd=sd(margin_2))<=mu2)
     
   }
   
@@ -39,13 +50,16 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     #Compound multiple poisson of Stein & Juritz, 1987
     mixing_dist<-rgamma(n,shape=c,scale=b)
     
-    margin_1=vector(length = n) 
-    margin_2=vector(length = n) 
+    mu1_long=mu1+sex*x1+age*x2
+    mu2_long=mu2+sex*x1+age*x2
+    
+    time_1=vector(length = n) 
+    time_2=vector(length = n) 
     for (i in 1:n) {
-      margin_1[i]=rpois(1,mu1*mixing_dist[i])
+      time_1[i]=rpois(1,mu1_long[i]*mixing_dist[i])
     }
     for (i in 1:n) {
-      margin_2[i]=rpois(1,mu2*mixing_dist[i])
+      time_2[i]=rpois(1,mu2_long[i]*mixing_dist[i])
     }
   }
   
@@ -133,6 +147,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     
   }
   
+  #Non-GJRM model regression first as once GJRM is loaded it breaks GAMLSS 
   if(include=="ALL" || include=="non-GJRM" ) {
     
     require(gamlss)
@@ -145,16 +160,16 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     ###Non-GJRM models first as GJRM breaks base gamlss
     
     if(dist=="GA") {
-      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=Gamma(link = "log"), maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=GA()) ))
+      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
+      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=GA()) ))
       #model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       
-      invisible(capture.output(model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
+      invisible(capture.output(model_lme4 <- glmer(formula=random_variable~as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
       
-      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+      model_gamm = gamm(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
       
     }
     if(dist=="NO") {
@@ -170,40 +185,45 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     }
     
     if(dist=="LO") {
-      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=BI())))
+      invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
+      invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=BI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
-      model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family=binomial)
+      model_lme4 <- glmer(formula=random_variable~as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)
       
-      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
+      model_gamm = gamm(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
     }
     
     if(dist=="PO"||dist=="NB") {
-      invisible(capture.output(model_glm <- glm.nb(random_variable~as.factor(time==1), data=dataset, maxit=1000)))
+      invisible(capture.output(model_glm <- glm.nb(random_variable~as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
       library(geeM)
-      model_gee<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, init.beta=model_glm$coefficients,
+      model_gee<-geem(random_variable~as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
                       family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
       
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
-      model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
+      model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
       
-      model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
+      model_gamm = gamm(formula=random_variable~as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"))
       
     }
     
     results_table=list()
     
     results_table[[1]]=summary(model_glm)$coeff[,1:2]
-    results_table[[2]]=summary(model_gee)$coeff[,c(1,4)]
+    if (dist=="PO")
+    {
+      results_table[[2]]=cbind(summary(model_gee)[[1]],summary(model_gee)[[3]])
+    } else {
+      results_table[[2]]=summary(model_gee)$coeff[,c(1,4)]
+    }
     results_table[[3]]=cbind(summary(model_re_nosig)[1:4],summary(model_re_nosig)[6:9])
     results_table[[4]]=cbind(summary(model_re_np)[1:4],summary(model_re_np)[8:11])
     results_table[[5]]=summary(model_lme4)$coefficients[,c(1,2)]
@@ -229,6 +249,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     
   }
   
+  #GJRM model regressions
   if(include=="ALL" || include=="GJRM" ) {
     
     require(GJRM)
@@ -261,8 +282,6 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   
   ########### 4. Combining results #########
   
-  
-  #All coeffs####
   
   coefficients_table= rbind(
     results_table[[1]][,1]
@@ -324,72 +343,84 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   )
   
   return(output_list)
+  ###################### 5. End of function #########
   
 }
 
-dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="NO",x1=1,x2=1)
+#dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=.5,mu2=.5,dist="LO",x1=1,x2=1)
+#dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="NO",x1=1,x2=1)
+#dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="GA",x1=1,x2=1)
+dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="PO",x1=1,x2=1)
 
-# library(gamlss)
-# model_gamlss=gamlss(formula=random_variable~as.factor(time==1)+as.factor(sex)+age,data=dataset)
-# summary(model_gamlss)
-# plot(model_gamlss)
-# term.plot(model_gamlss)
+#library(gamlss); fits=fitDist(dataset$random_variable,type="count")
 
-results=fitBivModels_Bt_withCov(dataset,dist="NO",include="ALL",a=1,b=1,c=.5,mu1=1,mu2=5,calc_actuals=FALSE)
+results=fitBivModels_Bt_withCov(dataset,dist="PO",include="ALL",a=1,b=1,c=.5,mu1=1,mu2=2,calc_actuals=FALSE)
 
-#results_list=list()
-#for (i in 1:10) {
-#  dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=5,dist="NO",x1=1,x2=.0002,x3=1)
-#  results[[i]]=fitBivModels_Bt_withCov(dataset,dist="NO",include="ALL",a=1,b=1,c=.5,mu1=1,mu2=5,calc_actuals=FALSE)
-#}
-
-plot.new()
-par(mfrow=c(2,ncol(df)))
+###TEMP PLOTTING
 
 df=results$coefficients
-df
+plot.new(); par(mfrow=c(2,ncol(df)))
 true_vals = c(1,1,1,1)
 for(i in 1:ncol(df)) {
   # Create the plot, with y-axis suppressed
   plot(df[,i]~seq_len(nrow(df)), xaxt = "n", xlab = "Values", ylab = "Name",main= colnames(df)[i],ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
-  abline(h=true_vals[i],col="red")
+  #abline(h=true_vals[i],col="red")
   # Add the custom y-axis with names
   axis(1, at = seq_len(nrow(df)), labels = rownames(df))
 }
 
 df=results$ses
-df
 true_vals = df[2,]
 for(i in 1:ncol(df)) {
   # Create the plot, with y-axis suppressed
   plot(df[,i]~seq_len(nrow(df)), xaxt = "n", xlab = "Values", ylab = "Name",main= colnames(df)[i],ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
-  abline(h=true_vals[i],col="red")
+  #abline(h=true_vals[i],col="red")
   # Add the custom y-axis with names
   axis(1, at = seq_len(nrow(df)), labels = rownames(df))
 }
 
-data_1=cbind(base_data[,c("sex","age","trt","time_1")],1)
-data_2=cbind(base_data[,c("sex","age","trt","time_2")],2)
-colnames(data_1)=colnames(data_2)=c("sex","age","trt","response","time")
-          
-rbind(data_1,data_2) -> dataset
+#############Proving we can combine multiple gammas
+shape1=2
+shape2=2
+scale1=3
+scale2=5
 
-library(gamlss)
-fit=gamlss(response~time+sex+poly(age,2)+as.factor(trt*time),data=dataset)
-summary(fit)
-plot(fit)
+gamma1=rgamma(100000,shape=shape1,scale=scale1)
+gamma2=rgamma(100000,shape=shape2,scale=scale2)
+
+meanguess=(shape1*scale1 + shape2*scale2)/2
+varguess=(scale2*shape2*(scale2^2)+scale1*shape1*(scale1^2))/(scale1+scale2)
+scaleguess=varguess/meanguess
+shapeguess=(meanguess^2)/varguess
+
+matrix(data=c(
+  shape1,scale1,
+  shape1*scale1 #shape*scale=mean of 6
+  ,shape1*(scale1^2) #variance of 12 3 * 2^2
+  ,shape2,scale2
+  ,shape2*scale2 #shape*scale=mean of 12
+  ,shape2*(scale2^2) #variance of 3 * 4^2 = 48
+  ,(mean(c(gamma1,gamma2))^2)/var(c(gamma1,gamma2))
+  ,var(c(gamma1,gamma2))/mean(c(gamma1,gamma2))
+  ,mean(c(gamma1,gamma2)) #shape*scale=mean of 9 - so we add the scales and divide by 2
+  ,var(c(gamma1,gamma2)) #This is the scale parameter (4.3????)
+  ,shapeguess
+  ,scaleguess
+  ,meanguess
+  ,varguess
+  ,(mean(c(gamma1,gamma2))^2)/var(c(gamma1,gamma2))/shapeguess
+  ,var(c(gamma1,gamma2))/mean(c(gamma1,gamma2))/scaleguess
+  ,mean(c(gamma1,gamma2))/meanguess #shape*scale=mean of 9 - so we add the scales and divide by 2
+  ,var(c(gamma1,gamma2))/varguess #This is the scale parameter (4.3????)
+  
+),ncol=4,byrow=TRUE,dimnames=list(c(paste("gamma 1:"),paste("gamma 2:"),paste("gamma (1,2) calc"),"Par method","Diff"),c("shape","scale","mean","var")))
+
+###VARIANCE GUESS IS CORRECT OK SO WE CAN ESTIMATE SCALE
 
 
-glm(base_data$time_2~base_data$time_1 + base_data$sex + base_data$age + base_data$trt)
+##########OK What about negbin 
 
 
-invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=gaussian, maxit=1000)))
-invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
-invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NO())))
-#invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
-invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
-                                                 , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
 
-model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
 
-model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=gaussian)
+
