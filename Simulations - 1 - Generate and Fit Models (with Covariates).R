@@ -34,7 +34,7 @@ for (type in c("non-GJRM","GJRM")) {
                 if(type == "non-GJRM") {datasets[[d]]<-generateBivDist_withCov(n,a[i],b[j],c[m],mu1[k],mu2[l],dist,x1[o],x2[p])}
                 tryCatch( {results[[z]] <- model_struct_FUN(datasets[[d]],dist,include=type,a[i],b[j],c[m],mu1[k],mu2[l])}
                           , error = function(e) {results[[z]]<- NA})
-                results[[z]]$actuals=c(n,a[i],b[j],c[m],mu1[k],mu2[l],x1[o],x2[p],type)
+                results[[z]]$actuals=c(n,a[i],b[j],c[m],mu1[k],mu2[l],x1[o],x2[p])
                 print(c(n,a[i],b[j],c[m],mu1[k],mu2[l],x1[o],x2[p]))
                 print(c(z
                         ,z/(iterations) 
@@ -66,9 +66,6 @@ for(i in 1:(length(results)/2)) {
 #results_combined <- results_combined[na_check==FALSE]
 
 ##### SAVE LOCATION
-if(Bt_mode==TRUE) {
-  save(results_combined,file=paste("Data/results_combined_B1_Bt_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
-} else {
-  save(results_combined,file=paste("Data/results_combined_B1_B2_",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
-}
+save(results_combined,file=paste("Data/results_combined",dist,"_",n,"_",Sys.Date(),".RData",sep=""))
+
 

@@ -19,7 +19,7 @@ for (inputs in input_list) {
     function(inputs) {
       list2env(inputs, envir = .GlobalEnv)
       script_lines <- readLines("Simulations - 1 - Generate and Fit Models (with Covariates).R")
-      eval(parse(text = script_lines[12:length(script_lines)]))
+      eval(parse(text = script_lines[1:length(script_lines)]))
     },
     args = list(inputs = inputs),
     supervise = TRUE,
