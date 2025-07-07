@@ -7,19 +7,18 @@ library(callr)
 
 # Set up a list of input configurations you wish to run
 input_list <- list(
-  list(Bt_mode=TRUE , a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000,dist="NO"),
-  list(Bt_mode=FALSE, a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000,dist="NO"),
-  list(Bt_mode=TRUE , a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000,dist="PO"),
-  list(Bt_mode=FALSE, a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000,dist="PO"),
+  list(Bt_mode=TRUE , a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000, dist="NO"),
+  list(Bt_mode=FALSE, a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000, dist="NO"),
+  list(Bt_mode=TRUE , a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000, dist="PO"),
+  list(Bt_mode=FALSE, a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000, dist="PO"),
   list(Bt_mode=TRUE , a=.1+.1*1:20, b=.1+.1*1:20    ,c=NA                           , mu1=10         , mu2=12                 , n=1000, dist="GA"),
   list(Bt_mode=FALSE, a=.1+.1*1:20, b=.1+.1*1:20    ,c=NA                           , mu1=10         , mu2=12                 , n=1000, dist="GA"),
-  list(Bt_mode=TRUE , a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000,dist="LO"),
-  list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000,dist="LO")
+  list(Bt_mode=TRUE , a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000, dist="LO"),
+  list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000, dist="LO")
 )
 
 # Get the script lines (excluding inputs)
-script_lines <- readLines("Simulations - 1 - Generate and Fit Models.R")
-script_to_run <- script_lines[12:length(script_lines)] # lines 12 onwards, this doesn't actually matter as previous lines are just comments
+script_to_run <- readLines("Simulations - 1 - Generate and Fit Models.R")
 # 
 # #Iterate through the list of input configurations and save results to /Data/ folder
 # for(inputs in input_list) {
