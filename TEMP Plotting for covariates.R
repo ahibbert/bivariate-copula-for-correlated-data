@@ -12,14 +12,14 @@ file_list=c("Data/results_combinedNO_1000_2025-07-08.RData"
 model_order <- c("glm", "gee", "lme4", "re_nosig", "gamm", "re_np", "cop", "cop_n")
 model_labels <- c("GLM", "GEE", "LME4", "GAMLSS", "GAMM", "GAMLSS NP", "GJRM (C)", "GJRM (N)")
 
-# Plotting function (updated to use factor with new order and labels)
+# Plotting function (updated to use factor with new order and labels, and new facet label)
 plot_results_gg_all_sims <- function(df, plot_title) {
   df$model <- factor(df$model, levels = model_order, labels = model_labels)
   ggplot(df, aes(x = model, y = estimate)) +
     geom_point() +
     geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se), width=0.2) +
     geom_hline(aes(yintercept = true), color="red", linetype="dashed") +
-    facet_grid(parameter ~ run, scales = "free_y") +
+    facet_grid(parameter ~ run_label, scales = "free_y") +
     labs(title = plot_title, x = "Model", y = "Estimate") +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -46,6 +46,13 @@ prepare_results_df <- function(results_combined, true_vals=rep(NA, 4)) {
     }
     names(params) <- c("n","a","b","c","mu1","mu2","x1","x2")
     
+    # Create custom run label for facets
+    run_label <- paste0("a=", signif(params["a"],3), 
+                        ", b=", signif(params["b"],3), 
+                        ", c=", signif(params["c"],3), 
+                        ", mu1=", signif(params["mu1"],3), 
+                        ", mu2=", signif(params["mu2"],3))
+    
     # Add as columns to long df
     df_long <- est_df %>%
       pivot_longer(cols = all_of(param_names), names_to = "parameter", values_to = "estimate") %>%
@@ -56,13 +63,13 @@ prepare_results_df <- function(results_combined, true_vals=rep(NA, 4)) {
       mutate(true = true_vals[match(parameter, param_names)],
              run = factor(run),
              n = params["n"], a = params["a"], b = params["b"], c = params["c"],
-             mu1 = params["mu1"], mu2 = params["mu2"], x1 = params["x1"], x2 = params["x2"])
+             mu1 = params["mu1"], mu2 = params["mu2"], x1 = params["x1"], x2 = params["x2"],
+             run_label = run_label)
     df_long
   })
   do.call(rbind, dfs)
 }
 
-true_vals_list=list(c(1,2,1,1), c(log(1),log(2),1,1), c(log(1),log(2),1,1), c(logit_inv(1),logit_inv(2),1,1))
 for (file in file_list) {
   # Extract the distribution from the filename  
   dist <- paste(regmatches(file, gregexpr("[A-Z]", file))[[1]][2],regmatches(file, gregexpr("[A-Z]", file))[[1]][3],sep="")
@@ -103,6 +110,11 @@ for (file in file_list) {
     df$true[df$parameter == "x2"] <- df$x2[df$parameter=="x2"]
   }
   
-  print(plot_results_gg_all_sims(df, plot_title = basename(file)))
-  readline(prompt = "Press [enter] to continue")
+  p=plot_results_gg_all_sims(df, plot_title = paste("Results for", dist, "distribution"))
+  
+  outfile <- file.path("Charts", paste0("Charts_", dist, "_", tools::file_path_sans_ext(basename(file)), ".png"))
+  ggsave(outfile, plot = p, width = 3*length(results_combined), height = 9, dpi = 600)
+  
+  #print(p)
+  #readline(prompt = "Press [enter] to continue")
 }
