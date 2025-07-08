@@ -1,3 +1,17 @@
+logit <- function(x) {
+  return(log(x/(1-x)))
+}
+#' @export
+logit_inv <- function(x) {
+  return(
+    if(all(is.nan(exp(x)/(1+exp(x))))) {
+      return(1)
+    } else {
+      return(exp(x)/(1+exp(x)))
+    }
+  )
+}
+
 generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
   
   if(dist=="GA") {
@@ -867,8 +881,8 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     #n=1000;a=1;b=1;c=0.5;mu1=2;mu2=3;dist="GA";x1=1;x2=1
     w<-rbeta(n,a,b)
     
-    mu1_long=mu1+sex*x1+age*x2
-    mu2_long=mu2+sex*x1+age*x2
+    mu1_long=exp(log(mu1)+sex*x1+age*x2)
+    mu2_long=exp(log(mu2)+sex*x1+age*x2)
     
     time_1<-w*rgamma(n,shape=a+b,scale=mu1_long)
     time_2<-w*rgamma(n,shape=a+b,scale=mu2_long)
@@ -894,11 +908,14 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     #c=0.5;n=1000 
     normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
     
-    margin_1<-normData[,1] + x1*sex + x2*age
-    margin_2<-normData[,2] + x1*sex + x2*age
+    margin_1<-normData[,1] - x1*sex - x2*age
+    margin_2<-normData[,2] - x1*sex - x2*age
     
-    time_1<-as.numeric(pnorm(margin_1,mean=mean(margin_1),sd=sd(margin_1))<=mu1)
-    time_2<-as.numeric(pnorm(margin_2,mean=mean(margin_2),sd=sd(margin_2))<=mu2)
+    #time_1<-as.numeric(pnorm(margin_1,mean=mean(margin_1),sd=sd(margin_1))<=mu1)
+    #time_2<-as.numeric(pnorm(margin_2,mean=mean(margin_2),sd=sd(margin_2))<=mu2)
+    
+    time_1<-as.numeric(logit_inv(margin_1)<=mu1)
+    time_2<-as.numeric(logit_inv(margin_2)<=mu2)
     
   }
   
@@ -907,8 +924,8 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     #Compound multiple poisson of Stein & Juritz, 1987
     mixing_dist<-rgamma(n,shape=c,scale=b)
     
-    mu1_long=mu1+sex*x1+age*x2
-    mu2_long=mu2+sex*x1+age*x2
+    mu1_long=exp(log(mu1)+sex*x1+age*x2)
+    mu2_long=exp(log(mu2)+sex*x1+age*x2)
     
     time_1=vector(length = n) 
     time_2=vector(length = n) 
@@ -1217,7 +1234,6 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   ###################### 5. End of function #########
   
 }
-
 
 plotDist <- function (dataset,dist) {
   

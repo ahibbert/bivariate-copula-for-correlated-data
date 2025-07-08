@@ -4,14 +4,14 @@ library(callr)
 
 # Set up a list of input configurations you wish to run
 input_list <- list(
-  list(Bt_mode=TRUE , a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
-  list(Bt_mode=FALSE, a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
-  list(Bt_mode=TRUE , a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000,dist="PO",x1=1,x2=1),
-  list(Bt_mode=FALSE, a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000,dist="PO",x1=1,x2=1),
-  list(Bt_mode=TRUE , a=.1+.1*1:20, b=.1+.1*1:20    ,c=NA                           , mu1=10         , mu2=12                 , n=1000,dist="GA",x1=1,x2=1),
-  list(Bt_mode=FALSE, a=.1+.1*1:20, b=.1+.1*1:20    ,c=NA                           , mu1=10         , mu2=12                 , n=1000,dist="GA",x1=1,x2=1),
-  list(Bt_mode=TRUE , a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000,dist="LO",x1=1,x2=1),
-  list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000,dist="LO",x1=1,x2=1)
+  #list(Bt_mode=FALSE, a=c(1,2)    , b=.1+.4*1:2    ,c=NA                           , mu1=1         , mu2=2                 , n=1000,dist="GA",x1=1,x2=1),
+  #list(Bt_mode=FALSE, a=1         , b=2            ,c=c(0.25,0.5,0.75), mu1=1          , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
+  #list(Bt_mode=FALSE, a=NA        , b=2            ,c=1               , mu1=1, mu2=1    , n=1000,dist="PO",x1=1,x2=1),
+  list(Bt_mode=FALSE, a=NA        , b=NA           ,c=.75, mu1=.25  , mu2=.75, n=1000,dist="LO",x1=1,x2=1)
+  #list(Bt_mode=FALSE, a=.5*1:5    , b=.5*1:5        ,c=c(.1,.2,.3,.4,.5,.6,.7,.8,.9), mu1=1          , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
+  #list(Bt_mode=FALSE, a=NA        , b=c(.2,.5,1,2,5),c=c(.2,.5,1,2,5)               , mu1=c(.5,1,2,5), mu2=c(.5,1,2,5)        , n=1000,dist="PO",x1=1,x2=1),
+  #list(Bt_mode=FALSE, a=.1+.1*1:20, b=.1+.1*1:20    ,c=NA                           , mu1=10         , mu2=12                 , n=1000,dist="GA",x1=1,x2=1),
+  #list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.1,.25,.5,.75,.9), mu1=c(.1,.25,.5,.75,.9)  , mu2=c(.1,.25,.5,.75,.9), n=1000,dist="LO",x1=1,x2=1)
 )
 
 for (inputs in input_list) {
@@ -19,7 +19,7 @@ for (inputs in input_list) {
     function(inputs) {
       list2env(inputs, envir = .GlobalEnv)
       script_lines <- readLines("Simulations - 1 - Generate and Fit Models (with Covariates).R")
-      eval(parse(text = script_lines[1:length(script_lines)]))
+      eval(parse(text = script_lines[11:length(script_lines)]))
     },
     args = list(inputs = inputs),
     supervise = TRUE,
