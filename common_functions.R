@@ -900,7 +900,6 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     time_2=margin_2 + x1*sex + x2*age
     
   }
-  
   if(dist=="LO") {
     
     require(MASS)
@@ -908,17 +907,16 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     #c=0.5;n=1000 
     normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
     
-    margin_1<-normData[,1] - x1*sex - x2*age
-    margin_2<-normData[,2] - x1*sex - x2*age
-    
+    margin_1<-pnorm(normData[,1],mean=0,sd=a) 
+    margin_2<-pnorm(normData[,2],mean=0,sd=b)
+  
     #time_1<-as.numeric(pnorm(margin_1,mean=mean(margin_1),sd=sd(margin_1))<=mu1)
     #time_2<-as.numeric(pnorm(margin_2,mean=mean(margin_2),sd=sd(margin_2))<=mu2)
     
-    time_1<-as.numeric(logit_inv(margin_1)<=mu1)
-    time_2<-as.numeric(logit_inv(margin_2)<=mu2)
+    time_1<-as.numeric(logit_inv(logit(margin_1) - x1*sex - x2*age)<=mu1)
+    time_2<-as.numeric(logit_inv(logit(margin_2) - x1*sex - x2*age)<=mu2)
     
   }
-  
   if(dist=="PO") {
     
     #Compound multiple poisson of Stein & Juritz, 1987
@@ -948,7 +946,7 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   return(dataset)
 }
 
-fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=FALSE) {
+fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
   
   #dist="NO"; include="ALL"; calc_actuals=FALSE
   
