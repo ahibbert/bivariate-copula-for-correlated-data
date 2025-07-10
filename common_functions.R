@@ -1028,12 +1028,14 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     require(MASS)
     require(gamlss.mx)
     library(mgcv)
+    library(glmtoolbox)
     
     ###Non-GJRM models first as GJRM breaks base gamlss
     
     if(dist=="GA") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+      #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=GA()) ))
       #model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
@@ -1047,7 +1049,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     if(dist=="NO") {
       ############UPDATED TO WITH COVARIATES
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=NO())))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
@@ -1058,7 +1060,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     
     if(dist=="LO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
-      invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=BI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
@@ -1072,9 +1074,10 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     if(dist=="PO"||dist=="NB") {
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
-      library(geeM)
-      model_gee<-geem(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
-                      family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+      #model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
+      #                  family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+      
+      invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
       
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
@@ -1090,12 +1093,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     results_table=list()
     
     results_table[[1]]=summary(model_glm)$coeff[,1:2]
-    if (dist=="PO")
-    {
-      results_table[[2]]=cbind(summary(model_gee)[[1]],summary(model_gee)[[3]])
-    } else {
-      results_table[[2]]=summary(model_gee)$coeff[,c(1,4)]
-    }
+    results_table[[2]]=summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients)-2),1:2]
     results_table[[3]]=cbind(summary(model_re_nosig)[1:4],summary(model_re_nosig)[6:9])
     results_table[[4]]=cbind(summary(model_re_np)[1:4],summary(model_re_np)[8:11])
     results_table[[5]]=summary(model_lme4)$coefficients[,c(1,2)]
@@ -1103,7 +1101,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     
     logLiks=c(
       logLik(model_glm)
-      , NA
+      , model_gee$logLik
       , logLik(model_re_nosig)
       , logLik(model_re_np)
       , logLik(model_lme4)
@@ -1112,7 +1110,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     
     dfs=c( ####Come back to DF
       n*2-df.residual(model_glm)
-      , n*2-df.residual(model_glm)+1
+      , n*2-model_gee$df.residual
       , model_re_nosig$df.fit
       , model_re_np$df.fit
       , NA
