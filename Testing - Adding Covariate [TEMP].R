@@ -6,6 +6,35 @@ source("common_functions.R")
 #dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="GA",x1=1,x2=1)
 dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="PO",x1=1,x2=1)
 
+calcTrueCovariateValues = function(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="NO",x1=1,x2=1,nsims=100) {
+  
+  #n=1000;a=1;b=1;c=.5;mu1=1;mu2=2;dist="NO";x1=1;x2=1
+  
+  dataset=generateBivDist_withCov(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="NO",x1=1,x2=1); 
+  
+  linkFunction=function(input_rv,dist="NO") {
+    if(dist=="NO") {
+      output_rv=input_rv  
+    } else if (dist=="PO"|dist=="NB"|dist=="GA") {
+      output_rv=log(input_rv)
+    } else if (dist=="LO") {
+      output_rv=logit(input_rv)
+    }
+  }
+  
+  mean_estimates=linkFunction(dataset$random_variable)-dataset$sex*x1-dataset$age*x2
+  
+  library(gamlss)
+  dist_list=NO()
+  dist_list  
+  
+  
+    return(mean_estimates)
+  
+}
+
+true=calcTrueCovariateValues(dataset,dist="PO",a=1,b=1,c=.5,mu1=1,mu2=2,x1=1,x2=1)
+
 results=fitBivModels_Bt_withCov(dataset,dist="PO",include="ALL",a=1,b=1,c=.5,mu1=1,mu2=1,calc_actuals=FALSE)
 
 library("glmtoolbox")
