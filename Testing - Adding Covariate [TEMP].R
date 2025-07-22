@@ -25,11 +25,13 @@ calcTrueCovariateValues = function(n=1000,a=1,b=1,c=.5,mu1=1,mu2=2,dist="NO",x1=
   mean_estimates=linkFunction(dataset$random_variable)-dataset$sex*x1-dataset$age*x2
   
   library(gamlss)
-  dist_list=NO()
-  dist_list  
   
+  pdf=if(dist=="NO") {dNO}
+  else if (dist=="PO"){dNBI} 
+  else if (dist=="GA"){dGA} 
+  else if (dist=="LO"){dBI}
   
-    return(mean_estimates)
+  return(mean_estimates)
   
 }
 
