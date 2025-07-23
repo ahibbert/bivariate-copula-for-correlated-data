@@ -1,10 +1,37 @@
-## This is a test script to run the models with covariates
+# This is a test script to run the models with covariates
 
 source("common_functions.R")
+dataset=generateBivDist_withCov(n=1000,a=.5,b=2,c=NA,mu1=1,mu2=2,dist="GA",x1=1,x2=1)
+results=fitBivModels_Bt_withCov(dataset,dist="GA",include="ALL",a=.5,b=2,c=NA,mu1=1,mu2=2,calc_actuals=FALSE)
+true=simCovariateMLEs(sims=100,n=1000,a=.5,b=2,c=NA,mu1=1,mu2=2,dist="GA",x1=1,x2=1,trace=TRUE)
+
+# Plotting for a single case
+
+df=results$coefficients
+plot.new(); par(mfrow=c(ncol(df),2),las=3)
+true_vals= true$coefficients
+factor_names=c("time 1 intercept","time 2 intercept","binary","linear")
+for(i in 1:ncol(df)) {
+  # Create the plot, with y-axis suppressed
+  plot(df[,i]~seq_len(nrow(df)), xaxt = "n", ylab = "Est",xlab="",main= paste("Est |",factor_names[i]),ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
+  abline(h=true_vals[i],col="red")
+  # Add the custom y-axis with names
+  axis(1, at = seq_len(nrow(df)), labels = rownames(df))
+}
+
+df=results$ses
+true_vals = true$ses
+for(i in 1:ncol(df)) {
+  # Create the plot, with y-axis suppressed
+  plot(df[,i]~seq_len(nrow(df)), xaxt = "n", ylab = "SE", xlab="",main= paste("SE |",factor_names[i]),ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
+  abline(h=true_vals[i],col="red")
+  # Add the custom y-axis with names
+  axis(1, at = seq_len(nrow(df)), labels = rownames(df))
+}
 
 
-results=fitBivModels_Bt_withCov(dataset,dist="PO",include="ALL",a=1,b=1,c=.5,mu1=1,mu2=1,calc_actuals=FALSE)
-true=calcTrueCovariateValues(dataset,dist="PO",a=1,b=1,c=.5,mu1=1,mu2=2,x1=1,x2=1)
+
+
 
 library("glmtoolbox")
 invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
@@ -23,30 +50,6 @@ df
 model_gee
 
 model_gee$logLik
-
-###TEMP PLOTTING
-
-df=results$coefficients
-plot.new(); par(mfrow=c(ncol(df),2),las=3)
-true_vals = c(1,1,1,1)
-factor_names=c("time 1 intercept","time 2 intercept","binary","linear")
-for(i in 1:ncol(df)) {
-  # Create the plot, with y-axis suppressed
-  plot(df[,i]~seq_len(nrow(df)), xaxt = "n", ylab = "Est",xlab="",main= factor_names[i],ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
-  #abline(h=true_vals[i],col="red")
-  # Add the custom y-axis with names
-  axis(1, at = seq_len(nrow(df)), labels = rownames(df))
-}
-
-df=results$ses
-true_vals = df[2,]
-for(i in 1:ncol(df)) {
-  # Create the plot, with y-axis suppressed
-  plot(df[,i]~seq_len(nrow(df)), xaxt = "n", ylab = "SE", xlab="",main= factor_names[i],ylim=c(min(df[,i], true_vals[i]) - 0.5, max(df[,i], true_vals[i]) + 0.5))
-  #abline(h=true_vals[i],col="red")
-  # Add the custom y-axis with names
-  axis(1, at = seq_len(nrow(df)), labels = rownames(df))
-}
 
 #############Proving we can combine multiple gammas########
 shape1=6
