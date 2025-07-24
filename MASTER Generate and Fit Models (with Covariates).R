@@ -4,14 +4,10 @@ library(callr)
 
 # Set up a list of input configurations you wish to run
 input_list <- list(
-  #list(Bt_mode=FALSE, a=1         , b=2            ,c=c(0.25,0.5,0.75), mu1=1          , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
-  #list(Bt_mode=FALSE, a=c(1,2)    , b=.1+.4*1:2    ,c=NA                           , mu1=1         , mu2=2                 , n=1000,dist="GA",x1=1,x2=1),
-  #list(Bt_mode=FALSE, a=NA        , b=2            ,c=1               , mu1=1, mu2=1    , n=1000,dist="PO",x1=1,x2=1),
-  #list(Bt_mode=FALSE, a=NA        , b=NA           ,c=.75, mu1=.25  , mu2=.75, n=1000,dist="LO",x1=1,x2=1)
-  #list(Bt_mode=FALSE, a=c(.5)     , b=c(.5,2.5)     ,c=c(.25,.75), mu1=1        , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
-  #list(Bt_mode=FALSE, a=c(.5,1) , b=c(.5,1,2)       ,c=NA        , mu1=1         , mu2=2                 , n=1000,dist="GA",x1=1,x2=1)
-  list(Bt_mode=FALSE, a=NA        , b=c(1,2)       ,c=c(.5,1,2)   , mu1=1         , mu2=2        , n=1000,dist="PO",x1=1,x2=1)
-  #list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.25,.5,.75), mu1=.25  , mu2=.5, n=1000,dist="LO",x1=1,x2=1)
+  list(Bt_mode=FALSE, a=c(.5)     , b=c(.5,2.5)     ,c=c(.25,.75), mu1=1        , mu2=2                  , n=1000,dist="NO",x1=1,x2=1),
+  list(Bt_mode=FALSE, a=c(.5,1) , b=c(.5,1,2)       ,c=NA        , mu1=1         , mu2=2                 , n=1000,dist="GA",x1=1,x2=1),
+  list(Bt_mode=FALSE, a=NA        , b=c(1,2)       ,c=c(.5,1,2)   , mu1=1         , mu2=2        , n=1000,dist="PO",x1=1,x2=1),
+  list(Bt_mode=FALSE, a=NA        , b=NA            ,c=c(.25,.5,.75), mu1=.25  , mu2=.5, n=1000,dist="LO",x1=1,x2=1)
 )
 
 for (inputs in input_list) {
