@@ -13,3 +13,12 @@ Data/trk2020v1/trk2020tr_r.dta
 Data/trk2020v1/TRK2020TR_R.do
 Data/trk2020v1/TRK2020TR_R.dct
 Data/trk2020v1/TRK2020TR_R.da
+rand_doc_visits
+rand_doc_visits_SAMPLED
+Charts/simulation_AIC_GAIC_1000_2024-12-05.png
+Charts/simulation_bias_plus_error_B21000_2024-12-05.png
+Charts/simulation_bias_plus_error_Bt1000_2024-12-05.png
+Charts/simulation_bias_plus_error_Bt1000_2024-12-06.png
+Charts/simulation_bias_plus_error_Bt1000_2024-12-09.png
+Charts/simulation_bias_skew1000_2024-12-05.png
+Charts/simulation_loglik_BIC_1000_2024-12-05.png

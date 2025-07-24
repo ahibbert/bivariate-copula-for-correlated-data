@@ -1,5 +1,18 @@
 ###########CHOOSE DISTRIBUTION AND PARAMETERS######################################
 
+# This function takes inputs from 'Simulations - 1 - Generate and Fit Models.R' and plots various outputs
+# including bias and standard error for parameters and likelihood criteria.
+
+#### 1) INPUT ####
+#Choose either bt_mode=TRUE and related files, or bt_mode=FALSE and related files.
+
+#bt_mode=FALSE;files_in=c("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData","Data/results_combined_B1_B2_PO_1000_2024-12-04.RData","Data/results_combined_B1_B2_GA_1000_2024-11-28.RData","Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
+bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-06.RData","Data/results_combined_B1_Bt_GA_1000_2024-12-05.RData","Data/results_combined_B1_Bt_LO_1000_2024-12-05.RData")
+
+# All plots are then saved in Charts/ in working directory. For bt_mode just bias and error plots are made. For bt_mode=FALSE, likelihood plots are also made.
+
+#### 2) Plotting functions ####
+
 require(latex2exp)
 require(ggplot2)
 require(ggpubr)
@@ -18,7 +31,16 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
   inputs=as.data.frame(inputs)
   smooth_fit=inputs*0
   
-  for (col_name in colnames(inputs)) {
+  cols=c('summary_glm',
+  'summary_gee',
+  'summary_lme4',
+  'summary_gamm',
+  'summary_re_nosig',
+  'summary_re_np',
+  'summary_cop',
+  'summary_cop_n')
+  
+  for (col_name in cols) {
     y=inputs[,col_name]
     weights=rep(1,length(y))
     if((col_name=="summary_re_nosig" | col_name=="summary_re_np") & remove_outliers==TRUE) {
@@ -41,7 +63,7 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_glm'], color="GLM"),linetype = 3) + 
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gee'], color="GEE"),linetype = 3,position=position_jitter()) + #
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_lme4'], color="LME4"),linetype = 5) + 
-    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gamm'], color="GAMM"),linetype = 5) +
+    geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_gamm'], color="GAMM"),linetype = 5,position=position_jitter(.001)) +
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_nosig'], color="GAMLSS (4)"),linetype = 5) +
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_re_np'], color="GAMLSS NP (5)"),linetype = 5) +
     geom_line(data=inputs, aes(x=x_input, y=smooth_fit[,'summary_cop'], color="GJRM (C)"),linetype = 4) +
@@ -52,9 +74,8 @@ plotVersusTrue <- function (limits,inputs,true,x_input,xlab,ylab,scaled=FALSE,ty
   return(plot)
 }
 
-#bt_mode=FALSE;files_in=c("Data/results_combined_B1_B2_NO_1000_2024-11-27.RData","Data/results_combined_B1_B2_PO_1000_2024-12-04.RData","Data/results_combined_B1_B2_GA_1000_2024-11-28.RData","Data/results_combined_B1_B2_LO_1000_2024-11-27.RData")
-#bt_mode=TRUE; files_in=c("Data/results_combined_B1_Bt_NO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_PO_1000_2024-12-05.RData","Data/results_combined_B1_Bt_GA_1000_2024-11-28.RData","Data/results_combined_B1_Bt_LO_1000_2024-11-26.RData")
 
+#### 3) Plotting setup ####
 files=files_in
 multiplot=TRUE; plotcount=plot_count_lik=0
 for (filename in files)
@@ -246,7 +267,6 @@ for (filename in files)
                                             ,ylab=TeX("$SE(\\hat{\\beta_{1}})$")
                                             ,scaled=FALSE
                                             ,remove_outliers=TRUE)
-  
   plotcount=plotcount+1
   bias_plots[[plotcount]]<- plotVersusTrue(limits_bias
                  ,if(dist=="NO"){cbind((t2intercepts)[,1:5],(t2intercepts)[,6:ncol(t2intercepts)])}
@@ -373,7 +393,7 @@ for (filename in files)
 }
 
 
-###Bias / Error
+#### Final Plots ####
 if(bt_mode==TRUE) {
   ggarrange(bias_plots[[2]],error_plots[[2]]
             ,bias_plots[[4]],error_plots[[4]]
@@ -381,7 +401,6 @@ if(bt_mode==TRUE) {
             ,bias_plots[[8]],error_plots[[8]]
             ,common.legend=TRUE, ncol=2, nrow=plotcount/2,      labels=c("NO","NO","NB","NB","GA","GA","LO","LO"),hjust=-.1) + bgcolor("white") + border(color = "white") # Bias x Tau
   ggsave(file=paste("Charts/simulation_bias_plus_error_Bt",parameters[1,"n"],"_",Sys.Date(),".png",sep=""),last_plot(),width=9,height=11,dpi=900)
-  
 } else {
   ggarrange(bias_plots[[1]],error_plots[[1]]
             ,bias_plots[[3]],error_plots[[3]]
@@ -404,17 +423,17 @@ if(bt_mode==TRUE) {
 
 #############Bias v skew table
 
-#bias_all[[plotcount/2]]<-cbind(trunc(tau*10,1)*10,trunc(skew),(if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}/mu1)-1)
+bias_all[[plotcount/2]]<-cbind(trunc(tau*10,1)*10,trunc(skew),(if(dist=="NO"){t1intercepts}else{exp(t1intercepts)}/mu1)-1)
 
 #bias_all_combined<-rbind(bias_all[[1]],bias_all[[2]])
 #bias_all<-bias_all_combined
 
-#bias_table_list<-list()
-#for (i in 1:3) {
-#  dataset<- bias_all[[plotcount/2]][,c(1,2,4+i)]
-#  colnames(dataset)<-c("tau","skew","bias")
-#  summary<-aggregate(dataset[,"bias"] ~ dataset[,"tau"] + dataset[,"skew"], data = dataset, mean, na.rm = TRUE)
-#  colnames(summary)<-c("tau","skew","bias")
-#  bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
-#}
+bias_table_list<-list()
+for (i in 1:3) {
+  dataset<- bias_all[[plotcount/2]][,c(1,2,4+i)]
+  colnames(dataset)<-c("tau","skew","bias")
+  summary<-aggregate(dataset[,"bias"] ~ dataset[,"tau"] + dataset[,"skew"], data = dataset, mean, na.rm = TRUE)
+  colnames(summary)<-c("tau","skew","bias")
+  bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
+}
 

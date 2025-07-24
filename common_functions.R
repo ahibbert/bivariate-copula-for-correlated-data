@@ -1310,3 +1310,94 @@ generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
   colnames(data_output) <- cbind("random_variable","time")
   return(data_output)
 }
+
+
+calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
+  
+  #n=1000;a=1;b=1;c=.5;mu1=1;mu2=2;dist="NO";x1=1;x2=1;s1=s2=1
+  #n=1000;a=1;b=1;c=.5;mu1=.3;mu2=.7;dist="LO";x1=1;x2=1;s1=s2=1
+  
+  dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2); 
+  
+  linkFunction=function(input_rv,dist="NO") {
+    if(dist=="NO") {
+      output_rv=input_rv  
+    } else if (dist=="PO"|dist=="NB"|dist=="GA") {
+      output_rv=log(input_rv)
+    } else if (dist=="LO") {
+      output_rv=logit(input_rv)
+    }
+    return(output_rv)
+  }
+  
+  linkInvFunction=function(input_rv,dist="NO") {
+    if(dist=="NO") {
+      output_rv=input_rv  
+    } else if (dist=="PO"|dist=="NB"|dist=="GA") {
+      output_rv=exp(input_rv)
+    } else if (dist=="LO") {
+      output_rv=logit_inv(input_rv)
+    }
+    return(output_rv)
+  }
+  
+  library(gamlss)
+  pdf=if(dist=="NO") {dNO
+  } else if (dist=="PO"){dNBI 
+  } else if (dist=="GA"){dGA
+  } else if (dist=="LO"){dLO}
+  
+  mu_1_eta=linkFunction(mu1,dist=dist)
+  mu_2_eta=linkFunction(mu1,dist=dist)
+  
+  getLogLik=function(par_input,dataset,pdf,linkFunction,linkInvFunction,dist) {
+    
+    mu1=linkInvFunction(par_input[1],dist=dist);
+    mu2=linkInvFunction(par_input[2],dist=dist);
+    x1=par_input[3];
+    x2=par_input[4];
+    s1=exp(par_input[5]);
+    s2=exp(par_input[6]);
+    
+    mean_estimates=cbind(dataset$time,linkInvFunction(dataset$sex*x1+dataset$age*x2-(dataset$time-1)*linkFunction(mu1,dist)+(dataset$time)*linkFunction(mu2,dist),dist))  
+    
+    if(dist=="LO") {
+      time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2])
+      time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2])
+    } else {
+      time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2],sigma=(s1))
+      time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2],sigma=(s2))
+    }
+    
+    return(-sum(log(time1))-sum(log(time2)))
+    
+  }
+  #getLogLik(par=c(mu1_eta,mu2_eta,x1,x2,s1,s2),dataset,pdf,linkFunction,linkInvFunction,dist)
+  
+  #Write an optimisation that chooses optim_par such that getLogLik is maximised
+  optim_par=optim(par=c(runif(1),runif(1),runif(1),runif(1),runif(1),runif(1))
+                  , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, dist=dist
+                  , control=list(maxit=10000, reltol=1e-8, trace=0))
+  
+  return(optim_par)
+  
+}
+
+simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
+  optim_cov_outputs=matrix(NA,ncol=6,nrow=sims)
+  counter=0
+  while (counter < sims) {
+    optim_est=calcTrueCovariateValues(n,a,b,c,mu1,mu2,dist,x1,x2)
+    if(optim_est$convergence==0) {
+      counter=counter+1
+      optim_cov_outputs[counter,]=optim_est$par
+    }
+    if(trace==TRUE) {
+      print(counter)  
+    }
+  }
+  colnames(optim_cov_outputs)=c("mu1","mu2","x1","x2","s1","s2")
+  return_list=list(colMeans(optim_cov_outputs),sqrt(diag(cov(optim_cov_outputs))*n)/sqrt(n))
+  names(return_list)=c("coefficients","ses")
+  return(return_list)
+}
