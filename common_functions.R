@@ -873,8 +873,11 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
 
 generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   
-  sex <- sample(0:1, n, replace=TRUE)
-  age <- runif(n, min=0, max=1)
+  if((n%%10)!=0) {
+    stop("n must be a multiple of 100")
+  }
+  sex <- c(rep(0,n/2),rep(1,n/2))
+  age <- rep(1:10,n/10)
   
   if(dist=="GA") {
     #Simulating bivariate random variable according to functional input
@@ -946,7 +949,7 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   return(dataset)
 }
 
-fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
+fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE) {
   
   #dist="NO"; include="ALL"; calc_actuals=FALSE
   
@@ -1033,62 +1036,47 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     ###Non-GJRM models first as GJRM breaks base gamlss
     
     if(dist=="GA") {
+      invisible(capture.output(model_re_nosig <- gamlss2(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA)))
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
-      #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=GA()) ))
-      #model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
-      
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
-      
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-      
-    }
-    if(dist=="NO") {
-      ############UPDATED TO WITH COVARIATES
+      invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))))
+    } else if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=NO())))
+      invisible(capture.output(model_re_nosig <- gamlss2(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NO)))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
-      
-    }
-    
-    if(dist=="LO") {
-      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
-      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=BI())))
-      #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
-                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
-      model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)
-      
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
-    }
-    
-    if(dist=="PO"||dist=="NB") {
+      invisible(capture.output(model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)))
+      invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)))
+    } else if(dist=="PO") {
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
       #model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
       #                  family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
-      
       invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
-      
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+random(as.factor(patient)), data=dataset, family=NBI())))
+      invisible(capture.output(model_re_nosig <- gamlss2(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
       model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
-      
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"))
+    } else if (dist=="LO") {
+      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
+      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+      #model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)
+      invisible(capture.output(model_re_nosig <- gamlss2(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI)))
+      #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
+      invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
+      
+      invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)))
     }
+    
     
     results_table=list()
     
@@ -1142,6 +1130,63 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , c(logLiks[5],dfs[5])
       , c(logLiks[6],dfs[6])
     )
+    
+    #########CROSS VALIDATED EVALUATION METRICS#########
+    if(cv==TRUE) {
+      
+      dataset_test=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2); dataset_test$patient=dataset_test$patient+1000
+      true=simCovariateMLEs(sims=sims,n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2,trace=TRUE)
+      
+      model_list= list(
+        glm=model_glm,
+        gee=model_gee,
+        re_nosig=model_re_nosig,
+        re_np=model_re_np,
+        lme4=model_lme4,
+        gamm=model_gamm$gam
+      )
+      
+      dfun=if(dist=="NO"){dNO}else if(dist=="GA"){dGA}else if(dist=="PO"){dNBI}else if(dist=="LO"){dBI} else {stop("Unsupported distribution")}
+      
+      pred_list=list()
+      evaluation=matrix(NA,ncol=length(model_list),nrow=3,dimnames=list(c("MSEP","LS","logLik"), names(model_list)))
+      for (model_name in names(model_list)) {
+        if(model_name=="re_np") {evaluation[,model_name]=c(NA,NA,NA); next} #re_np is not supported for prediction
+        model=model_list[[model_name]]
+        if(model_name=="gee" & dist=="PO") { #Ones that aren't working yet
+          pred_list[[model_name]]=exp(dataset_test[,"age"]*model_gee$coefficients["age",]+
+                                        dataset_test[,"sex"]*model_gee$coefficients["as.factor(sex)1",]+
+                                        -(dataset_test[,"time"]-1)*model_gee$coefficients["as.factor(time == 1)FALSE",]+
+                                        (dataset_test[,"time"])*model_gee$coefficients["as.factor(time == 1)TRUE",]) # gee does not support predict for negative binomial
+        } else {
+          pred_list[[model_name]]= predict(model, newdata=dataset_test, type="response", allow.new.levels=TRUE)
+        }
+        if(dist=="LO") {
+          ls_temp=log(dfun(dataset_test$random_variable, mu=pred_list[[model_name]])) #Evaluated at the TRUE sigma. Does this make sense?
+          ls_temp[is.infinite(ls_temp)]=0; # Replace infinite values with 0 until we have a fix
+          evaluation["LS",model_name]=sum(ls_temp)
+        } else {
+          sigma_temp=dataset_test$time* true$coefficients["s2"] - (dataset_test$time-1) * true$coefficients["s2"]
+          ls_temp=log(dfun(dataset_test$random_variable, mu=pred_list[[model_name]],sigma=exp(sigma_temp))) #Evaluated at the TRUE sigma. Does this make sense?
+          ls_temp[is.infinite(ls_temp)]=0; # Replace infinite values with 0 until we have a fix
+          evaluation["LS",model_name]=sum(ls_temp)
+        }
+        evaluation["MSEP",model_name]= mean((dataset_test$random_variable - pred_list[[model_name]])^2)
+        
+        if(model_name=="gamm") {
+          model_temp=model_gamm$lme
+          evaluation["logLik",model_name]=logLik(model_temp)
+        } else {
+          evaluation["logLik",model_name]=logLik(model)  
+        }
+      }
+      
+      evaluation_table=t(evaluation)
+    ########################
+    } else {
+      evaluation_table=NA
+    }
+    
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=c("glm" ,"gee","re_nosig","re_np","lme4","gamm")
     
   }
@@ -1310,7 +1355,6 @@ generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
   colnames(data_output) <- cbind("random_variable","time")
   return(data_output)
 }
-
 
 calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   
