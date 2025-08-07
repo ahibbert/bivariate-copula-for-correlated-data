@@ -57,14 +57,14 @@ source("common_functions.R")
 #sims=100
 #dist="GA" ;sims=100 ;n=1000 ;a=.5 ;b=2 ;c=NA ;mu1=1 ;mu2=2 ;x1=1 ;x2=1 # Covariate 2 value
 #dist="PO"; a=NA;b=1;c=2;mu1=1;mu2=2;x1=1;x2=1;n=1000
-#dist="NO"; a=1;b=1;c=.75;mu1=.25;mu2=.75;x1=1;x2=1;n=1000
+dist="NO"; a=1;b=1;c=.75;mu1=.25;mu2=.75;x1=1;x2=1;n=1000
 outer_runs=100
 vs_outer=vs_outer_wt=es_outer=vs1_outer=matrix(NA, ncol=4,nrow=outer_runs)
 
 for (outer_run in 1:outer_runs) {
   
   print(outer_run)
-  dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=1;n=100
+  dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=1;n=1000
   # Generate a dataset with covariates
   dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)
   # Fit all models to the dataset
@@ -72,7 +72,7 @@ for (outer_run in 1:outer_runs) {
   # Calculate the MLE estimate to find true value for the coefficients and standard errors based on simulation
   #true=simCovariateMLEs(sims=sims,n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2,trace=TRUE)
   
-  dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)
+  #dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)
   #dataset_test=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2); dataset_test$patient=dataset_test$patient+1000
   #true=simCovariateMLEs(sims=sims,n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2,trace=TRUE)
   
@@ -186,8 +186,8 @@ for (outer_run in 1:outer_runs) {
   # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
   for (i in seq(1, 2*n, by=2)) {
-    w_vs[i, i+1] <- n
-    w_vs[i+1, i] <- n
+    w_vs[i, i+1] <- ((n^2)-2*(n-1))/(2*(n-1))
+    w_vs[i+1, i] <- ((n^2)-2*(n-1))/(2*(n-1))
   }
   
   
