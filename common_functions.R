@@ -1160,8 +1160,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     require(GJRM)
 
     dataset_col=data.frame(gamma_c_mu1,gamma_c_mu2)
-    print(head(dataset_col))
-    
+
     #Setting up GJRM equations
     eq.mu.1 <- formula(random_variable~as.factor(sex)+age)
     eq.mu.2 <- formula(random_variable.1~as.factor(sex)+age)
@@ -1247,6 +1246,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     , sigmas=sigmas
     , correlations=correlations
     , y=dataset$random_variable
+    , dist=dist
   )
   
   return(output_list)
@@ -1254,27 +1254,47 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   
 }
 
-evaluateModels <- function(fits,model_list=rownames(fits$correlations)) {
+evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
   
   #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
-
-  coefficients=fits$coefficients
-  ses=fits$ses
+  #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
   logliks=fits$logliks
   actuals=fits$actuals
-  sigmas=fits$sigmas
-  correlations=fits$correlations
+  dist=fits$dist
   y=fits$y
+  n=length(y)/2
+  
+  
+  ##These are updated in this function 
+  coefficients_in=fits$coefficients
+  ses_in=fits$ses
+  sigmas_in=fits$sigmas
+  correlations_in=fits$correlations
+  
   
   ###### FOR RANDOM EFFECT MODELS WE HAVE TO ESTIMATE MARGINAL PARAMETERS HERE
   #"re_nosig","re_np","lme4","gamm"
   #This is because the coefficients are not the marginal parameters
   
-  #Temp to check workflow
-  model_list=c("glm","gee","cop_n")
   
-  vg_sims=100; vg_x=vg_x_mean=list(); vg=list(); datasets=list()
+  #####Normal
   
+  if(dist=="NO") {
+    coefficients=coefficients_in
+    ses=ses_in
+    
+  }
+  
+  
+  for (model in model_list) {
+    if (model == "glm") {
+      coefficients
+    }
+    
+  }
+  
+  ##########EXTRACT PARAMETERS FROM INPUT ##########
+  vg_x=vg_x_mean=list(); vg=list(); datasets=list()
   for(model in model_list) {
     for (run in 1:vg_sims) {
       mu1=coefficients[model,1]
@@ -1286,7 +1306,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations)) {
       b=sigmas[model,2]
       c=correlations[model,1]
       
-      datasets[[model]][[run]]=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)$random_variable
+      datasets[[model]][[run]]=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=fits$dist,x1=x1,x2=x2)$random_variable
     }
   }
   
@@ -1295,7 +1315,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations)) {
   w_vs=matrix(1,ncol=length(y),nrow=length(y))
   # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
-  for (i in seq(1, 2*n, by=2)) {
+  for (i in seq(1, n*2, by=2)) {
     w_vs[i, i+1] <- ((n^2)-2*(n-1))/(2*(n-1))
     w_vs[i+1, i] <- ((n^2)-2*(n-1))/(2*(n-1))
   }
