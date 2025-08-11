@@ -1287,7 +1287,6 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
         sigmas[model,]=sigmas_in[model,]+correlations_in[model,]
       }
     }
-    
   }
   
   
