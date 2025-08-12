@@ -1,5 +1,5 @@
 source("common_functions.R")
-dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=1;n=100
+dist="NO";a=10;b=10;c=.75;mu1=1;mu2=2;x1=1;x2=1;n=100
 
 #fits=fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE)
 
