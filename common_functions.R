@@ -1039,7 +1039,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA)))
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
       invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))))
@@ -1047,7 +1047,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NO)))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       invisible(capture.output(model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)))
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
@@ -1059,7 +1059,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"))
@@ -1069,7 +1069,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       #model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI)))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
@@ -1144,9 +1144,9 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     correlations=rbind(
     0
     ,(model_gee$corr[2,1])
-    ,as.numeric(VarCorr(getSmo(model_re_nosig))[[1]])^2 
+    ,as.numeric(VarCorr(getSmo(model_re_nosig))[[1]]) 
     ,0
-    ,summary(model_lme4)$varcor$patient[1,1]^2
+    ,summary(model_lme4)$varcor$patient[1,1]
     ,var(ranef(model_gamm$lme)[[1]])
     )
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=
@@ -1158,8 +1158,6 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   if(include=="ALL" || include=="GJRM" ) {
     
     require(GJRM)
-
-    dataset_col=data.frame(gamma_c_mu1,gamma_c_mu2)
 
     #Setting up GJRM equations
     eq.mu.1 <- formula(random_variable~as.factor(sex)+age)
@@ -1175,7 +1173,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     copula_models_results=list()
     i=1
     for (copula in c("C0","N","J0","G0","F","AMH","FGM","PL","HO","T")) {
-      copula_models[[i]] <- gjrm(fl, margins = c(margin_dist,margin_dist), copula = copula, data=dataset_col, model="B")
+      copula_models[[i]] <- gjrm(fl, margins = c(margin_dist,margin_dist), copula = copula, data=data.frame(dataset[dataset$time==0,],dataset[dataset$time==1,]), model="B")
       copula_models_results[[i]]=list()
       cm=copula_models[[i]]
       copula_models_results[[i]][[1]]=summary(cm)$tableP1[,1:2]
@@ -1254,7 +1252,41 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   
 }
 
+simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
+  library(VineCopula)
+  #par=c(coefficients[model,],sigmas[model,],correlations_in[model,])
+  print(model)
+  cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
+  vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
+  cop_vine=vine_cop_family[grep(paste("\\b",model,"\\b",sep=""),cop_model_names)]
+  
+  print(cop_vine)
+  
+  if(is.na(cop_vine)) {
+    return(NA)
+  } else {
+    corr_mat=matrix(NA,nrow=sims,ncol=1)
+    for (i in 1:sims) {
+      simCop=BiCopSim(N=n, family=cop_vine,par=par[length(par)])
+      qFUN=if(dist=="NO") {qNO} else if (dist=="GA") {qGA} else if (dist=="PO" | dist=="NB") {qNBI}
+      t1 = qFUN(simCop[,1],mu=par["as.factor(time == 1)FALSE"],sigma=par[length(par)-2])
+      t2 = qFUN(simCop[,2],mu=par["as.factor(time == 1)TRUE"],sigma=par[length(par)-1])
+      
+      #Would this work without parameters...? For the normal maybe, but otherwise I don't think it will be scale invariant
+      #t1 = qFUN(simCop[,1])
+      #t2 = qFUN(simCop[,2])
+      
+      corr_mat[i,1]=cor(t1,t2)
+    }
+    return(mean(corr_mat))
+  }
+}
+
 evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
+  
+  
+  print("EXTRACTING & TRANSFORMING MODEL INFORMATION")
+  #model_list=rownames(fits$correlations);vg_sims=100
   
   #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
   #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
@@ -1271,6 +1303,8 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   sigmas_in=fits$sigmas
   correlations_in=fits$correlations
   
+  sigmas=sigmas_in*0
+  correlations=correlations_in*0
   
   ###### FOR RANDOM EFFECT MODELS WE HAVE TO ESTIMATE MARGINAL PARAMETERS HERE
   #"re_nosig","re_np","lme4","gamm"
@@ -1282,20 +1316,48 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   if(dist=="NO") {
     coefficients=coefficients_in
     ses=ses_in
-    
-  }
-  
-  
-  for (model in model_list) {
-    if (model == "glm") {
-      coefficients
+    for(model in model_list) {
+      if(model == "glm" | model == "gee") {
+        sigmas[model,]=sqrt(sigmas_in[model,])
+        correlations[model,]=correlations_in[model,]
+      } else if (model == "re_nosig") {
+        sigmas[model,]=sqrt(exp(sigmas_in[model,])^2+correlations_in[model,])
+        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+      } else if (model=="re_np") {
+        sigmas[model,]=exp(sigmas_in[model,])
+        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+      } else if (model == "gamm" | model == "lme4") {
+        sigmas[model,]=sqrt((sigmas_in[model,])^2+correlations_in[model,])
+        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+      }
+      else if (startsWith(model,"cop")) {
+        sigmas[model,]=sqrt(sigmas_in[model,])
+        if(model=="cop_n") {
+          correlations[model,]=correlations_in[model,]  
+        } else {
+          correlations[model,]=simCopulaCorrelation(model=model,par=c(coefficients[model,],sigmas[model,],correlations_in[model,]),dist=dist)
+        }
+        
+      }
     }
-    
   }
+  sig_cor_out=cbind(sigmas,correlations)
+  colnames(sig_cor_out)=c("sigma1","sigma2","cor")
+  
+  if(any(is.na(correlations))|any(is.na(sigmas))) {
+    print("Some correlations or sigmas could not be calculated");
+    rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) any(is.na(x)))]
+    #print(sig_cor_out)
+  }
+  
+  
+  model_list_complete=rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) !any(is.na(x)))]
   
   ##########EXTRACT PARAMETERS FROM INPUT ##########
+  print("CALCULATING VARIOGRAM SCORES (1. SIMULATION)")
   vg_x=vg_x_mean=list(); vg=list(); datasets=list()
-  for(model in model_list) {
+  for(model in model_list_complete) {
+    print(model)
     for (run in 1:vg_sims) {
       mu1=coefficients[model,1]
       mu2=coefficients[model,2]
@@ -1310,31 +1372,42 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
     }
   }
   
+  print("CALCULATING VARIOGRAM SCORES (2. CALCULATION)")
   library(scoringRules)
   
   w_vs=matrix(1,ncol=length(y),nrow=length(y))
+  w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
   # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
   for (i in seq(1, n*2, by=2)) {
-    w_vs[i, i+1] <- ((n^2)-2*(n-1))/(2*(n-1))
-    w_vs[i+1, i] <- ((n^2)-2*(n-1))/(2*(n-1))
+    w_vs[i, i+1] <- (n^2)/2
+    w_vs[i+1, i] <- (n^2)/2
+    w_vs_0[i, i+1] <- 1
+    w_vs_0[i+1, i] <- 1
   }
   
-  vs2_wt=vs2=es=vs1=rep(NA,length(model_list))
-  names(vs2_wt)=names(vs2)=names(es)=names(vs1)=model_list
+  vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
+  names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
   
-  for (model in model_list) {
+  for (model in model_list_complete) {
     vs2_wt[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs)
+    vs2_wt_coronly[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs_0)
     vs2[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2)
     vs1[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=1)
     es[model]=es_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])))
   }
   
   return(list(
-    vs2_wt=vs2_wt
+    coefficients=coefficients
+    , ses=ses
+    , sigmas=sigmas
+    , correlations=correlations
+    , logliks=logliks
+    , vs2_wt=vs2_wt
     , vs2=vs2
     , es=es
     , vs1=vs1
+    ,vs2_wt_coronly=vs2_wt_coronly
   ))
   
 }
