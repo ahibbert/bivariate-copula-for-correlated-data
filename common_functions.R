@@ -1202,8 +1202,8 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       
       std_copula_se_results[i,c(1)]=sqrt(copula_models_results[[i]][[5]][1,1])
       std_copula_se_results[i,c(2)]=sqrt(copula_models_results[[i]][[5]][4,4]) #+ copula_models_results[[i]][[5]][1,1] + 2*copula_models_results[[i]][[5]][4,1])
-      std_copula_se_results[i,c(3)]=sqrt(copula_models_results[[i]][[5]][2,1] + copula_models_results[[i]][[5]][5,1] + 2*copula_models_results[[i]][[5]][2,5])
-      std_copula_se_results[i,c(4)]=sqrt(copula_models_results[[i]][[5]][3,1] + copula_models_results[[i]][[5]][6,1] + 2*copula_models_results[[i]][[5]][3,6])
+      std_copula_se_results[i,c(3)]=sqrt(copula_models_results[[i]][[5]][2,2] + copula_models_results[[i]][[5]][5,5] + 2*copula_models_results[[i]][[5]][2,5])
+      std_copula_se_results[i,c(4)]=sqrt(copula_models_results[[i]][[5]][3,3] + copula_models_results[[i]][[5]][6,6] + 2*copula_models_results[[i]][[5]][3,6])
       std_copula_models_logliks[i,1]=copula_models_results[[i]][[3]]
       std_copula_models_logliks[i,2]=copula_models_results[[i]][[4]]
       std_copula_models_sigmas[i,c(1,2)]=copula_models_results[[i]][[6]]
@@ -1380,8 +1380,8 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
   for (i in seq(1, n*2, by=2)) {
-    w_vs[i, i+1] <- (n^2)/2
-    w_vs[i+1, i] <- (n^2)/2
+    w_vs[i, i+1] <- (n^2)/sqrt(n)
+    w_vs[i+1, i] <- (n^2)/sqrt(n)
     w_vs_0[i, i+1] <- 1
     w_vs_0[i+1, i] <- 1
   }
