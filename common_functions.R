@@ -1331,7 +1331,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
         correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
       }
       else if (startsWith(model,"cop")) {
-        sigmas[model,]=sqrt(sigmas_in[model,])
+        sigmas[model,]=(sigmas_in[model,])
         if(model=="cop_n") {
           correlations[model,]=correlations_in[model,]  
         } else {
@@ -1380,8 +1380,8 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
   for (i in seq(1, n*2, by=2)) {
-    w_vs[i, i+1] <- (n^2)/sqrt(n)
-    w_vs[i+1, i] <- (n^2)/sqrt(n)
+    w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+    w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
     w_vs_0[i, i+1] <- 1
     w_vs_0[i+1, i] <- 1
   }
