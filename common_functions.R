@@ -1310,7 +1310,6 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
     #model="glm"
     #Get linear predictor
     
-    
     if(dist=="NO") {
       t1=rNO(n, mu=(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=rNO(n, mu=(lp_2), sigma=sqrt(sigmas[model,2]))
@@ -1362,8 +1361,8 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t1=rBI(n, mu=logit_inv(lp_1+re_val), sigma=exp(sigmas[model,1]))#*exp(re_val)####COME BACK FOR THIS
       t2=rBI(n, mu=logit_inv(lp_2+re_val), sigma=exp(sigmas[model,2]))#*exp(re_val)
     } else if (dist=="PO") {
-      t1=rPO(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
-      t2=rPO(n, mu=exp(lp_2+re_val), sigma=exp(sigmas[model,2]))
+      t1=rNBI(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
+      t2=rNBI(n, mu=exp(lp_2+re_val), sigma=exp(sigmas[model,2]))
     }
   } else if (model == "lme4" | model == "gamm") {
     #model="lme4"; model="gamm"
@@ -1403,17 +1402,17 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
         simCop=BiCopSim(N=n, family=cop_vine,par=correlations[model,])
         
         if(dist=="NO") {
-          t1=rNO(n, mu=(lp_1), sigma=(sigmas[model,1]))
-          t2=rNO(n, mu=(lp_2), sigma=(sigmas[model,2]))
+          t1=qNO(simCop[,1], mu=(lp_1), sigma=(sigmas[model,1]))
+          t2=qNO(simCop[,2], mu=(lp_2), sigma=(sigmas[model,2]))
         } else if (dist=="GA") {
-          t1=rGA(n, mu=exp(lp_1), sigma=(sigmas[model,1]))
-          t2=rGA(n, mu=exp(lp_2), sigma=(sigmas[model,2]))
+          t1=qGA(simCop[,1], mu=exp(lp_1), sigma=(sigmas[model,1]))
+          t2=qGA(simCop[,2], mu=exp(lp_2), sigma=(sigmas[model,2]))
         } else if (dist=="LO") {
-          t1=rBI(n, mu=logit_inv(lp_1), sigma=(sigmas[model,1]))
-          t2=rBI(n, mu=logit_inv(lp_2), sigma=(sigmas[model,2]))
+          t1=qBI(simCop[,1], mu=logit_inv(lp_1), sigma=(sigmas[model,1]))
+          t2=qBI(simCop[,2], mu=logit_inv(lp_2), sigma=(sigmas[model,2]))
         } else if (dist=="PO") {
-          t1=rPO(n, mu=exp(lp_1), sigma=(sigmas[model,1]))
-          t2=rPO(n, mu=exp(lp_2), sigma=(sigmas[model,2]))
+          t1=qNBI(simCop[,1], mu=exp(lp_1), sigma=(sigmas[model,1]))
+          t2=qNBI(simCop[,2], mu=exp(lp_2), sigma=(sigmas[model,2]))
         }
     }
   }

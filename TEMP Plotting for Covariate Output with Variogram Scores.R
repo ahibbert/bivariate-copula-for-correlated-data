@@ -1,3 +1,10 @@
+#load("Data/CoefSimData_GA_2_0.5_NA_1_2_1_0.01_1000_2025-08-20.RData");dist="GA";a=2;b=0.5;c=NA;mu1=1;mu2=2;x1=1;x2=.1;n=1000
+#load("Data/CoefSimData_GA_0.5_2_NA_1_2_1_0.01_1000_2025-08-20.RData");dist="GA";a=.5;b=2;c=NA;mu1=1;mu2=2;x1=1;x2=.1;n=1000
+#load("Data/CoefSimData_GA_1_1_NA_1_2_1_0.01_1000_2025-08-20.RData");dist="GA";a=1;b=1;c=NA;mu1=1;mu2=2;x1=1;x2=.1;n=1000
+
+load("Data/CoefSimData_NO_1_1_0.75_1_2_1_0.01_1000_2025-08-20.RData"); dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=0.1;n=1000
+#load("Data/CoefSimData_NO_1_1_0.25_1_2_1_0.01_1000_2025-08-20.RData"); dist="NO";a=1;b=1;c=.25;mu1=1;mu2=2;x1=1;x2=0.1;n=1000
+
 #######VARIOGRAM AND LOGLIK#####
 library(ggplot2)
 library(tidyr)
@@ -86,17 +93,17 @@ meds <- score_long %>%
 p=ggplot(score_long, aes(x = method_label, y = value, fill = score_type_label)) +
   geom_boxplot(position = position_dodge(width = 0.8)) +
   geom_hline(data = meds, aes(yintercept = min_median), linetype = "dashed", color = "red", inherit.aes = FALSE) +
-  facet_wrap(~score_type_label, scales = "free", ncol = 1, labeller = labeller(score_type_label = label_value)) +
+  facet_wrap(~score_type_label, scales = "free", ncol = 2, labeller = labeller(score_type_label = label_value)) +
   theme_bw() +
   labs(title = "Model evaluation",
        y = "Score Value", x = "Method") +
-  theme(legend.position = "none")
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45, hjust = 1))
 p
 ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 15, dpi = 900)
 
 
 
-#### JUST p=2 ####
+#### All four bottom panels in one plot, outliers removed, in one chart ####
 library(ggplot2)
 library(tidyr)
 library(dplyr)
@@ -115,15 +122,11 @@ score_long <- map2_dfr(score_items, names(score_items), ~ {
   df_long
 })
 
-#score_long <- score_long %>% select(-row)
-
-# Set the correct order and labels for method
 method_order <- c(
   "glm", "gee", "re_nosig", "re_np", "lme4", "gamm",
   "cop", "cop_n", "cop_j", "cop_g", "cop_f",
   "cop_amh", "cop_fgm", "cop_pl", "cop_h", "cop_t"
 )
-
 rename_model <- function(x) {
   main_map <- c(
     glm = "GLM",
@@ -149,14 +152,11 @@ rename_model <- function(x) {
   if(x %in% names(cop_map)) return(cop_map[x])
   return(x)
 }
-
 method_label_order <- sapply(method_order, rename_model)
-
 score_long <- score_long %>%
   mutate(method_label = sapply(as.character(method), rename_model),
          method_label = factor(method_label, levels = method_label_order))
 
-# Set order and labels for score_type
 score_type_map <- c(
   es = "Energy Score",
   vs1 = "Variogram Score (p=1)",
@@ -166,12 +166,10 @@ score_type_map <- c(
   logliks = "Log Likelihood"
 )
 score_type_order <- score_type_map[c("es", "vs1", "vs2", "vs2_wt", "vs2_wt_coronly", "logliks")]
-
 score_long <- score_long %>%
   mutate(score_type_label = score_type_map[score_type],
          score_type_label = factor(score_type_label, levels = score_type_order))
 
-# Calculate lowest median per score_type
 meds <- score_long %>%
   group_by(score_type, method_label) %>%
   summarize(med = median(value), .groups = "drop") %>%
@@ -180,24 +178,45 @@ meds <- score_long %>%
   mutate(score_type_label = score_type_map[score_type],
          score_type_label = factor(score_type_label, levels = score_type_order))
 
-# ----- MODIFICATION: Show only the bottom four charts -----
-# Select only the bottom four score types (last four in order)
 bottom_four_labels <- tail(levels(score_long$score_type_label), 4)
 score_long_bottom4 <- score_long %>% filter(score_type_label %in% bottom_four_labels)
 meds_bottom4 <- meds %>% filter(score_type_label %in% bottom_four_labels)
 
-p=ggplot(score_long_bottom4, aes(x = method_label, y = value, fill = score_type_label)) +
-  geom_boxplot(position = position_dodge(width = 0.8)) +
-  geom_hline(data = meds_bottom4, aes(yintercept = min_median), linetype = "dashed", color = "red", inherit.aes = FALSE) +
-  facet_wrap(~score_type_label, scales = "free", ncol = 1, labeller = labeller(score_type_label = label_value)) +
-  theme_bw() +
-  labs(title = "Model evaluation (Bottom Four Score Types)",
-       y = "Score Value", x = "Method") +
-  theme(legend.position = "none")
-p
-ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4.png",sep=""), plot = p, width = 9, height = 12, dpi = 900)
+# Calculate whisker limits (exclude outliers) for each facet/panel and method
+whisker_limits <- score_long_bottom4 %>%
+  group_by(score_type_label, method_label) %>%
+  summarize(
+    Q1 = quantile(value, 0.25, na.rm = TRUE),
+    Q3 = quantile(value, 0.75, na.rm = TRUE),
+    IQR = Q3 - Q1,
+    lower = Q1 - 1.5 * IQR,
+    upper = Q3 + 1.5 * IQR
+  )
 
-#####Coefficients WITH ALL COEFFICIENTS INCLUDED####
+# Join limits back and filter out outliers
+score_no_outliers <- score_long_bottom4 %>%
+  left_join(whisker_limits, by = c("score_type_label", "method_label")) %>%
+  filter(value >= lower & value <= upper)
+
+# Plot as usual, but outliers are gone
+p = ggplot(score_no_outliers, aes(x = method_label, y = value, fill = score_type_label)) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA) + # outlier.shape=NA disables drawing dots just in case
+  geom_hline(data = meds_bottom4, aes(yintercept = min_median), linetype = "dashed", color = "red", inherit.aes = FALSE) +
+  facet_wrap(~score_type_label, scales = "free", ncol = 2, labeller = labeller(score_type_label = label_value)) +
+  theme_bw() +
+  labs(
+    title = "Model evaluation (Bottom Four Score Types, outliers removed)",
+    y = "Score Value", x = "Method"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p
+ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4_no_outliers.png",sep=""), plot = p, width = 9, height = 12, dpi = 900)
+
+####Coefficients WITH ALL COEFFICIENTS INCLUDED####
 results_list=par_estimates
 library(ggplot2)
 library(dplyr)
