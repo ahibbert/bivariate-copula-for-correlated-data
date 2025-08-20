@@ -1042,7 +1042,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
-      invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))))
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
     } else if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
@@ -1074,7 +1074,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
       
-      invisible(capture.output(model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)))
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
     }
     
     
@@ -1252,6 +1252,520 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
   
 }
 
+# simRE = function (n,dist,mu1,mu2, x1, x2, sigma1,sigma2,b_var,sims=1000) {
+#   
+#   #n=n;dist=dist;mu1=mu1_in;mu2=mu2_in;x1=x1_in; x2=x2_in;sigma1=sigma1_in;sigma2=sigma2_in;b_var=b_var_in;sims=100
+#   
+#   library(gamlss)
+#   
+#   #sex <- c(rep(0,n/2),rep(1,n/2))
+#   #age <- rep(1:10,n/10)
+#   
+#   out_outer=matrix(ncol=5,nrow=sims)
+#   colnames(out_outer)=c("mean_1","mean_2","var_1","var_2","corr")
+#   
+#   for (i in 1:sims) {
+#     if(dist=="GA") {
+#       re_val=rnorm(n,mean=0,sd=sqrt(sqrt(b_var)))
+#       t1=rGA(n,mu=exp(log(mu1)),sigma=sqrt(sigma1))
+#       t2=rGA(n,mu=exp(log(mu2)),sigma=sqrt(sigma2))
+#     }
+#     
+#     #mean - mu1
+#     #sigma_1^2 * mu1^2 - variance
+#     
+#     t1_plus_re=exp(log(t1)+re_val)
+#     t2_plus_re=exp(log(t2)+re_val)
+#     
+#     out_outer[i,]=c(mean(t1_plus_re)
+#                     ,mean(t2_plus_re)
+#                     ,var(t1_plus_re)
+#                     ,var(t2_plus_re)
+#                     ,cor(t1_plus_re,t2_plus_re))
+#   }
+#   
+#   medians=c(median(out_outer[,1])
+#             ,median(out_outer[,2])
+#             ,(median(out_outer[,3]))
+#             ,(median(out_outer[,4]))
+#             ,median(out_outer[,5]))
+#   names(medians)=colnames(out_outer)
+#   print(medians)
+#   print(colMeans(out_outer))
+#   
+#   #return(colMeans(out_outer))
+#   return(medians)
+# }
+
+sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
+  
+  sex <- c(rep(0,n/2),rep(1,n/2))
+  age <- rep(1:10,n/10)
+  
+  #Calculate linear predictor
+  lp_1=coefficients[model,1]+coefficients[model,3]*sex + coefficients[model,4]*age
+  lp_2=coefficients[model,2]+coefficients[model,3]*sex + coefficients[model,4]*age
+  
+  if (model == "glm") {
+    #model="glm"
+    #Get linear predictor
+    
+    
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=rNO(n, mu=(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=rGA(n, mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=rBI(n, mu=logit_inv(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="PO") {
+      t1=rPO(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=rPO(n, mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+    }
+    
+  } else if (model == "gee") {
+    library(VineCopula)
+    #model="gee"
+    #Generate basic correlation structure based on correlation parameter
+    c0=BiCopSim(n,family=1,par=correlations[model,1])
+    
+    if(dist=="NO") {
+      t1=qNO(c0[,1], mu=(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=qNO(c0[,2], mu=(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="GA") {
+      t1=qGA(c0[,1], mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=qGA(c0[,2], mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="LO") {
+      t1=qBI(c0[,1], mu=logit_inv(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=qBI(c0[,2], mu=logit_inv(lp_2), sigma=sqrt(sigmas[model,2]))
+    } else if (dist=="PO") {
+      t1=qPO(c0[,1], mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=qPO(c0[,2], mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+    }
+    
+  } else if (model == "re_nosig") {
+    #model="re_nosig"
+    
+    #Generate random effects
+    b_var=correlations[model,1]
+    re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
+    
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1+re_val), sigma=exp(sigmas[model,1]))
+      t2=rNO(n, mu=(lp_2+re_val), sigma=exp(sigmas[model,2]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
+      t2=rGA(n, mu=exp(lp_2+re_val), sigma=exp(sigmas[model,2]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1+re_val), sigma=exp(sigmas[model,1]))#*exp(re_val)####COME BACK FOR THIS
+      t2=rBI(n, mu=logit_inv(lp_2+re_val), sigma=exp(sigmas[model,2]))#*exp(re_val)
+    } else if (dist=="PO") {
+      t1=rPO(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
+      t2=rPO(n, mu=exp(lp_2+re_val), sigma=exp(sigmas[model,2]))
+    }
+  } else if (model == "lme4" | model == "gamm") {
+    #model="lme4"; model="gamm"
+    
+    #Generate random effects
+    b_var=correlations[model,1]
+    re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
+    
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1+re_val), sigma=(sigmas[model,1]))
+      t2=rNO(n, mu=(lp_2+re_val), sigma=(sigmas[model,2]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
+      t2=rGA(n, mu=exp(lp_2+re_val), sigma=(sigmas[model,2]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1+re_val), sigma=(sigmas[model,1]))#*exp(re_val)####COME BACK FOR THIS
+      t2=rBI(n, mu=logit_inv(lp_2+re_val), sigma=(sigmas[model,2]))#*exp(re_val)
+    } else if (dist=="PO") {
+      t1=rNBI(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
+      t2=rNBI(n, mu=exp(lp_2+re_val), sigma=(sigmas[model,2]))
+    }
+  } else if (model == "re_np") {
+    t1=rep(NA,n)
+    t2=rep(NA,n)
+  } else if (startsWith(model, "cop")) {
+    #model="cop"
+    
+    library(VineCopula)
+    cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
+    vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
+    cop_vine=vine_cop_family[grep(paste("\\b",model,"\\b",sep=""),cop_model_names)]
+
+    if(is.na(cop_vine)) {
+      t1=rep(NA,n)
+      t2=rep(NA,n)
+    } else {
+        simCop=BiCopSim(N=n, family=cop_vine,par=correlations[model,])
+        
+        if(dist=="NO") {
+          t1=rNO(n, mu=(lp_1), sigma=(sigmas[model,1]))
+          t2=rNO(n, mu=(lp_2), sigma=(sigmas[model,2]))
+        } else if (dist=="GA") {
+          t1=rGA(n, mu=exp(lp_1), sigma=(sigmas[model,1]))
+          t2=rGA(n, mu=exp(lp_2), sigma=(sigmas[model,2]))
+        } else if (dist=="LO") {
+          t1=rBI(n, mu=logit_inv(lp_1), sigma=(sigmas[model,1]))
+          t2=rBI(n, mu=logit_inv(lp_2), sigma=(sigmas[model,2]))
+        } else if (dist=="PO") {
+          t1=rPO(n, mu=exp(lp_1), sigma=(sigmas[model,1]))
+          t2=rPO(n, mu=exp(lp_2), sigma=(sigmas[model,2]))
+        }
+    }
+  }
+  
+  return(c(t1,t2))
+}
+
+evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
+  
+  #Extract model info
+  logliks=fits$logliks
+  actuals=fits$actuals
+  dist=fits$dist
+  ses=fits$ses
+  y=fits$y
+  n=length(y)/2
+  
+  coefficients=fits$coefficients
+  correlations=fits$correlations
+  sigmas=fits$sigmas
+  model_list_complete=model_list
+  
+  # Simulate vg_sims times from each model formulation
+  
+  #vg_sims=100
+  #model_list=rownames(fits$correlations);vg_sims=100
+  sim_model_out=list()
+  for(model in model_list) {
+    sim_model_out[[model]]=matrix(NA,ncol=vg_sims,nrow=length(y))
+    for(i in 1:vg_sims) {
+      sim_model_out[[model]][,i]=sim_model(model,dist,n,coefficients,sigmas,correlations)
+    }
+    if(all(is.na(sim_model_out[[model]]))) {
+      model_list_complete=model_list_complete[model_list_complete!=model]
+    }
+  }
+  
+  # Calculate Variogram scores
+  print("CALCULATING VARIOGRAM SCORES (2. CALCULATION)")
+  library(scoringRules)
+  
+  w_vs=matrix(1,ncol=length(y),nrow=length(y))
+  w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
+  # Set values where row = col + n or col = row + n to 10
+  # For every pair of adjacent observations
+  for (i in seq(1, n*2, by=2)) {
+    w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+    w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+    w_vs_0[i, i+1] <- 1
+    w_vs_0[i+1, i] <- 1
+  }
+  
+  vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
+  names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
+  
+  for (model in model_list_complete) {
+    vs2_wt[model]=        vs_sample(y=y,dat=sim_model_out[[model]],p=2,w_vs=w_vs)
+    vs2_wt_coronly[model]=vs_sample(y=y,dat=sim_model_out[[model]],p=2,w_vs=w_vs_0)
+    vs2[model]=           vs_sample(y=y,dat=sim_model_out[[model]],p=2)
+    vs1[model]=           vs_sample(y=y,dat=sim_model_out[[model]],p=1)
+    es[model]=            es_sample(y=y,dat=sim_model_out[[model]])
+  }
+  
+  vs2
+  
+  return(list(
+    coefficients=coefficients
+    , ses=ses
+    , sigmas=sigmas
+    , correlations=correlations
+    , logliks=logliks
+    , vs2_wt=vs2_wt
+    , vs2=vs2
+    , es=es
+    , vs1=vs1
+    ,vs2_wt_coronly=vs2_wt_coronly
+  ))
+}
+# 
+# evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
+#   
+#   #model_list=rownames(fits$correlations);vg_sims=100
+#   print("EXTRACTING & TRANSFORMING MODEL INFORMATION")
+#   
+#   logliks=fits$logliks
+#   actuals=fits$actuals
+#   dist=fits$dist
+#   y=fits$y
+#   n=length(y)/2
+#   
+#   
+#   ##These are updated in this function 
+#   coefficients_in=fits$coefficients
+#   ses_in=fits$ses
+#   sigmas_in=fits$sigmas
+#   correlations_in=fits$correlations
+#   
+#   sigmas=sigmas_in*0
+#   correlations=correlations_in*0
+#   
+#   ###### FOR RANDOM EFFECT MODELS WE HAVE TO ESTIMATE MARGINAL PARAMETERS HERE
+#   #"re_nosig","re_np","lme4","gamm"
+#   #This is because the coefficients are not the marginal parameters
+#   
+#   
+#   #####Normal
+#   
+#   if(dist=="NO") {
+#     coefficients=coefficients_in
+#     ses=ses_in
+#     for(model in model_list) {
+#       if(model == "glm" | model == "gee") {
+#         sigmas[model,]=sqrt(sigmas_in[model,])
+#         correlations[model,]=correlations_in[model,]
+#       } else if (model == "re_nosig") {
+#         sigmas[model,]=sqrt(exp(sigmas_in[model,])^2+correlations_in[model,])
+#         correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+#       } else if (model=="re_np") {
+#         sigmas[model,]=exp(sigmas_in[model,])
+#         correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+#       } else if (model == "gamm" | model == "lme4") {
+#         sigmas[model,]=sqrt((sigmas_in[model,])^2+correlations_in[model,])
+#         correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
+#       }
+#       else if (startsWith(model,"cop")) {
+#         sigmas[model,]=(sigmas_in[model,])
+#         if(model=="cop_n") {
+#           correlations[model,]=correlations_in[model,]  
+#         } else {
+#           correlations[model,]=simCopulaCorrelation(model=model,par=c(coefficients[model,],sigmas[model,],correlations_in[model,]),dist=dist)
+#         }
+#         
+#       }
+#       
+#       mu1_all=coefficients[,1]
+#       mu2_all=coefficients[,2]
+#       x1_all=coefficients[,3]
+#       x2_all=coefficients[,4]
+#       
+#       a_all=sigmas[,1]
+#       b_all=sigmas[,2]
+#       c_all=correlations[,1]
+#       
+#     }
+#   } else if (dist=="GA") {
+# 
+#     #ake in fit information and setup matrixes
+#     a_vector=correlations*0
+#     b_vector=correlations*0
+#     
+#     mu_link=log
+#     sigma_link=log
+#     mu_linkinv=exp
+#     sigma_linkinv=exp
+#     
+#     ses=ses_in
+#     
+#     coefficients=coefficients_in*0
+#     coefficients[,c(1,2)]=mu_linkinv(coefficients_in[,c(1,2)])
+#     coefficients[,c(3,4)]=coefficients_in[,c(3,4)]
+#     
+#     for(model in model_list) {
+#       if(model == "glm" | model == "gee") {
+#         sigmas[model,]=sqrt(sigmas_in[model,])
+#         correlations[model,]=correlations_in[model,]
+#       } else if (model == "re_nosig") {
+#         
+#         b_var_in=correlations_in[model,]
+#         sigma1_in=exp(sigmas_in[model,1])
+#         sigma2_in=exp(sigmas_in[model,2])
+#         
+#         mu1_in=exp(coefficients_in[model,1])
+#         mu2_in=exp(coefficients_in[model,2])
+#         x1_in=coefficients[model,3]
+#         x2_in=coefficients[model,4]
+#         
+#         re_sim_out=simRE(n,dist,mu1=mu1_in,mu2=mu2_in,x1=x1_in, x2=x2_in,sigma1=sigma1_in,sigma2=sigma2_in,b_var=b_var_in,sims=100)
+# 
+#         correlations[model,]=re_sim_out["corr"]
+#         sigmas[model,]=sqrt(sqrt(re_sim_out[c("var_1","var_2")])/c(re_sim_out["mean_1"],re_sim_out["mean_2"]))
+#         
+#         coefficients[model,c(1,2)]=c(re_sim_out["mean_1"],re_sim_out["mean_2"])
+#         
+#       } else if (model=="re_np") {
+#         
+#         b_var_in=correlations_in[model,]
+#         sigma1_in=exp(sigmas_in[model,1])
+#         sigma2_in=exp(sigmas_in[model,2])
+#         
+#         mu1_in=exp(coefficients_in[model,1])
+#         mu2_in=exp(coefficients_in[model,2])
+#         x1_in=coefficients[model,3]
+#         x2_in=coefficients[model,4]
+#         
+#         re_sim_out=simRE(n,dist,mu1=mu1_in,mu2=mu2_in,x1=x1_in, x2=x2_in,sigma1=sigma1_in,sigma2=sigma2_in,b_var=b_var_in,sims=100)
+#         
+#         correlations[model,]=re_sim_out["corr"]
+#         sigmas[model,]=sqrt(sqrt(re_sim_out[c("var_1","var_2")])/c(re_sim_out["mean_1"],re_sim_out["mean_2"]))
+#         
+#         coefficients[model,c(1,2)]=c(re_sim_out["mean_1"],re_sim_out["mean_2"])
+#         
+#         
+#       } else if (model == "gamm" | model == "lme4") {
+#         
+#         b_var_in=correlations_in[model,]
+#         sigma1_in=(sigmas_in[model,1])
+#         sigma2_in=(sigmas_in[model,2])
+#         
+#         mu1_in=exp(coefficients_in[model,1])
+#         mu2_in=exp(coefficients_in[model,2])
+#         x1_in=coefficients[model,3]
+#         x2_in=coefficients[model,4]
+#         
+#         re_sim_out=simRE(n,dist,mu1=mu1_in,mu2=mu2_in,x1=x1_in, x2=x2_in,sigma1=sigma1_in,sigma2=sigma2_in,b_var=b_var_in,sims=100)
+#         
+#         correlations[model,]=re_sim_out["corr"]
+#         sigmas[model,]=sqrt(sqrt((re_sim_out[c("var_1","var_2")])/(c(re_sim_out["mean_1"],re_sim_out["mean_2"])^2)))
+#         sigmas[model,]
+#         
+#         coefficients[model,c(1,2)]=c(re_sim_out["mean_1"],re_sim_out["mean_2"])
+#         
+#         #a=1/sigmasq
+#         #musq*ssq=var
+#         
+#       }
+#       else if (startsWith(model,"cop")) {
+#         sigmas[model,]=(sigmas_in[model,])
+#         if(model=="cop_n") {
+#           correlations[model,]=correlations_in[model,]  
+#         } else {
+#           correlations[model,]=simCopulaCorrelation(model=model,par=c(coefficients[model,],sigmas[model,],correlations_in[model,]),dist=dist)
+#         }
+#         
+#       }
+#       
+# 
+#     
+#       #mu1=exp(coefficients[model,1])
+#       #mu2=exp(coefficients[model,2])
+#       #x1=coefficients[model,3]
+#       #x2=coefficients[model,4]
+#       
+#       #Var(Y_t)=sigma_t^2 * mu_t^2 | sigma=1/sqrt(alpha)
+#       #Var(Y_t)=(1/sqrt(alpha))^2 * mu_t^2=1/alpha *  | alpha = 1/Var(Y_t)
+#       #a=
+#       #b=
+#       #c=NA
+#       
+#     }
+#     mu1_all=coefficients[,1]
+#     mu2_all=coefficients[,2]
+#     x1_all=coefficients[,3]
+#     x2_all=coefficients[,4]
+#     
+#     a_all=1/(sigmas[,2]^2)
+#     b_all=rep(1,length(a_all))
+#     c_all=correlations[,1]
+#   }
+#   
+#   c_all[c_all<0]=0
+#   
+#   sig_cor_out=cbind(sigmas,correlations)
+#   colnames(sig_cor_out)=c("sigma1","sigma2","cor")
+#   sig_cor_out
+#   
+#   # Function to compute b given a and c based on the equation:
+#   b = (-sqrt(-4*a_all^2*c_all^2 + a_all^2 - 4*a_all*c_all^2) - 2*a_all*c_all^2 + a_all - 2*c_all^2) / (2*c_all^2)
+# 
+#   compute_b <- function(b, a, c) {
+#     # Function whose root you want to find
+#     value = ((sqrt(a * b) / (a + b + 1)) - c)
+#     return(value)
+#   }
+#   
+#   for (i in c(2,3,5,6,7:11)) { # Skip 1 (glm) and 4 (re_np)
+#     # Objective function: squared value to find root
+#     objective <- function(b) {
+#       compute_b(b, a_all[i], c_all[i])^2
+#     }
+#     opt <- optim(par = b_all[i], fn = objective, method = "BFGS")
+#     b_all[i] <- opt$par
+#   } 
+#   for (i in c(1,4,12:16)) {
+#     b_all[i]=0
+#   }
+#   
+#   names(b_all)=names(a_all)=names(c_all)=model_list
+#   
+#   if(any(is.na(correlations))|any(is.na(sigmas))) {
+#     print("Some correlations or sigmas could not be calculated");
+#     rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) any(is.na(x)))]
+#     #print(sig_cor_out)
+#   }
+#   
+#   
+#   model_list_complete=rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) !any(is.na(x)))]
+#   
+#   ##########EXTRACT PARAMETERS FROM INPUT ##########
+#   print("CALCULATING VARIOGRAM SCORES (1. SIMULATION)")
+#   vg_x=vg_x_mean=list(); vg=list(); datasets=list()
+#   for(model in model_list_complete) {
+#     print(model)
+#     for (run in 1:vg_sims) {
+#       a=a_all[model];b=b_all[model];c=c_all[model];
+#       mu1=mu1_all[model];mu2=mu2_all[model];
+#       x1=x1_all[model];x2=x2_all[model];
+#       datasets[[model]][[run]]=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=fits$dist,x1=x1,x2=x2)$random_variable
+#     }
+#   }
+#   
+#   print("CALCULATING VARIOGRAM SCORES (2. CALCULATION)")
+#   library(scoringRules)
+#   
+#   w_vs=matrix(1,ncol=length(y),nrow=length(y))
+#   w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
+#   # Set values where row = col + n or col = row + n to 10
+#   # For every pair of adjacent observations
+#   for (i in seq(1, n*2, by=2)) {
+#     w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+#     w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+#     w_vs_0[i, i+1] <- 1
+#     w_vs_0[i+1, i] <- 1
+#   }
+#   
+#   vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
+#   names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
+#   
+#   for (model in model_list_complete) {
+#     vs2_wt[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs)
+#     vs2_wt_coronly[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs_0)
+#     vs2[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2)
+#     vs1[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=1)
+#     es[model]=es_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])))
+#   }
+#   
+#   return(list(
+#     coefficients=coefficients
+#     , ses=ses
+#     , sigmas=sigmas
+#     , correlations=correlations
+#     , logliks=logliks
+#     , vs2_wt=vs2_wt
+#     , vs2=vs2
+#     , es=es
+#     , vs1=vs1
+#     ,vs2_wt_coronly=vs2_wt_coronly
+#   ))
+#   
+# }
+# 
+# 
+
 simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
   library(VineCopula)
   #par=c(coefficients[model,],sigmas[model,],correlations_in[model,])
@@ -1278,138 +1792,8 @@ simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
       
       corr_mat[i,1]=cor(t1,t2)
     }
-    return(mean(corr_mat))
+    return(c(t1,t2))
   }
-}
-
-evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
-  
-  
-  print("EXTRACTING & TRANSFORMING MODEL INFORMATION")
-  #model_list=rownames(fits$correlations);vg_sims=100
-  
-  #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
-  #fits <- fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE)
-  logliks=fits$logliks
-  actuals=fits$actuals
-  dist=fits$dist
-  y=fits$y
-  n=length(y)/2
-  
-  
-  ##These are updated in this function 
-  coefficients_in=fits$coefficients
-  ses_in=fits$ses
-  sigmas_in=fits$sigmas
-  correlations_in=fits$correlations
-  
-  sigmas=sigmas_in*0
-  correlations=correlations_in*0
-  
-  ###### FOR RANDOM EFFECT MODELS WE HAVE TO ESTIMATE MARGINAL PARAMETERS HERE
-  #"re_nosig","re_np","lme4","gamm"
-  #This is because the coefficients are not the marginal parameters
-  
-  
-  #####Normal
-  
-  if(dist=="NO") {
-    coefficients=coefficients_in
-    ses=ses_in
-    for(model in model_list) {
-      if(model == "glm" | model == "gee") {
-        sigmas[model,]=sqrt(sigmas_in[model,])
-        correlations[model,]=correlations_in[model,]
-      } else if (model == "re_nosig") {
-        sigmas[model,]=sqrt(exp(sigmas_in[model,])^2+correlations_in[model,])
-        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
-      } else if (model=="re_np") {
-        sigmas[model,]=exp(sigmas_in[model,])
-        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
-      } else if (model == "gamm" | model == "lme4") {
-        sigmas[model,]=sqrt((sigmas_in[model,])^2+correlations_in[model,])
-        correlations[model,]=correlations_in[model,]/(sigmas[model,1]*sigmas[model,2])
-      }
-      else if (startsWith(model,"cop")) {
-        sigmas[model,]=(sigmas_in[model,])
-        if(model=="cop_n") {
-          correlations[model,]=correlations_in[model,]  
-        } else {
-          correlations[model,]=simCopulaCorrelation(model=model,par=c(coefficients[model,],sigmas[model,],correlations_in[model,]),dist=dist)
-        }
-        
-      }
-    }
-  }
-  sig_cor_out=cbind(sigmas,correlations)
-  colnames(sig_cor_out)=c("sigma1","sigma2","cor")
-  
-  if(any(is.na(correlations))|any(is.na(sigmas))) {
-    print("Some correlations or sigmas could not be calculated");
-    rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) any(is.na(x)))]
-    #print(sig_cor_out)
-  }
-  
-  
-  model_list_complete=rownames(sig_cor_out)[apply(sig_cor_out, 1, function(x) !any(is.na(x)))]
-  
-  ##########EXTRACT PARAMETERS FROM INPUT ##########
-  print("CALCULATING VARIOGRAM SCORES (1. SIMULATION)")
-  vg_x=vg_x_mean=list(); vg=list(); datasets=list()
-  for(model in model_list_complete) {
-    print(model)
-    for (run in 1:vg_sims) {
-      mu1=coefficients[model,1]
-      mu2=coefficients[model,2]
-      x1=coefficients[model,3]
-      x2=coefficients[model,4]
-      
-      a=sigmas[model,1]
-      b=sigmas[model,2]
-      c=correlations[model,1]
-      
-      datasets[[model]][[run]]=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=fits$dist,x1=x1,x2=x2)$random_variable
-    }
-  }
-  
-  print("CALCULATING VARIOGRAM SCORES (2. CALCULATION)")
-  library(scoringRules)
-  
-  w_vs=matrix(1,ncol=length(y),nrow=length(y))
-  w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
-  # Set values where row = col + n or col = row + n to 10
-  # For every pair of adjacent observations
-  for (i in seq(1, n*2, by=2)) {
-    w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
-    w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
-    w_vs_0[i, i+1] <- 1
-    w_vs_0[i+1, i] <- 1
-  }
-  
-  vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
-  names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
-  
-  for (model in model_list_complete) {
-    vs2_wt[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs)
-    vs2_wt_coronly[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2,w_vs=w_vs_0)
-    vs2[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=2)
-    vs1[model]=vs_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])),p=1)
-    es[model]=es_sample(y=y,dat=as.matrix(do.call(cbind, datasets[[model]])))
-  }
-  
-  return(list(
-    coefficients=coefficients
-    , ses=ses
-    , sigmas=sigmas
-    , correlations=correlations
-    , logliks=logliks
-    , vs2_wt=vs2_wt
-    , vs2=vs2
-    , es=es
-    , vs1=vs1
-    ,vs2_wt_coronly=vs2_wt_coronly
-  ))
-  
 }
 
 plotDist <- function (dataset,dist) {

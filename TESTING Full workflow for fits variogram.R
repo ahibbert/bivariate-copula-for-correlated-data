@@ -1,11 +1,10 @@
 source("common_functions.R")
-dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=1;n=100
+dist="NO";a=1;b=1;c=.75;mu1=1;mu2=2;x1=1;x2=0.01;n=100
+#dist="GA";a=.25;b=2;c=NA;mu1=1;mu2=2;x1=1;x2=.01;n=1000
 
-#fits=fitBivModels_Bt_withCov(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE)
-
-#dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)
-#fits=fitBivModels_Bt_withCov(      dataset=dataset,      dist=dist,      include = "ALL",      a=a,b=b,c=c,mu1=mu1,mu2=mu2,      calc_actuals = FALSE,      cv = FALSE    )
-#eval=evaluateModels(fits,vg_sims=100)
+dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2)
+fits=fitBivModels_Bt_withCov(      dataset=dataset,      dist=dist,      include = "ALL",      a=a,b=b,c=c,mu1=mu1,mu2=mu2,      calc_actuals = FALSE,      cv = FALSE    )
+eval=evaluateModels(fits,vg_sims=100)
 
 library(callr)
 outer_sims=10
