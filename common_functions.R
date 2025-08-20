@@ -1054,15 +1054,15 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     } else if(dist=="PO") {
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
-      #model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
-      #                  family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
-      invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
+      model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
+                        family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+      #invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"))
+      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"),control=list(niterEM=1000))
     } else if (dist=="LO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
@@ -1320,8 +1320,8 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t1=rBI(n, mu=logit_inv(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=rBI(n, mu=logit_inv(lp_2), sigma=sqrt(sigmas[model,2]))
     } else if (dist=="PO") {
-      t1=rPO(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
-      t2=rPO(n, mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+      t1=rNBI(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=rNBI(n, mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
     }
     
   } else if (model == "gee") {
@@ -1340,8 +1340,8 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t1=qBI(c0[,1], mu=logit_inv(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=qBI(c0[,2], mu=logit_inv(lp_2), sigma=sqrt(sigmas[model,2]))
     } else if (dist=="PO") {
-      t1=qPO(c0[,1], mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
-      t2=qPO(c0[,2], mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
+      t1=qNBI(c0[,1], mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+      t2=qNBI(c0[,2], mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
     }
     
   } else if (model == "re_nosig") {
@@ -1416,8 +1416,7 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
         }
     }
   }
-  
-  return(c(t1,t2))
+  return(as.vector(rbind(t1, t2)))
 }
 
 evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
