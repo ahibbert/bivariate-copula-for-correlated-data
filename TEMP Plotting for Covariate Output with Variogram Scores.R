@@ -8,48 +8,97 @@ library(purrr)
 
 # ---- Dataset list ----
 input_datasets <- list(
-  # list(
-  #   rdata = "Data/CoefSimData_GA_2_0.5_0.25_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="GA",a=2,b=0.5,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
-  # ),
-  # list(
-  #   rdata = "Data/CoefSimData_GA_0.5_2_0.25_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="GA",a=.5,b=2,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
-  # ),
-  # list(
-  #   rdata = "Data/CoefSimData_GA_1_1_0.25_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="GA",a=1,b=1,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
-  # ),
-  # list(
-  #   rdata = "Data/CoefSimData_NO_1_1_0.9_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="NO",a=1,b=1,c=.9,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
-  # ),
-  # list(
-  #   rdata = "Data/CoefSimData_NO_1_1_0.75_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="NO",a=1,b=1,c=.75,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
-  # ),
-  # list(
-  #   rdata = "Data/CoefSimData_NO_1_1_0.25_1_2_1_0.1_1000_2025-08-20.RData",
-  #   meta = list(dist="NO",a=1,b=1,c=.25,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
-  # ),
-  list(
-    rdata= "Data/CoefSimData_PO_NA_0.2_5_0.5_5_1_0.1_1000_2025-08-20.RData",
-    meta=list(dist="PO", a=NA, b=.2, c=5, mu1=.5, mu2=5, x1=1, x2=0.1, n=1000)
-  )
-  # ,
-  # list(
-  #   rdata= "Data/CoefSimData_PO_NA_5_0.2_0.5_0.5_1_0.1_1000_2025-08-20.RData",
-  #   meta=list(dist="PO", a=NA, b=5, c=.2, mu1=.5, mu2=.5, x1=1, x2=0.1, n=1000)
-  # ),
+   # list(
+   #   rdata = "Data/CoefSimData_GA_2_0.5_NA_1_2_1_0.1_1000_100_2025-08-21.RData",
+   #   meta = list(dist="GA",a=2,b=0.5,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
+   # ),
+   # list(
+   #   rdata = "Data/CoefSimData_GA_0.5_2_NA_1_2_1_0.1_1000_100_2025-08-20.RData",
+   #   meta = list(dist="GA",a=.5,b=2,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
+   # ),
+   # list(
+   #   rdata = "Data/CoefSimData_GA_1_1_NA_1_2_1_0.1_1000_100_2025-08-21.RData",
+   #   meta = list(dist="GA",a=1,b=1,c=NA,mu1=1,mu2=2,x1=1,x2=.1,n=1000)
+   # ),
+   # list(
+   #   rdata = "Data/CoefSimData_NO_1_1_0.9_1_2_1_0.1_1000_100_2025-08-20.RData",
+   #   meta = list(dist="NO",a=1,b=1,c=.9,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
+   # ),
+   # list(
+   #   rdata = "Data/CoefSimData_NO_1_1_0.75_1_2_1_0.1_1000_100_2025-08-20.RData",
+   #   meta = list(dist="NO",a=1,b=1,c=.75,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
+   # ),
+   # list(
+   #   rdata = "Data/CoefSimData_NO_1_1_0.25_1_2_1_0.1_1000_100_2025-08-20.RData",
+   #   meta = list(dist="NO",a=1,b=1,c=.25,mu1=1,mu2=2,x1=1,x2=0.1,n=1000)
+   # ),
   # list(
   #   rdata= "Data/CoefSimData_PO_NA_0.2_5_0.5_5_1_0.1_1000_2025-08-20.RData",
   #   meta=list(dist="PO", a=NA, b=.2, c=5, mu1=.5, mu2=5, x1=1, x2=0.1, n=1000)
+  # )
+  #  ,
+  #  list(
+  #    rdata= "Data/CoefSimData_PO_NA_5_0.2_0.5_0.5_1_0.1_1000_2025-08-20.RData",
+  #    meta=list(dist="PO", a=NA, b=5, c=.2, mu1=.5, mu2=.5, x1=1, x2=0.1, n=1000)
+  #  ),
+  #  list(
+  #    rdata= "Data/CoefSimData_PO_NA_0.2_5_0.5_5_1_0.1_1000_2025-08-20.RData",
+  #    meta=list(dist="PO", a=NA, b=.2, c=5, mu1=.5, mu2=5, x1=1, x2=0.1, n=1000)
+  #  ),
+  #  list(
+  #    rdata= "Data/CoefSimData_PO_NA_5_0.2_0.5_0.5_1_0.1_1000_2025-08-20.RData",
+  #    meta=list(dist="PO", a=NA, b=5, c=.2, mu1=.5, mu2=.5, x1=1, x2=0.1, n=1000)
+  #  ),
+  # list(
+  #   rdata= "Data/CoefSimData_LO_NA_NA_0.25_0.25_0.5_1_0.1_1000_100_2025-08-21.RData",
+  #   meta=list(dist="LO", a=NA, b=NA, c=.25, mu1=.25, mu2=.5, x1=1, x2=0.1, n=1000)
   # ),
   # list(
-  #   rdata= "Data/CoefSimData_PO_NA_5_0.2_0.5_0.5_1_0.1_1000_2025-08-20.RData",
-  #   meta=list(dist="PO", a=NA, b=5, c=.2, mu1=.5, mu2=.5, x1=1, x2=0.1, n=1000)
+  #   rdata= "Data/CoefSimData_LO_NA_NA_0.75_0.25_0.5_1_0.1_1000_100_2025-08-21.RData",
+  #   meta=list(dist="LO", a=NA, b=NA, c=.75, mu1=.25, mu2=.5, x1=1, x2=0.1, n=1000)
   # )
   
+  #list(dist="PO", a=NA, b=.2, c=5, mu1=5, mu2=10, x1=1, x2=0.1, n=1000),
+  
+  # list(
+  #   rdata = "Data/CoefSimData_PO_NA_0.2_5_5_10_1_0.1_1000_10_2025-08-21.RData",
+  #   meta = list(dist="PO", a=NA, b=.2, c=5, mu1=5, mu2=10, x1=1, x2=0.1, n=1000)
+  # ),
+  # #list(dist="PO", a=NA, b=5, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000),
+  # list(
+  #   rdata = "Data/CoefSimData_PO_NA_5_0.2_5_10_1_0.1_1000_10_2025-08-21.RData",
+  #   meta = list(dist="PO", a=NA, b=5, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000)
+  # ),
+  # #list(dist="PO", a=NA, b=.2, c=5, mu1=5, mu2=10, x1=1, x2=0.1, n=1000),
+  # list(
+  #   rdata = "Data/CoefSimData_PO_NA_5_0.2_5_10_1_0.1_1000_10_2025-08-21.RData",
+  #   meta = list(dist="PO", a=NA, b=5, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000)
+  # ),
+  # #list(dist="PO", a=NA, b=5, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000),
+  # list(
+  #   rdata = "Data/CoefSimData_PO_NA_0.2_0.2_5_10_1_0.1_1000_10_2025-08-21.RData",
+  #   meta = list(dist="PO", a=NA, b=.2, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000)
+  # ),
+  # #list(dist="PO", a=NA, b=5, c=5, mu1=5, mu2=10, x1=1, x2=0.1, n=1000),
+  # list(
+  #  rdata = "Data/CoefSimData_PO_NA_0.2_0.2_5_10_1_0.1_1000_10_2025-08-21.RData",
+  #  meta = list(dist="PO", a=NA, b=.2, c=.2, mu1=5, mu2=10, x1=1, x2=0.1, n=1000)
+  # ),
+  # list(dist="PO", a=NA, b=2, c=1, mu1=5, mu2=10, x1=1, x2=0.01, n=1000),
+  #list(
+  #  rdata= "Data/CoefSimData_PO_NA_2_1_5_10_1_0.01_1000_10_2025-08-21.RData",
+  #  meta=list(dist="PO", a=NA, b=2, c=1, mu1=5, mu2=10, x1=1, x2=0.01, n=1000)
+  #),
+  #list(dist="PO", a=NA, b=1, c=5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)
+  # list(
+  #   rdata= "Data/CoefSimData_PO_NA_1_5_1_2_1_0.01_1000_10_2025-08-21.RData",
+  #   meta=list(dist="PO", a=NA, b=1, c=5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)
+  # ),
+  #list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)
+  list(
+    rdata= "Data/CoefSimData_NO_1_1_0.25_1_2_1_0.01_1000_10_2025-08-21.RData",
+    meta=list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)
+  )
 )
 
 # ---- Helper functions ----
@@ -87,7 +136,7 @@ score_type_map <- c(
   logliks = "Log Likelihood"
 )
 get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
-  sim_out <- simCovariateMLEs(sims = 200, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2,
+  sim_out <- simCovariateMLEs(sims = 100, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2,
                               dist = dist, x1 = x1, x2 = x2, trace = FALSE)
   ses <- sim_out$ses[1:4]
   names(ses) <- c("t1", "t2", "x1", "x2")
@@ -147,7 +196,7 @@ for (ds in input_datasets) {
          y = "Score Value", x = "Method") +
     theme(legend.position = "none",axis.text.x = element_text(angle = 45, hjust = 1))
   print(p)
-  ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 15, dpi = 900)
+  ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 12, dpi = 900)
   
   # ---- Bottom 4 panels, outliers removed ----
   bottom_four_labels <- tail(levels(score_long$score_type_label), 4)
@@ -183,7 +232,7 @@ for (ds in input_datasets) {
     )
   
   print(p2)
-  ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4_no_outliers.png",sep=""), plot = p2, width = 9, height = 12, dpi = 900)
+  ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4_no_outliers.png",sep=""), plot = p2, width = 9, height = 9, dpi = 900)
   
   # ---- Coefficient plots: all coefficients ----
   results_list=par_estimates
@@ -228,7 +277,7 @@ for (ds in input_datasets) {
     facet_wrap(~ variable, scales = "free", ncol = 3) +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(title = "Comparison of Models Across Variables", y = "Value", x = "Model")
+    labs(title = "Comparison of Models for x1, x2", y = "Value", x = "Model")
   
   print(q)
   ggsave(plot=q,file=paste("Charts/AllCoefficients_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 12, height = 12, dpi = 900)
