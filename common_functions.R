@@ -1672,7 +1672,9 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   #getLogLik(par=c(mu1_eta,mu2_eta,x1,x2,s1,s2),dataset,pdf,linkFunction,linkInvFunction,dist)
   
   #Write an optimisation that chooses optim_par such that getLogLik is maximised
-  optim_par=optim(par=c(runif(1),runif(1),runif(1),runif(1),runif(1),runif(1))
+  sd_start_1=log(sd(dataset$random_variable[dataset$time==0]))
+  sd_start_2=log(sd(dataset$random_variable[dataset$time==1]))
+  optim_par=optim(par=c(mu_1_eta,mu_2_eta,x1,x2,sd_start_1,sd_start_2)
                   , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, dist=dist
                   , control=list(maxit=10000, reltol=1e-8, trace=0))
   

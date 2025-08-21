@@ -5,6 +5,7 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(purrr)
+source("common_functions.R")
 
 # ---- Dataset list ----
 input_datasets <- list(
@@ -136,7 +137,7 @@ score_type_map <- c(
   logliks = "Log Likelihood"
 )
 get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
-  sim_out <- simCovariateMLEs(sims = 100, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2,
+  sim_out <- simCovariateMLEs(sims = 5000, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2,
                               dist = dist, x1 = x1, x2 = x2, trace = FALSE)
   ses <- sim_out$ses[1:4]
   names(ses) <- c("t1", "t2", "x1", "x2")
