@@ -1090,7 +1090,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       timer[2,2]=Sys.time()
       timer[3,1]=Sys.time()
       #invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI())))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(100))))
       timer[3,2]=Sys.time()
       timer[4,1]=Sys.time()
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
@@ -1145,12 +1145,27 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , logLik(model_gamm$lme)
     )
 
+    ###Calculating effective degrees of freedom from Donohue
+    X<-getME(model_lme4,name="X")[,1:2]
+    Z<-getME(model_lme4,name="Z")
+    U<-cbind(X,Z)
+    W<-model_lme4@resp$sqrtrwt #weights(model_lme4,type = "working")
+    UWU=(t(as.matrix(U))%*%(diag(as.vector(W)))%*%as.matrix(U))
+    dim(UWU)
+    D<-getME(model_lme4,name="Lambda")
+
+    if(sum(D)==0) {lme_EDF=summary_lme4[length(summary_lme4)]} else {
+      D_inv<-solve(D)
+      dinv_plus_00<-c(0,0,diag(D_inv))
+      lme_EDF=sum(diag(UWU%*%solve(UWU+diag(dinv_plus_00))))
+    }
+
     dfs=c( ####Come back to DF
       n*2-df.residual(model_glm)
       , n*2-model_gee$df.residual
       , model_re_nosig$df.fit
       , model_re_np$df.fit
-      , NA
+      , lme_EDF
       , NA
     )
 
