@@ -4,17 +4,20 @@ source("common_functions.R")
 
 # Define the list of input parameter sets as a list of lists
 input_params_list <- list(
-  list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)#,
-  #list(dist="NO", a=1, b=1, c=0.5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="NO", a=1, b=2, c=0.5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="LO",a=NA,b=NA,c=.25,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
-  #list(dist="LO",a=NA,b=NA,c=.5,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
-  #list(dist="NO", a=1, b=1, c=0.9, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="GA", a=.5, b=2, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="GA", a=1, b=1, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="GA", a=2, b=.5, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  
-  #list(dist="PO", a=NA, b=1, c=5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000)
+  list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="NO", a=1, b=1, c=0.5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="LO",a=NA,b=NA,c=.25,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
+  list(dist="LO",a=NA,b=NA,c=.5,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
+  list(dist="GA", a=.5, b=2, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="GA", a=1, b=1, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=.2, c=5, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=5, c=5, mu1=5, mu2=5, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=2, c=2, mu1=2, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=1, c=2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=.2, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=1, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=5, c=.2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=2, c=2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000)
 )
 
 outer_sims <- 10  # Number of simulations per input set
@@ -23,7 +26,7 @@ outer_sims <- 10  # Number of simulations per input set
 for (param_set_idx in seq_along(input_params_list)) {
   params <- input_params_list[[param_set_idx]]
   eval_outer <- list()
-  max_retries <- 5
+  max_retries <- 10
   for (i in 1:outer_sims) {
     cat(sprintf("Input set %d, simulation %d\n", param_set_idx, i))
     attempt <- 1
@@ -45,7 +48,38 @@ for (param_set_idx in seq_along(input_params_list)) {
           args = params
         )
       }, error = function(e) {
-        cat(sprintf("Error in callr::r attempt %d: %s\n", attempt, e$message))
+        # Enhanced error reporting with full error details
+        error_msg <- paste0("Error in callr::r attempt ", attempt, ":\n")
+
+        # Add the main error message
+        error_msg <- paste0(error_msg, "Message: ", e$message, "\n")
+
+        # Add call information if available
+        if (!is.null(e$call)) {
+          error_msg <- paste0(error_msg, "Call: ", deparse(e$call), "\n")
+        }
+
+        # Add traceback if available (for callr errors)
+        if ("parent" %in% names(e) && !is.null(e$parent)) {
+          error_msg <- paste0(error_msg, "Subprocess error: ", e$parent$message, "\n")
+          if (!is.null(e$parent$call)) {
+            error_msg <- paste0(error_msg, "Subprocess call: ", deparse(e$parent$call), "\n")
+          }
+          # Add subprocess traceback if available
+          if (!is.null(e$parent$trace)) {
+            error_msg <- paste0(error_msg, "Subprocess traceback:\n", e$parent$trace, "\n")
+          }
+        }
+
+        # Add stdout/stderr if available (callr specific)
+        if ("stdout" %in% names(e) && !is.null(e$stdout) && nchar(e$stdout) > 0) {
+          error_msg <- paste0(error_msg, "Subprocess stdout:\n", e$stdout, "\n")
+        }
+        if ("stderr" %in% names(e) && !is.null(e$stderr) && nchar(e$stderr) > 0) {
+          error_msg <- paste0(error_msg, "Subprocess stderr:\n", e$stderr, "\n")
+        }
+
+        cat(error_msg)
         NULL
       })
       if (!is.null(eval)) {
@@ -64,7 +98,7 @@ for (param_set_idx in seq_along(input_params_list)) {
       eval_outer[[i]] <- eval
     }
   }
-  
+
   score_items <- list()
   score_item_names <- c("vs2_wt", "vs2", "es", "vs1", "vs2_wt_coronly", "logliks")
   for (i in 1:length(eval_outer)) {
@@ -81,7 +115,7 @@ for (param_set_idx in seq_along(input_params_list)) {
       }
     }
   }
-  
+
   par_estimates <- list()
   par_item_names <- c("coefficients", "ses", "sigmas", "correlations")
   for (i in 1:11) {
@@ -103,16 +137,18 @@ for (param_set_idx in seq_along(input_params_list)) {
                                          "cop", "cop_n", "cop_j", "cop_g", "cop_f",
                                          "cop_amh", "cop_fgm", "cop_pl", "cop_h", "cop_t")
   }
-  
+
   times=matrix(NA, nrow=length(eval_outer), ncol=length(colnames(par_estimates[[1]])))
+  conv=matrix(NA, nrow=length(eval_outer), ncol=length(colnames(par_estimates[[1]])))
   colnames(times) <- colnames(par_estimates[[1]])
   for (i in 1:length(eval_outer)) {
     time2=eval_outer[[i]][["timer"]][,2]
     time1=eval_outer[[i]][["timer"]][,1]
     timediff=difftime(time2, time1, units = "secs")
     times[i, ] <- c(timediff)
+    conv[i, ] <- eval_outer[[i]][["conv"]]
   }
-  
+
   # Save the results for this parameter set
   save_filename <- paste0(
     "Data/CoefSimData_", paste(
@@ -120,5 +156,5 @@ for (param_set_idx in seq_along(input_params_list)) {
       sep="_"
     ), ".RData"
   )
-  save(list = c("par_estimates", "score_items","times"), file = save_filename)
+  save(list = c("par_estimates", "score_items","times","conv"), file = save_filename)
 }
