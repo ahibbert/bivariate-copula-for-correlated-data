@@ -13,13 +13,13 @@ logit_inv <- function(x) {
 }
 
 generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
-  
+
   if(dist=="GA") {
     #Simulating bivariate random variable according to functional input
     w<-rbeta(n,a,b)
     margin_1<-w*rgamma(n,shape=a+b,scale=mu1)
     margin_2<-w*rgamma(n,shape=a+b,scale=mu2)
-    
+
   }
   if(dist=="NO") {
     require(MASS)
@@ -27,24 +27,24 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
     margin_1<-normData[,1]
     margin_2<-normData[,2]
   }
-  
+
   if(dist=="LO") {
-    
+
     require(MASS)
     a=1;b=1
     normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
     margin_1<-as.numeric(pnorm(normData[,1])<=mu1)
     margin_2<-as.numeric(pnorm(normData[,2])<=mu2)
-    
+
   }
-  
+
   if(dist=="PO") {
-    
+
     #Compound multiple poisson of Stein & Juritz, 1987
     mixing_dist<-rgamma(n,shape=c,scale=b)
-  
-    margin_1=vector(length = n) 
-    margin_2=vector(length = n) 
+
+    margin_1=vector(length = n)
+    margin_2=vector(length = n)
     for (i in 1:n) {
       margin_1[i]=rpois(1,mu1*mixing_dist[i])
     }
@@ -58,23 +58,23 @@ generateBivDist <- function(n,a,b,c,mu1,mu2,dist) {
   dataset<-as.data.frame(rbind(cbind(patient,margin_1,0)
                                ,cbind(patient,margin_2,1)))
   colnames(dataset)<-c("patient","random_variable","time")
-  
+
   dataset<-dataset[order(dataset$patient),]
-  
+
   return(dataset)
 }
 
 fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
-  
+
   n=nrow(dataset[dataset$time==0,])
-  
+
   #Data Setup
   gamma_c_mu1<-dataset[dataset$time==0,]
   gamma_c_mu2<-dataset[dataset$time==1,]
-  
+
   #Calculating actuals for parameters where available
   if(calc_actuals==FALSE) {actuals<-c(NA,NA,NA,NA,NA,NA,NA,NA)} else {
-  
+
   library(e1071)
 
     if(dist=="GA"){
@@ -100,7 +100,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       )
     }
     if(dist=="NO"){
-      actuals<-c( 
+      actuals<-c(
         mu1
         , mu2
         , (a*sqrt(1-c^2))/sqrt(n)
@@ -112,13 +112,13 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       )
     }
     if(dist=="PO"){
-      
+
       e_x1 = mu1*c*b
       e_x2 = mu2*c*b
       v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
       v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
-      
-      actuals<-c( 
+
+      actuals<-c(
         e_x1
         , e_x2
         , sqrt(v_x1)     /sqrt(n)
@@ -132,9 +132,9 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
         ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
       )
     }
-    
+
   }
-  
+
   if(include=="ALL" || include=="non-GJRM" ) {
 
     library(gee)
@@ -143,9 +143,9 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     library(gamlss.mx)
     library(mgcv)
     library(MASS)
-    
+
     ###Non-GJRM models first as GJRM breaks base gamlss
-    
+
     if(dist=="GA") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=Gamma(link = "log"), maxit=1000)))
       invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
@@ -153,11 +153,11 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       #model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                               , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
-      
+
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
-    
+
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-      
+
     }
     if(dist=="LO") {
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
@@ -166,7 +166,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset,family=binomial)
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
     }
@@ -177,13 +177,13 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=gaussian)
     }
-    
+
     if(dist=="PO"||dist=="NB") {
-      
+
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1), data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
       library(geeM)
@@ -194,12 +194,12 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                               , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1) + (1|patient), data=dataset)
-      
+
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
     }
-    
+
     ###Capturing coefficient values and errors from each model
     summary_glm<-c( summary(model_glm)$coeff[1]
                     ,summary(model_glm)$coeff[2]
@@ -211,10 +211,10 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                     , 3
     )
     if(dist=="PO"||dist=="NB"){model_sum_gee=summary(model_gee)
-                                summary_gee<-c( 
+                                summary_gee<-c(
                                  model_sum_gee$beta[1]
                                , model_sum_gee$beta[2]
-                               , model_sum_gee$se.model[1]#### 
+                               , model_sum_gee$se.model[1]####
                                , model_sum_gee$se.model[2]####
                                , NA
                                , NA
@@ -222,14 +222,14 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                                , 4)} else{
     summary_gee<-c( summary(model_gee)$coeff[1]
                     , summary(model_gee)$coeff[2]
-                    , summary(model_gee)$coeff[7]#### 
+                    , summary(model_gee)$coeff[7]####
                     , summary(model_gee)$coeff[8]####
                     , NA
                     , NA
                     , NA
                     , 4
     )}
-    
+
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]
                            ,summary(model_re_nosig)[2]
@@ -241,7 +241,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                            , model_re_nosig$df.fit
       )
     ))
-    
+
     #invisible(capture.output(
       #summary_re<-c( summary(model_re)[1]
       #               ,summary(model_re)[2]
@@ -252,7 +252,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
       #               , model_re$df.fit
       #)
     #))
-    
+
     invisible(capture.output(
       summary_re_np<-c( summary(model_re_np)[1]
                      ,summary(model_re_np)[2]
@@ -264,8 +264,8 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                      , model_re_np$df.fit
       )
     ))
-    
-    
+
+
     summary_lme4 <- c(summary(model_lme4)$coefficients[1]
                       ,summary(model_lme4)$coefficients[2]
                       ,summary(model_lme4)$coefficients[3]
@@ -274,7 +274,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , AIC(model_lme4)
                       , BIC(model_lme4)
                       , 4)
-    
+
     ###Calculating effective degrees of freedom from Donohue
     X<-getME(model_lme4,name="X")
     Z<-getME(model_lme4,name="Z")
@@ -283,14 +283,14 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     UWU=(t(as.matrix(U))%*%(diag(as.vector(W)))%*%as.matrix(U))
     dim(UWU)
     D<-getME(model_lme4,name="Lambda")
-    
+
     if(sum(D)==0) {lme_EDF=summary_lme4[length(summary_lme4)]} else {
       D_inv<-solve(D)
       dinv_plus_00<-c(0,0,diag(D_inv))
       lme_EDF=sum(diag(UWU%*%solve(UWU+diag(dinv_plus_00))))
-      
+
     }
-    
+
     summary_lme4 <- c(summary(model_lme4)$coefficients[1]
                       ,summary(model_lme4)$coefficients[2]
                       ,summary(model_lme4)$coefficients[3]
@@ -299,7 +299,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       ,-2*logLik(model_lme4)+2*lme_EDF
                       , BIC(model_lme4)
                       ,lme_EDF)
-    
+
     summary_gamm<-c( summary(model_gamm$lme)$coefficients[[1]][1]
                      , summary(model_gamm$lme)$coefficients[[1]][2]
                      , sqrt(diag(model_gamm$lme$varFix))[1]
@@ -309,18 +309,18 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                      ,BIC(model_gamm$lme)
                      ,lme_EDF
     )
-    
+
   }
-  
+
   if(include=="ALL" || include=="GJRM" ) {
-  
+
     require(GJRM)
-    
+
     #Setting up GJRM equations
     eq.mu.1 <- formula(random_variable~1)
     eq.mu.2 <- formula(random_variable.1~1)
     fl <- list(eq.mu.1, eq.mu.2)
-    
+
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
@@ -336,7 +336,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
     model_copula_pl<- gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_h<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_t<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
-    
+
     summary_cop<-c( model_copula$coefficients[1]
                     , model_copula$coefficients[2]
                     , summary(model_copula)$tableP1[2] #SE for time 0
@@ -346,16 +346,16 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                     ,BIC(model_copula)
                     , 5
     )
-    
+
     summary_cop_n<-c( model_copula_n$coefficients[1]
-                      , model_copula_n$coefficients[2] 
+                      , model_copula_n$coefficients[2]
                       , summary(model_copula_n)$tableP1[2] #SE for time 0
                       , summary(model_copula_n)$tableP2[2] #SE for time 1
                       , logLik(model_copula_n)
                       , 2*5-2*logLik(model_copula_n)
                       ,BIC(model_copula_n)
                       , 5
-                      
+
     )
     summary_cop_j<-c( model_copula_j$coefficients[1]
                       , model_copula_j$coefficients[2]
@@ -365,17 +365,17 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , 2*5-2*logLik(model_copula_j)
                       ,BIC(model_copula_j)
                       , 5
-                      
+
     )
     summary_cop_g<-c( model_copula_g$coefficients[1]
-                      , model_copula_g$coefficients[2] 
+                      , model_copula_g$coefficients[2]
                       , summary(model_copula_g)$tableP1[2] #SE for time 0
                       , summary(model_copula_g)$tableP2[2] #SE for time 1
                       , logLik(model_copula_g)
                       , 2*5-2*logLik(model_copula_g)
                       ,BIC(model_copula_g)
                       , 5
-                      
+
     )
     summary_cop_f<-c( model_copula_f$coefficients[1]
                       , model_copula_f$coefficients[2]
@@ -385,7 +385,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , 2*5-2*logLik(model_copula_f)
                       ,BIC(model_copula_f)
                       , 5
-                      
+
     )
     summary_cop_amh<-c( model_copula_amh$coefficients[1]
                         , model_copula_amh$coefficients[2]
@@ -395,7 +395,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                         , 2*5-2*logLik(model_copula_amh)
                         ,BIC(model_copula_amh)
                         , 5
-                        
+
     )
     summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
                         , model_copula_fgm$coefficients[2]
@@ -405,7 +405,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                         , 2*5-2*logLik(model_copula_fgm)
                         ,BIC(model_copula_fgm)
                         , 5
-                        
+
     )
     summary_cop_pl<-c( model_copula_pl$coefficients[1]
                        , model_copula_pl$coefficients[2]
@@ -415,7 +415,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                        , 2*5-2*logLik(model_copula_pl)
                        ,BIC(model_copula_pl)
                        , 5
-                       
+
     )
     summary_cop_h<-c( model_copula_h$coefficients[1]
                       , model_copula_h$coefficients[2]
@@ -425,7 +425,7 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , 2*5-2*logLik(model_copula_h)
                       ,BIC(model_copula_h)
                       , 5
-                      
+
     )
     summary_cop_t<-c( model_copula_t$coefficients[1]
                       , model_copula_t$coefficients[2]
@@ -435,14 +435,14 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
                       , AIC(model_copula_t)
                       ,BIC(model_copula_t)
                       , 6
-                      
+
     )
   }
 
   ########### 4. Combining results #########
-  
+
   if(include=="ALL") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
   }
   if(include=="GJRM") {
     results_exbias<- rbind(summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
@@ -450,29 +450,29 @@ fitBivModels <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TR
   if(include=="non-GJRM") {
     results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,actuals)
   }
-  
+
   results_exbias[,1:4]<- round(results_exbias[,1:4],4)
   results_exbias[,5:8]<- round(results_exbias[,5:8],0)
-  
+
   colnames(results_exbias)<-c("b_1","b_2","se_b1","se_b2","LogLik","AIC","BIC","EDF")
-  
+
   return(results_exbias)
-  
+
 }
 
 fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE) {
-  
+
   n=nrow(dataset[dataset$time==0,])
-  
+
   #Data Setup
   gamma_c_mu1<-dataset[dataset$time==0,]
   gamma_c_mu2<-dataset[dataset$time==1,]
-  
+
   #Calculating actuals for parameters where available
   if(calc_actuals==FALSE) {actuals<-c(NA,NA,NA,NA,NA,NA,NA,NA)} else {
-    
+
     library(e1071)
-    
+
     if(dist=="GA"){
       actuals<-c( log(a*mu1)
                   , log(a*mu2)
@@ -496,7 +496,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       )
     }
     if(dist=="NO"){
-      actuals<-c( 
+      actuals<-c(
         mu1
         , mu2
         , (a*sqrt(1-c^2))/sqrt(n)
@@ -508,13 +508,13 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       )
     }
     if(dist=="PO"){
-      
+
       e_x1 = mu1*c*b
       e_x2 = mu2*c*b
       v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
       v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
-      
-      actuals<-c( 
+
+      actuals<-c(
         e_x1
         , e_x2
         , sqrt(v_x1)     /sqrt(n)
@@ -528,20 +528,20 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
         ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
       )
     }
-    
+
   }
-  
+
   if(include=="ALL" || include=="non-GJRM" ) {
-    
+
     require(gamlss)
     require(gee)
     require(lme4)
     require(MASS)
     require(gamlss.mx)
     library(mgcv)
-    
+
     ###Non-GJRM models first as GJRM breaks base gamlss
-    
+
     if(dist=="GA") {
       invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=Gamma(link = "log"), maxit=1000)))
       invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
@@ -549,11 +549,11 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       #model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=GA(), method=CG(1000))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
-      
+
       invisible(capture.output(model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset, family=Gamma(link="log"))))
-      
+
       model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-      
+
     }
     if(dist=="NO") {
       invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=gaussian, maxit=1000)))
@@ -562,12 +562,12 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- lmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
-      
+
       model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=gaussian)
     }
-    
+
     if(dist=="LO") {
       invisible(capture.output(model_glm <- glm(random_variable~as.factor(time==1), data=dataset, family=binomial, maxit=1000)))
       invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
@@ -575,30 +575,30 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- glmer(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset,family=binomial)
-      
+
       model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=binomial)
     }
-    
+
     if(dist=="PO"||dist=="NB") {
       invisible(capture.output(model_glm <- glm.nb(random_variable~as.factor(time==1), data=dataset, maxit=1000)))
       #invisible(capture.output(model_gee<-gee(random_variable~as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
       library(geeM)
       model_gee<-geem(random_variable~as.factor(time==1), id=patient, data=dataset, init.beta=model_glm$coefficients,
                       family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
-      
+
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), data=dataset, family=NBI())))
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~as.factor(time==1), sigma.formula=~as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      
+
       model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
-      
+
       model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
-      
+
     }
-    
+
     ###Capturing coefficient values and errors from each model
     summary_glm<-c( summary(model_glm)$coeff[1]
                     ,summary(model_glm)$coeff[2]
@@ -609,12 +609,12 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                     , BIC(model_glm)
                     , 3
     )
-    
+
     if(dist=="PO"||dist=="NB"){model_sum_gee=summary(model_gee)
-    summary_gee<-c( 
+    summary_gee<-c(
       model_sum_gee$beta[1]
       , model_sum_gee$beta[2]
-      , model_sum_gee$se.model[1]#### 
+      , model_sum_gee$se.model[1]####
       , model_sum_gee$se.model[2]####
       , NA
       , NA
@@ -622,14 +622,14 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       , 4)} else{
         summary_gee<-c( summary(model_gee)$coeff[1]
                         , summary(model_gee)$coeff[2]
-                        , summary(model_gee)$coeff[7]#### 
+                        , summary(model_gee)$coeff[7]####
                         , summary(model_gee)$coeff[8]####
                         , NA
                         , NA
                         , NA
                         , 4
         )}
-    
+
     invisible(capture.output(
       summary_re_nosig<-c( summary(model_re_nosig)[1]
                            ,summary(model_re_nosig)[2]
@@ -641,7 +641,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                            , model_re_nosig$df.fit
       )
     ))
-    
+
     #invisible(capture.output(
     #summary_re<-c( summary(model_re)[1]
     #               ,summary(model_re)[2]
@@ -652,7 +652,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     #               , model_re$df.fit
     #)
     #))
-    
+
     invisible(capture.output(
       summary_re_np<-c( summary(model_re_np)[1]
                         ,summary(model_re_np)[2]
@@ -664,8 +664,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                         , model_re_np$df.fit
       )
     ))
-    
-    
+
+
     summary_lme4 <- c(summary(model_lme4)$coefficients[1]
                       ,summary(model_lme4)$coefficients[2]
                       ,summary(model_lme4)$coefficients[3]
@@ -674,8 +674,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , AIC(model_lme4)
                       , BIC(model_lme4)
                       , 4)
-    
-    
+
+
     ###Calculating effective degrees of freedom from Donohue
     X<-getME(model_lme4,name="X")
     Z<-getME(model_lme4,name="Z")
@@ -684,14 +684,14 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     UWU=(t(as.matrix(U))%*%(diag(as.vector(W)))%*%as.matrix(U))
     dim(UWU)
     D<-getME(model_lme4,name="Lambda")
-    
+
     if(sum(D)==0) {lme_EDF=summary_lme4[length(summary_lme4)]} else {
       D_inv<-solve(D)
       dinv_plus_00<-c(0,0,diag(D_inv))
       lme_EDF=sum(diag(UWU%*%solve(UWU+diag(dinv_plus_00))))
-      
+
     }
-    
+
     summary_lme4 <- c(summary(model_lme4)$coefficients[1]
                       ,summary(model_lme4)$coefficients[2]
                       ,summary(model_lme4)$coefficients[3]
@@ -700,8 +700,8 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       ,-2*logLik(model_lme4)+2*lme_EDF
                       , BIC(model_lme4)
                       ,lme_EDF)
-    
-  
+
+
     summary_gamm<-c( summary(model_gamm$lme)$coefficients[[1]][1]
                      , summary(model_gamm$lme)$coefficients[[1]][2]
                      , sqrt(diag(model_gamm$lme$varFix))[1]
@@ -711,23 +711,23 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                      ,BIC(model_gamm$lme)
                      ,lme_EDF
     )
-    
+
   }
-  
+
   if(include=="ALL" || include=="GJRM" ) {
-    
+
     require(GJRM)
-    
+
     #Setting up GJRM equations
     eq.mu.1 <- formula(random_variable~1)
     eq.mu.2 <- formula(random_variable.1~1)
     fl <- list(eq.mu.1, eq.mu.2)
-    
+
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
     if(dist=="LO"){margin_dist="logit"}
-    
+
     model_copula<-    gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "C0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
     model_copula_n<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "N",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_j<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "J0",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
@@ -738,7 +738,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     model_copula_pl<- gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "PL",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_h<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "HO",data=data.frame(gamma_c_mu1,gamma_c_mu2),model="B")
     model_copula_t<-  gjrm(fl, margins = c(margin_dist,margin_dist) , copula = "T",data=data.frame(gamma_c_mu1,gamma_c_mu2),model ="B")
-    
+
     slv_cop_He=solve(model_copula$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop<-c( model_copula$coefficients[1]
                     , model_copula$coefficients[2]
@@ -751,14 +751,14 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     )
     slv_cop_He=solve(model_copula_n$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_n<-c( model_copula_n$coefficients[1]
-                      , model_copula_n$coefficients[2] 
+                      , model_copula_n$coefficients[2]
                       , summary(model_copula_n)$tableP1[2] #SE for time 0
                       , se_2
                       , logLik(model_copula_n)
                       , 2*5-2*logLik(model_copula_n)
                       ,BIC(model_copula_n)
                       , 5
-                      
+
     )
     slv_cop_He=solve(model_copula_j$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_j<-c( model_copula_j$coefficients[1]
@@ -769,18 +769,18 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , 2*5-2*logLik(model_copula_j)
                       ,BIC(model_copula_j)
                       , 5
-                      
+
     )
     slv_cop_He=solve(model_copula_g$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_g<-c( model_copula_g$coefficients[1]
-                      , model_copula_g$coefficients[2] 
+                      , model_copula_g$coefficients[2]
                       , summary(model_copula_g)$tableP1[2] #SE for time 0
                       , se_2
                       , logLik(model_copula_g)
                       , 2*5-2*logLik(model_copula_g)
                       ,BIC(model_copula_g)
                       , 5
-                      
+
     )
     slv_cop_He=solve(model_copula_f$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_f<-c( model_copula_f$coefficients[1]
@@ -791,7 +791,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , 2*5-2*logLik(model_copula_f)
                       ,BIC(model_copula_f)
                       , 5
-                      
+
     )
     slv_cop_He=solve(model_copula_amh$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_amh<-c( model_copula_amh$coefficients[1]
@@ -802,7 +802,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                         , 2*5-2*logLik(model_copula_amh)
                         ,BIC(model_copula_amh)
                         , 5
-                        
+
     )
     slv_cop_He=solve(model_copula_fgm$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_fgm<-c( model_copula_fgm$coefficients[1]
@@ -813,7 +813,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                         , 2*5-2*logLik(model_copula_fgm)
                         ,BIC(model_copula_fgm)
                         , 5
-                        
+
     )
     slv_cop_He=solve(model_copula_pl$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_pl<-c( model_copula_pl$coefficients[1]
@@ -824,7 +824,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                        , 2*5-2*logLik(model_copula_pl)
                        ,BIC(model_copula_pl)
                        , 5
-                       
+
     )
     slv_cop_He=solve(model_copula_h$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_h<-c( model_copula_h$coefficients[1]
@@ -835,7 +835,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , 2*5-2*logLik(model_copula_h)
                       ,BIC(model_copula_h)
                       , 5
-                      
+
     )
     slv_cop_He=solve(model_copula_t$He);se_2=sqrt(slv_cop_He[1,1]+slv_cop_He[2,2]-2*slv_cop_He[1,2])
     summary_cop_t<-c( model_copula_t$coefficients[1]
@@ -846,14 +846,14 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , AIC(model_copula_t)
                       ,BIC(model_copula_t)
                       , 6
-                      
+
     )
   }
-  
+
   ########### 4. Combining results #########
-  
+
   if(include=="ALL") {
-    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)  
+    results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
   }
   if(include=="GJRM") {
     results_exbias<- rbind(summary_cop,summary_cop_n,summary_cop_j,summary_cop_g,summary_cop_f,summary_cop_amh,summary_cop_fgm,summary_cop_pl,summary_cop_h,summary_cop_t,actuals)
@@ -861,75 +861,75 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
   if(include=="non-GJRM") {
     results_exbias<- rbind(summary_glm,summary_gee,summary_re_nosig,summary_re_np,summary_lme4,summary_gamm,actuals)
   }
-  
+
   results_exbias[,1:4]<- round(results_exbias[,1:4],4)
   results_exbias[,5:8]<- round(results_exbias[,5:8],0)
-  
+
   colnames(results_exbias)<-c("b_1","b_2","se_b1","se_b2","LogLik","AIC","BIC","EDF")
-  
+
   return(results_exbias)
-  
+
 }
 
 generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
-  
+
   if((n%%100)!=0) {
     stop("n must be a multiple of 100")
   }
   sex <- c(rep(0,n/2),rep(1,n/2))
   age <- rep(1:100,n/100)
-  
+
   if(dist=="GA") {
     #Simulating bivariate random variable according to functional input
     #n=1000;a=1;b=1;c=0.5;mu1=2;mu2=3;dist="GA";x1=1;x2=1
     w<-rbeta(n,a,b)
-    
+
     mu1_long=exp(log(mu1)+sex*x1+age*x2)
     mu2_long=exp(log(mu2)+sex*x1+age*x2)
-    
+
     time_1<-w*rgamma(n,shape=a+b,scale=mu1_long)
     time_2<-w*rgamma(n,shape=a+b,scale=mu2_long)
-    
+
   }
   if(dist=="NO") {
     require(MASS)
     normData<-mvrnorm(n,mu=c(mu1,mu2),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
     margin_1<-normData[,1]
     margin_2<-normData[,2]
-    
+
     #trt <- sample(0:1, length(margin_1), replace=TRUE)
-    
+
     time_1=margin_1 + x1*sex + x2*age
     time_2=margin_2 + x1*sex + x2*age
-    
+
   }
   if(dist=="LO") {
-    
+
     require(MASS)
     a=1;b=1
-    #c=0.5;n=1000 
+    #c=0.5;n=1000
     normData<-mvrnorm(n,mu=c(0,0),Sigma = matrix(c(a^2,c*a*b,c*a*b,b^2),nrow=2))
-    
-    margin_1<-pnorm(normData[,1],mean=0,sd=a) 
+
+    margin_1<-pnorm(normData[,1],mean=0,sd=a)
     margin_2<-pnorm(normData[,2],mean=0,sd=b)
-  
+
     #time_1<-as.numeric(pnorm(margin_1,mean=mean(margin_1),sd=sd(margin_1))<=mu1)
     #time_2<-as.numeric(pnorm(margin_2,mean=mean(margin_2),sd=sd(margin_2))<=mu2)
-    
+
     time_1<-as.numeric(logit_inv(logit(margin_1) - x1*sex - x2*age)<=mu1)
     time_2<-as.numeric(logit_inv(logit(margin_2) - x1*sex - x2*age)<=mu2)
-    
+
   }
   if(dist=="PO") {
-    
+
     #Compound multiple poisson of Stein & Juritz, 1987
     mixing_dist<-rgamma(n,shape=c,scale=b)
-    
+
     mu1_long=exp(log(mu1)+sex*x1+age*x2)
     mu2_long=exp(log(mu2)+sex*x1+age*x2)
-    
-    time_1=vector(length = n) 
-    time_2=vector(length = n) 
+
+    time_1=vector(length = n)
+    time_2=vector(length = n)
     for (i in 1:n) {
       time_1[i]=rpois(1,mu1_long[i]*mixing_dist[i])
     }
@@ -937,33 +937,33 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
       time_2[i]=rpois(1,mu2_long[i]*mixing_dist[i])
     }
   }
-  
+
   #Transforming data to format required for random effect models
   patient<-as.factor(seq(1:n))
   dataset<-as.data.frame(rbind(cbind(patient,time_1,0,sex,age)
                                ,cbind(patient,time_2,1,sex,age)))
   colnames(dataset)<-c("patient","random_variable","time","sex","age")
-  
+
   dataset<-dataset[order(dataset$patient),]
-  
+
   return(dataset)
 }
 
 fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE) {
-  
+
   #dist="NO"; include="ALL"; calc_actuals=FALSE
-  
+
   n=nrow(dataset[dataset$time==0,])
-  
+
   #Data Setup
   gamma_c_mu1<-dataset[dataset$time==0,]
   gamma_c_mu2<-dataset[dataset$time==1,]
-  
+
   #Calculating actuals for parameters where available
   if(calc_actuals==FALSE) {actuals<-c(NA,NA,NA,NA,NA,NA,NA,NA)} else {
-    
+
     library(e1071)
-    
+
     if(dist=="GA"){
       actuals<-c( log(a*mu1)
                   , log(a*mu2)
@@ -987,7 +987,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       )
     }
     if(dist=="NO"){
-      actuals<-c( 
+      actuals<-c(
         mu1
         , mu2
         , (a*sqrt(1-c^2))/sqrt(n)
@@ -999,13 +999,13 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       )
     }
     if(dist=="PO"){
-      
+
       e_x1 = mu1*c*b
       e_x2 = mu2*c*b
       v_x1 = (((mu1^2)*(c*b^2)+(mu1*c*b))/((mu1*c*b)^2))
       v_x2 = (((mu2^2)*(c*b^2)+(mu2*c*b))/((mu2*c*b)^2))
-      
-      actuals<-c( 
+
+      actuals<-c(
         e_x1
         , e_x2
         , sqrt(v_x1)     /sqrt(n)
@@ -1019,12 +1019,12 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
         ,(skewness(gamma_c_mu1$random_variable)+skewness(gamma_c_mu2$random_variable))*10000/2
       )
     }
-    
+
   }
-  
-  #Non-GJRM model regression first as once GJRM is loaded it breaks GAMLSS 
+
+  #Non-GJRM model regression first as once GJRM is loaded it breaks GAMLSS
   if(include=="ALL" || include=="non-GJRM" ) {
-    
+
     require(gamlss)
     require(gee)
     require(lme4)
@@ -1032,11 +1032,11 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     require(gamlss.mx)
     library(mgcv)
     library(glmtoolbox)
-    
+
     timer=matrix(NA,ncol=2,nrow=16)
-    
+
     ###Non-GJRM models first as GJRM breaks base gamlss
-    
+
     if(dist=="GA") {
       timer[1,1]=Sys.time()
       invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA)))
@@ -1057,7 +1057,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       timer[6,1]=Sys.time()
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
       timer[6,2]=Sys.time()
-      
+
     } else if(dist=="NO") {
       timer[1,1]=Sys.time()
       invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
@@ -1078,7 +1078,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       timer[6,1]=Sys.time()
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
       timer[6,2]=Sys.time()
-    
+
     } else if(dist=="PO") {
       timer[1,1]=Sys.time()
       invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
@@ -1126,17 +1126,16 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
       timer[6,2]=Sys.time()
     }
-    
-    
+
     results_table=list()
-    
+
     results_table[[1]]=summary(model_glm)$coeff[,1:2]
     results_table[[2]]=summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients)-2),1:2]
     results_table[[3]]=cbind(summary(model_re_nosig)[1:4],summary(model_re_nosig)[6:9])
     results_table[[4]]=cbind(summary(model_re_np)[1:4],summary(model_re_np)[8:11])
     results_table[[5]]=summary(model_lme4)$coefficients[,c(1,2)]
     results_table[[6]]=cbind(summary(model_gamm$lme)$coefficients[[1]],sqrt(diag(model_gamm$lme$varFix)))
-    
+
     logLiks=c(
       logLik(model_glm)
       , model_gee$logLik
@@ -1145,7 +1144,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , logLik(model_lme4)
       , logLik(model_gamm$lme)
     )
-    
+
     dfs=c( ####Come back to DF
       n*2-df.residual(model_glm)
       , n*2-model_gee$df.residual
@@ -1154,7 +1153,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , NA
       , NA
     )
-    
+
     #Creating summary tables
     coefficients_table= rbind(
       results_table[[1]][,1]
@@ -1180,7 +1179,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , c(logLiks[5],dfs[5])
       , c(logLiks[6],dfs[6])
     )
-    
+
     sigmas=rbind(
       rep(summary(model_glm)$dispersion,2)
       , rep(model_gee$phi,2)
@@ -1189,36 +1188,44 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , rep(summary(model_lme4)$sigma,2)
       , rep(model_gamm$lme$sigma,2)
     )
-    
+
     #Extract correlations - for random effect models this is the random effect sd
     correlations=rbind(
     0
     ,(model_gee$corr[2,1])
-    ,as.numeric(VarCorr(getSmo(model_re_nosig))[[1]]) 
+    ,as.numeric(VarCorr(getSmo(model_re_nosig))[[1]])
     ,0
     ,summary(model_lme4)$varcor$patient[1,1]
     ,var(ranef(model_gamm$lme)[[1]])
     )
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=
       rownames(sigmas)=rownames(correlations)=c("glm" ,"gee","re_nosig","re_np","lme4","gamm")
-    
+
+    conv_check = c(
+      model_glm$converged,
+      model_gee$converged,
+      model_re_nosig$converged,
+      model_re_np$converged,
+      !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ),
+      !any( grepl("converge", warnings(model_gamm)))
+    )
   }
-  
+
   #GJRM model regressions
   if(include=="ALL" || include=="GJRM" ) {
-    
+
     require(GJRM)
 
     #Setting up GJRM equations
     eq.mu.1 <- formula(random_variable~as.factor(sex)+age)
     eq.mu.2 <- formula(random_variable.1~as.factor(sex)+age)
     fl <- list(eq.mu.1, eq.mu.2)
-    
+
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
     if(dist=="LO"){margin_dist="logit"}
-    
+
     copula_models=list()
     copula_models_results=list()
     i=1
@@ -1235,15 +1242,17 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       copula_models_results[[i]][[5]]=solve(cm$He) #Inverse of hessian - variance matrix
       copula_models_results[[i]][[6]]=if(dist=="LO"){c(NA,NA)} else {c(cm$sigma1,cm$sigma2)} #Sigmas)
       copula_models_results[[i]][[7]]=cm$theta #Thetas)
+      copula_models_results[[i]][[8]]=cm$fit$converged
       i=i+1
     }
-    
+
     #standardising copula results for coeffs
     std_copula_models_results=std_copula_se_results=matrix(NA,ncol=4,nrow=10)
     std_copula_models_logliks=matrix(NA,ncol=2,nrow=10)
     std_copula_models_sigmas=matrix(NA,ncol=2,nrow=10)
     std_copula_models_correlations=matrix(NA,ncol=1,nrow=10)
-    
+    std_copula_models_conv=matrix(NA,ncol=1,nrow=10)
+
     for (i in 1:length(copula_models_results)) {
       temp_cop_results=c(copula_models_results[[i]][[1]][,1],copula_models_results[[i]][[2]][,1])
       num_cov=length(temp_cop_results)
@@ -1251,7 +1260,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       std_copula_models_results[i,c(2)]=temp_cop_results[c(4)]#-temp_cop_results[c(1)] #Time
       std_copula_models_results[i,c(3)]=(temp_cop_results[c(2)]+temp_cop_results[c(5)])/2 #Sex / binary
       std_copula_models_results[i,c(4)]=(temp_cop_results[c(3)]+temp_cop_results[c(6)])/2 #Age / linear
-      
+
       std_copula_se_results[i,c(1)]=sqrt(copula_models_results[[i]][[5]][1,1])
       std_copula_se_results[i,c(2)]=sqrt(copula_models_results[[i]][[5]][4,4]) #+ copula_models_results[[i]][[5]][1,1] + 2*copula_models_results[[i]][[5]][4,1])
       std_copula_se_results[i,c(3)]=sqrt((copula_models_results[[i]][[5]][2,2] + copula_models_results[[i]][[5]][5,5] + 2*copula_models_results[[i]][[5]][2,5]))/2
@@ -1260,19 +1269,21 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       std_copula_models_logliks[i,2]=copula_models_results[[i]][[4]]
       std_copula_models_sigmas[i,c(1,2)]=copula_models_results[[i]][[6]]
       std_copula_models_correlations[i,1]=copula_models_results[[i]][[7]]
-      
+      std_copula_models_conv[i,1]=copula_models_results[[i]][[8]]
+
       std_copula_se_results[is.na(std_copula_se_results)]<-0 #Replace NAs with 0s
     }
   }
-  
+
   ########### 4. Combining results #########
-  
+
   if(include=="ALL") {
     coefficients_table=rbind(coefficients_table,std_copula_models_results)
     ses_table=rbind(ses_table,std_copula_se_results)
     loglik_table=rbind(loglik_table,std_copula_models_logliks)
     sigmas=rbind(sigmas,std_copula_models_sigmas)
     correlations=rbind(correlations,std_copula_models_correlations)
+    conv_check = c(conv_check,std_copula_models_conv)
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=rownames(correlations)=c("glm" ,"gee","re_nosig","re_np","lme4","gamm"   ,"cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
   } else if (include == "GJRM") {
     coefficients_table=std_copula_models_results
@@ -1280,14 +1291,18 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     loglik_table=std_copula_models_logliks
     sigmas=std_copula_models_sigmas
     correlations=std_copula_models_correlations
+    conv_check = std_copula_models_conv
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=rownames(correlations)=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
   } else if (include == "non-GJRM") {
     coefficients_table=coefficients_table
     ses_table=ses_table
     loglik_table=loglik_table
+    sigmas=sigmas
+    correlations=correlations
+    conv_check=conv_check
     rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=rownames(correlations)=c("glm" ,"gee","re_nosig","re_np","lme4","gamm")
   }
-    
+
   output_list=list(
     coefficients=coefficients_table
     , ses=ses_table
@@ -1298,26 +1313,27 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     , y=dataset$random_variable
     , dist=dist
     , timer=timer
+    , conv_check=conv_check
   )
-  
+
   return(output_list)
   ###################### 5. End of function #########
-  
+
 }
 
 sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
-  
+
   sex <- c(rep(0,n/2),rep(1,n/2))
   age <- rep(1:100,n/100)
-  
+
   #Calculate linear predictor
   lp_1=coefficients[model,1]+coefficients[model,3]*sex + coefficients[model,4]*age
   lp_2=coefficients[model,2]+coefficients[model,3]*sex + coefficients[model,4]*age
-  
+
   if (model == "glm") {
     #model="glm"
     #Get linear predictor
-    
+
     if(dist=="NO") {
       t1=rNO(n, mu=(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=rNO(n, mu=(lp_2), sigma=sqrt(sigmas[model,2]))
@@ -1331,13 +1347,13 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t1=rNBI(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=rNBI(n, mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
     }
-    
+
   } else if (model == "gee") {
     library(VineCopula)
     #model="gee"
     #Generate basic correlation structure based on correlation parameter
     c0=BiCopSim(n,family=1,par=correlations[model,1])
-    
+
     if(dist=="NO") {
       t1=qNO(c0[,1], mu=(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=qNO(c0[,2], mu=(lp_2), sigma=sqrt(sigmas[model,2]))
@@ -1351,14 +1367,14 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t1=qNBI(c0[,1], mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
       t2=qNBI(c0[,2], mu=exp(lp_2), sigma=sqrt(sigmas[model,2]))
     }
-    
+
   } else if (model == "re_nosig") {
     #model="re_nosig"
-    
+
     #Generate random effects
     b_var=correlations[model,1]
     re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
-    
+
     if(dist=="NO") {
       t1=rNO(n, mu=(lp_1+re_val), sigma=exp(sigmas[model,1]))
       t2=rNO(n, mu=(lp_2+re_val), sigma=exp(sigmas[model,2]))
@@ -1374,11 +1390,11 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
     }
   } else if (model == "lme4" | model == "gamm") {
     #model="lme4"; model="gamm"
-    
+
     #Generate random effects
     b_var=correlations[model,1]
     re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
-    
+
     if(dist=="NO") {
       t1=rNO(n, mu=(lp_1+re_val), sigma=(sigmas[model,1]))
       t2=rNO(n, mu=(lp_2+re_val), sigma=(sigmas[model,2]))
@@ -1397,7 +1413,7 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
     t2=rep(NA,n)
   } else if (startsWith(model, "cop")) {
     #model="cop"
-    
+
     library(VineCopula)
     cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
     vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
@@ -1408,7 +1424,7 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
       t2=rep(NA,n)
     } else {
         simCop=BiCopSim(N=n, family=cop_vine,par=correlations[model,])
-        
+
         if(dist=="NO") {
           t1=qNO(simCop[,1], mu=(lp_1), sigma=(sigmas[model,1]))
           t2=qNO(simCop[,2], mu=(lp_2), sigma=(sigmas[model,2]))
@@ -1428,7 +1444,7 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
 }
 
 evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
-  
+
   #Extract model info
   logliks=fits$logliks
   actuals=fits$actuals
@@ -1436,14 +1452,14 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   ses=fits$ses
   y=fits$y
   n=length(y)/2
-  
+
   coefficients=fits$coefficients
   correlations=fits$correlations
   sigmas=fits$sigmas
   model_list_complete=model_list
-  
+
   # Simulate vg_sims times from each model formulation
-  
+
   #vg_sims=100
   #model_list=rownames(fits$correlations);vg_sims=100
   sim_model_out=list()
@@ -1456,11 +1472,11 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
       model_list_complete=model_list_complete[model_list_complete!=model]
     }
   }
-  
+
   # Calculate Variogram scores
   print("CALCULATING VARIOGRAM SCORES (2. CALCULATION)")
   library(scoringRules)
-  
+
   w_vs=matrix(1,ncol=length(y),nrow=length(y))
   w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
   # Set values where row = col + n or col = row + n to 10
@@ -1471,10 +1487,10 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
     w_vs_0[i, i+1] <- 1
     w_vs_0[i+1, i] <- 1
   }
-  
+
   vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
   names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
-  
+
   for (model in model_list_complete) {
     vs2_wt[model]=        vs_sample(y=y,dat=sim_model_out[[model]],p=2,w_vs=w_vs)
     vs2_wt_coronly[model]=vs_sample(y=y,dat=sim_model_out[[model]],p=2,w_vs=w_vs_0)
@@ -1482,7 +1498,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
     vs1[model]=           vs_sample(y=y,dat=sim_model_out[[model]],p=1)
     es[model]=            es_sample(y=y,dat=sim_model_out[[model]])
   }
-  
+
   return(list(
     coefficients=coefficients
     , ses=ses
@@ -1495,6 +1511,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
     , vs1=vs1
     , vs2_wt_coronly=vs2_wt_coronly
     , timer= fits$timer
+    , conv=fits$conv_check
   ))
 }
 
@@ -1506,9 +1523,9 @@ simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
   cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
   vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
   cop_vine=vine_cop_family[grep(paste("\\b",model,"\\b",sep=""),cop_model_names)]
-  
+
   print(cop_vine)
-  
+
   if(is.na(cop_vine)) {
     return(NA)
   } else {
@@ -1518,11 +1535,11 @@ simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
       qFUN=if(dist=="NO") {qNO} else if (dist=="GA") {qGA} else if (dist=="PO" | dist=="NB") {qNBI}
       t1 = qFUN(simCop[,1],mu=par["as.factor(time == 1)FALSE"],sigma=par[length(par)-2])
       t2 = qFUN(simCop[,2],mu=par["as.factor(time == 1)TRUE"],sigma=par[length(par)-1])
-      
+
       #Would this work without parameters...? For the normal maybe, but otherwise I don't think it will be scale invariant
       #t1 = qFUN(simCop[,1])
       #t2 = qFUN(simCop[,2])
-      
+
       corr_mat[i,1]=cor(t1,t2)
     }
     return(c(t1,t2))
@@ -1530,95 +1547,95 @@ simCopulaCorrelation <-function(model,par,n=1000,sims=100,dist) {
 }
 
 plotDist <- function (dataset,dist) {
-  
-  require(gamlss)  
+
+  require(gamlss)
   require(latex2exp)
   require(ggplot2)
   require(ggpubr)
-  
+
   num_margins=length(unique(dataset[,"time"]))
-  
+
   margin_data=list()
   margin_unif=list()
   margin_fit=list()
-  
+
   for (i in 1:num_margins) {
     margin_data[[i]]<-(dataset[dataset[,"time"]==i-1,"random_variable"])
     margin_fit[[i]]<-gamlss(margin_data[[i]]~1,family=dist)
     margin_unif[[i]]<-pnorm(margin_fit[[i]]$residuals)
   }
-  
+
   ##plot.new()
   #par(mfrow=c(1,num_margins))
-  
+
   #for (i in 1:num_margins) {histDist(margin_data[[i]],family=dist,xlab=TeX(paste("$Y_",i,"$")),main=paste("Histogram of margin",i,"and fitted",dist))}
   #invisible(readline(prompt="Press [enter] to continue"))
-  
+
   plots=list()
-  
+
   z=1
   for (i in 1:(num_margins)) {
       for (j in 1:(num_margins)) {
         if(i==j) {
           input_data=data.frame(margin_data[[i]])
           colnames(input_data)<-"X1"
-          p <- ggplot(input_data, aes(x=X1)) + 
-            geom_histogram() + 
+          p <- ggplot(input_data, aes(x=X1)) +
+            geom_histogram() +
             labs(x = TeX(paste("$Y_",i,"$")))
         }
         if(i!=j) {
           input_data=data.frame(cbind(margin_unif[[i]],margin_unif[[j]]))
           p=ggplot(data=input_data,aes(x=X1,y=X2)) +
-            #geom_point(size=0.25,color="black") + 
-            geom_density_2d(contour_var="density",bins=20,color="black") + 
+            #geom_point(size=0.25,color="black") +
+            geom_density_2d(contour_var="density",bins=20,color="black") +
             scale_fill_brewer() +
             labs(x = TeX(paste("$Y_",i,"$")), y=TeX(paste("$Y_",j,"$")),fill="density")
         }
-        
+
         plots[[z]]=p
         z=z+1
       }
   }
   ggarrange(plotlist=plots,ncol=num_margins,nrow=num_margins)
-  
+
 }
 
 generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
-  
+
   if(dist=="NO") {
     require(MASS)
     cor_matrix<-diag(rep(1,length(sigma_vector)))
     if (length(rho_vector)==1) {
       cor_matrix[lower.tri(cor_matrix,diag=FALSE)]<-rho_vector[1]
       cor_matrix[upper.tri(cor_matrix,diag=FALSE)]<-rho_vector[1]
-      
+
       cov_matrix<-diag(sigma_vector) %*% cor_matrix %*% diag(sigma_vector)
     } else {
       cor_matrix=cor_matrix+rho_vector
       cov_matrix<-diag(sigma_vector) %*% cor_matrix %*% diag(sigma_vector)
     }
-    
+
     data<-mvrnorm(n,mu=mu_vector,Sigma = cov_matrix)
   }
-  
+
   data_output<-cbind(data[,1],0)
   for (i in 2:ncol(data)) {
-    data_output<-rbind(data_output,cbind(data[,i],i-1)) 
+    data_output<-rbind(data_output,cbind(data[,i],i-1))
   }
   colnames(data_output) <- cbind("random_variable","time")
   return(data_output)
 }
 
 calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
-  
+
   #n=1000;a=1;b=1;c=.5;mu1=1;mu2=2;dist="NO";x1=1;x2=1;s1=s2=1
   #n=1000;a=1;b=1;c=.5;mu1=.3;mu2=.7;dist="LO";x1=1;x2=1;s1=s2=1
-  
-  dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2); 
-  
+
+  dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2);
+
   linkFunction=function(input_rv,dist="NO") {
     if(dist=="NO") {
-      output_rv=input_rv  
+      output_rv=input_rv
     } else if (dist=="PO"|dist=="NB"|dist=="GA") {
       output_rv=log(input_rv)
     } else if (dist=="LO") {
@@ -1626,10 +1643,10 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     }
     return(output_rv)
   }
-  
+
   linkInvFunction=function(input_rv,dist="NO") {
     if(dist=="NO") {
-      output_rv=input_rv  
+      output_rv=input_rv
     } else if (dist=="PO"|dist=="NB"|dist=="GA") {
       output_rv=exp(input_rv)
     } else if (dist=="LO") {
@@ -1637,27 +1654,27 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
     }
     return(output_rv)
   }
-  
+
   library(gamlss)
   pdf=if(dist=="NO") {dNO
-  } else if (dist=="PO"){dNBI 
+  } else if (dist=="PO"){dNBI
   } else if (dist=="GA"){dGA
   } else if (dist=="LO"){dLO}
-  
+
   mu_1_eta=linkFunction(mu1,dist=dist)
   mu_2_eta=linkFunction(mu1,dist=dist)
-  
+
   getLogLik=function(par_input,dataset,pdf,linkFunction,linkInvFunction,dist) {
-    
+
     mu1=linkInvFunction(par_input[1],dist=dist);
     mu2=linkInvFunction(par_input[2],dist=dist);
     x1=par_input[3];
     x2=par_input[4];
     s1=exp(par_input[5]);
     s2=exp(par_input[6]);
-    
-    mean_estimates=cbind(dataset$time,linkInvFunction(dataset$sex*x1+dataset$age*x2-(dataset$time-1)*linkFunction(mu1,dist)+(dataset$time)*linkFunction(mu2,dist),dist))  
-    
+
+    mean_estimates=cbind(dataset$time,linkInvFunction(dataset$sex*x1+dataset$age*x2-(dataset$time-1)*linkFunction(mu1,dist)+(dataset$time)*linkFunction(mu2,dist),dist))
+
     if(dist=="LO") {
       time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2])
       time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2])
@@ -1665,21 +1682,21 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
       time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2],sigma=(s1))
       time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2],sigma=(s2))
     }
-    
+
     return(-sum(log(time1))-sum(log(time2)))
-    
+
   }
   #getLogLik(par=c(mu1_eta,mu2_eta,x1,x2,s1,s2),dataset,pdf,linkFunction,linkInvFunction,dist)
-  
+
   #Write an optimisation that chooses optim_par such that getLogLik is maximised
   sd_start_1=log(sd(dataset$random_variable[dataset$time==0]))
   sd_start_2=log(sd(dataset$random_variable[dataset$time==1]))
   optim_par=optim(par=c(mu_1_eta,mu_2_eta,x1,x2,sd_start_1,sd_start_2)
                   , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, dist=dist
                   , control=list(maxit=10000, reltol=1e-8, trace=0))
-  
+
   return(optim_par)
-  
+
 }
 
 simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
@@ -1692,7 +1709,7 @@ simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
       optim_cov_outputs[counter,]=optim_est$par
     }
     if(trace==TRUE) {
-      print(counter)  
+      print(counter)
     }
   }
   colnames(optim_cov_outputs)=c("mu1","mu2","x1","x2","s1","s2")
