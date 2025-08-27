@@ -1098,7 +1098,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
       timer[4,2]=Sys.time()
       timer[5,1]=Sys.time()
-      model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)
+      model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset,control=glmerControl(optCtrl = list(maxfun=200000)))
       timer[5,2]=Sys.time()
       timer[6,1]=Sys.time()
       model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"),control=list(niterEM=1000))
