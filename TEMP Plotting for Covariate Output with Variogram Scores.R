@@ -16,7 +16,8 @@ cat("1. Interactive selection (recommended)\n")
 cat("2. Auto-select all files\n")
 cat("3. Manual specification (original method)\n\n")
 
-selection_method <- readline("Enter choice (1, 2, or 3): ")
+#selection_method <- readline("Enter choice (1, 2, or 3): ")
+selection_method=2
 
 if (selection_method == "1") {
   # Interactive selection

@@ -17,14 +17,54 @@ input_params_list <- list(
   list(dist="PO", a=NA, b=.2, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
   list(dist="PO", a=NA, b=1, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
   list(dist="PO", a=NA, b=5, c=.2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
-  list(dist="PO", a=NA, b=2, c=2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000)
+  list(dist="PO", a=NA, b=2, c=2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+
+  # All parameters different
+  list(dist="PO", a=NA, b=.2, c=1, mu1=2, mu2=5, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=5, c=2, mu1=1, mu2=.2, x1=1, x2=0.01, n=1000),
+
+  # Reverse pairing
+  list(dist="PO", a=NA, b=2, c=5, mu1=5, mu2=2, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=1, c=.2, mu1=2, mu2=5, x1=1, x2=0.01, n=1000),
+
+  # Edge cases and more extreme values
+  list(dist="PO", a=NA, b=.2, c=5, mu1=5, mu2=.2, x1=1, x2=0.01, n=1000),
+  list(dist="PO", a=NA, b=5, c=.2, mu1=.2, mu2=5, x1=1, x2=0.01, n=1000)
 )
 
-outer_sims <- 10  # Number of simulations per input set
+outer_sims <- 100  # Number of simulations per input set
 
 # Loop over each parameter set in the input_params_list
 for (param_set_idx in seq_along(input_params_list)) {
   params <- input_params_list[[param_set_idx]]
+
+  # Check if output file already exists (cache check) - accepts any date
+  base_filename_pattern <- paste0(
+    "Data/CoefSimData_", paste(
+      params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims,
+      sep="_"
+    ), "_*.RData"
+  )
+
+  existing_files <- Sys.glob(base_filename_pattern)
+
+  if (length(existing_files) > 0) {
+    cat(sprintf("Input set %d: Output file already exists, skipping: %s\n", param_set_idx, existing_files[1]))
+    next
+  }
+
+  # Define the save filename for new file
+  save_filename <- paste0(
+    "Data/CoefSimData_", paste(
+      params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
+      sep="_"
+    ), ".RData"
+  )
+    next
+  }
+
+  cat(sprintf("Input set %d: Processing parameters: %s\n", param_set_idx, paste(unlist(params), collapse=", ")))
+
   eval_outer <- list()
   max_retries <- 10
   for (i in 1:outer_sims) {
@@ -150,11 +190,5 @@ for (param_set_idx in seq_along(input_params_list)) {
   }
 
   # Save the results for this parameter set
-  save_filename <- paste0(
-    "Data/CoefSimData_", paste(
-      params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
-      sep="_"
-    ), ".RData"
-  )
   save(list = c("par_estimates", "score_items","times","conv"), file = save_filename)
 }
