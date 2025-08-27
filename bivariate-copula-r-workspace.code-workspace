@@ -1,0 +1,41 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        // Inherit all settings from .vscode/settings.json
+        // Auto-open plot viewer when workspace opens
+        "workbench.action.terminal.runSelectedText": false
+    },
+    "extensions": {
+        "recommendations": [
+            "reditorsupport.r",
+            "ms-toolsai.jupyter",
+            "mechatroner.rainbow-csv",
+            "ms-toolsai.datawrangler"
+        ]
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "Auto-open Plot Viewer",
+                "type": "shell",
+                "command": "echo",
+                "args": ["Plot viewer available at: http://127.0.0.1:9001/live?token=vscode-r-plots"],
+                "group": "build",
+                "runOptions": {
+                    "runOn": "folderOpen"
+                },
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                }
+            }
+        ]
+    }
+}
