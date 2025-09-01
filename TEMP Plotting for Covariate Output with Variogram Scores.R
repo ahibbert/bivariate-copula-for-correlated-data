@@ -73,7 +73,7 @@ score_type_map <- c(
   vs1 = "Variogram Score (p=1)",
   vs2 = "Variogram Score (p=2)",
   vs2_wt = "Variogram Score (p=2, Weighted)",
-  vs2_wt_coronly = "Variogram Score (p=2, Cor Only)",
+  bic = "BIC",
   logliks = "-2*Log Likelihood"
 )
 get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
@@ -133,7 +133,39 @@ for (ds in input_datasets) {
   # --- Score boxplots ---
   # Exclude logliks models not in other matrices
   ref_models <- colnames(score_items[[which(names(score_items) != "logliks")[1]]])
+  
+  # Calculate BIC using actual df values from df_values
+  # BIC = -2*loglik + log(n)*df
+  
+  # Store original logliks matrix before processing
+  original_logliks <- score_items$logliks
+  
+  # Calculate -2*loglik (standard transformation)
   score_items$logliks <- -2*score_items$logliks[, ref_models, drop = FALSE]
+  
+  # Calculate BIC using actual df values
+  if (exists("df_values") && !is.null(df_values[["logliks"]])) {
+    # Use actual df values from the data
+    df_matrix <- df_values[["logliks"]][, ref_models, drop = FALSE]
+    bic_matrix <- score_items$logliks + log(n) * df_matrix
+  } else {
+    # Fallback to default df if df_values not available
+    cat("Warning: df_values not found, using default df = 4\n")
+    bic_matrix <- score_items$logliks + log(n) * 4
+  }
+  
+  score_items$bic <- bic_matrix
+  
+  # Set GEE log likelihood and BIC to NA (GEE doesn't have proper likelihood)
+  if ("gee" %in% colnames(score_items$logliks)) {
+    score_items$logliks[, "gee"] <- NA
+  }
+  if ("gee" %in% colnames(score_items$bic)) {
+    score_items$bic[, "gee"] <- NA
+  }
+  
+  # Remove vs2_wt_coronly 
+  score_items$vs2_wt_coronly <- NULL
 
   score_long <- map2_dfr(score_items, names(score_items), ~ {
     df <- as.data.frame(.x)
@@ -154,7 +186,7 @@ for (ds in input_datasets) {
     mutate(method_label = sapply(as.character(method), rename_model),
            method_label = factor(method_label, levels = method_label_order))
 
-  score_type_order <- score_type_map[c("es", "vs1", "vs2", "vs2_wt", "vs2_wt_coronly", "logliks")]
+  score_type_order <- score_type_map[c("es", "vs1", "vs2", "vs2_wt", "bic", "logliks")]
   score_long <- score_long %>%
     mutate(score_type_label = score_type_map[score_type],
            score_type_label = factor(score_type_label, levels = score_type_order))
@@ -167,15 +199,15 @@ for (ds in input_datasets) {
     mutate(score_type_label = score_type_map[score_type],
            score_type_label = factor(score_type_label, levels = score_type_order))
 
-  p=ggplot(score_long, aes(x = method_label, y = value, fill = score_type_label)) +
+  p=ggplot(score_long, aes(x = method_label, y = value, fill = method_label)) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     geom_hline(data = meds, aes(yintercept = min_median), linetype = "dashed", color = "red", inherit.aes = FALSE) +
     facet_wrap(~score_type_label, scales = "free", ncol = 2, labeller = labeller(score_type_label = label_value)) +
     theme_bw() +
     labs(title = paste("Model evaluation -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"),
-         y = "Score Value", x = "Method") +
-    theme(legend.position = "none",axis.text.x = element_text(angle = 45, hjust = 1))
-  #print(p)
+         y = "Score Value") +
+    theme(legend.position = "none",axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x=element_blank())
+  print(p)
   ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 12, dpi = 900)
 
   # ---- Bottom 4 panels, outliers removed ----
@@ -197,18 +229,19 @@ for (ds in input_datasets) {
     left_join(whisker_limits, by = c("score_type_label", "method_label")) %>%
     filter(value >= lower & value <= upper)
 
-  p2 = ggplot(score_no_outliers, aes(x = method_label, y = value, fill = score_type_label)) +
+  p2 = ggplot(score_no_outliers, aes(x = method_label, y = value, fill = method_label)) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     geom_hline(data = meds_bottom4, aes(yintercept = min_median), linetype = "dashed", color = "red", inherit.aes = FALSE) +
     facet_wrap(~score_type_label, scales = "free", ncol = 4, labeller = labeller(score_type_label = label_value)) +
     theme_bw() +
     labs(
       #title = paste("Model evaluation (Bottom Four Score Types, outliers removed) -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"),
-      y = "Score Value", x = "Method"
+      y = "Score Value"
     ) +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(angle = 45, hjust = 1)
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.x=element_blank()
     )
 
   print(p2)
@@ -256,10 +289,10 @@ for (ds in input_datasets) {
     geom_boxplot() +
     facet_wrap(~ variable, scales = "free", ncol = 3) +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(title = paste("Comparison of Models for x1, x2 -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"), y = "Value", x = "Model")
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x=element_blank()) +
+    labs(title = paste("Comparison of Models for x1, x2 -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"), y = "Value")
 
-  #print(q)
+  print(q)
   ggsave(plot=q,file=paste("Charts/AllCoefficients_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 12, height = 12, dpi = 900)
 
   # ---- Coefficient plots: only x1, x2, with true lines ----
@@ -313,11 +346,10 @@ for (ds in input_datasets) {
       colour = "red", linetype = "dashed", linewidth = 1
     ) +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x=element_blank()) +
     labs(
       #title = paste(dist_name, ": X1, X2 Coef + SE (100 Simulations) -", "(a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "n:", n, ")"),
-      y = "Value",
-      x = "Model"
+      y = "Value"
     ) +
     theme(legend.position = "none")
   print(coefplot)
@@ -350,3 +382,56 @@ for (i in 1:length(times_summary_all)) {
 print(times_summary_avg)
 print(times_summary_sd)
 print(times_summary_conv)
+
+# ---- Save summary tables to CSV files with date stamps ----
+# Create a timestamp for the files
+timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+date_stamp <- Sys.Date()
+
+# Create Charts directory if it doesn't exist
+if (!dir.exists("Charts")) {
+  dir.create("Charts", recursive = TRUE)
+}
+
+# Save timing summary tables
+cat("Saving timing and convergence summary tables...\n")
+
+# Save average timing data
+avg_filename <- paste0("Charts/timing_summary_avg_", date_stamp, ".csv")
+write.csv(times_summary_avg, file = avg_filename, row.names = TRUE)
+cat("Saved average timing summary to:", avg_filename, "\n")
+
+# Save standard deviation timing data
+sd_filename <- paste0("Charts/timing_summary_sd_", date_stamp, ".csv")
+write.csv(times_summary_sd, file = sd_filename, row.names = TRUE)
+cat("Saved timing standard deviation summary to:", sd_filename, "\n")
+
+# Save convergence data
+conv_filename <- paste0("Charts/convergence_summary_", date_stamp, ".csv")
+write.csv(times_summary_conv, file = conv_filename, row.names = TRUE)
+cat("Saved convergence summary to:", conv_filename, "\n")
+
+# Also save a combined summary with detailed timestamp
+combined_filename <- paste0("Charts/timing_convergence_combined_", timestamp, ".csv")
+
+# Create a combined data frame with clear column names
+combined_data <- data.frame(
+  Dataset = rownames(times_summary_avg),
+  stringsAsFactors = FALSE
+)
+
+# Add timing averages with clear column names
+for (method in colnames(times_summary_avg)) {
+  combined_data[[paste0(method, "_avg_time")]] <- times_summary_avg[, method]
+  combined_data[[paste0(method, "_sd_time")]] <- times_summary_sd[, method]
+  combined_data[[paste0(method, "_convergence")]] <- times_summary_conv[, method]
+}
+
+write.csv(combined_data, file = combined_filename, row.names = FALSE)
+cat("Saved combined timing and convergence summary to:", combined_filename, "\n")
+
+cat("\n=== Summary of exported files ===\n")
+cat("1. Average timing:", avg_filename, "\n")
+cat("2. Timing std dev:", sd_filename, "\n") 
+cat("3. Convergence rates:", conv_filename, "\n")
+cat("4. Combined data:", combined_filename, "\n")
