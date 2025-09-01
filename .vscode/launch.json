@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "R-Debugger",
+            "name": "Launch R-Debugger",
+            "request": "launch",
+            "debugMode": "file",
+            "workingDirectory": "${workspaceFolder}",
+            "file": "${file}",
+            "includePackageScopes": false,
+            "debuggedPackages": [],
+            "allowGlobalDebugging": false
+        },
+        {
+            "type": "R-Debugger",
+            "name": "Debug R-Debugger (Function)",
+            "request": "launch",
+            "debugMode": "function",
+            "workingDirectory": "${workspaceFolder}",
+            "file": "${file}",
+            "mainFunction": "main",
+            "allowGlobalDebugging": false
+        },
+        {
+            "type": "R-Debugger",
+            "name": "Attach R-Debugger",
+            "request": "attach",
+            "splitOverwrittenOutput": true
+        }
+    ]
+}
