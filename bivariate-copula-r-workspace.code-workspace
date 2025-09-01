@@ -12,6 +12,10 @@
     "extensions": {
         "recommendations": [
             "reditorsupport.r",
+            "rdebugger.r-debugger",
+            "quarto.quarto",
+            "yzhang.markdown-all-in-one",
+            "shd101wyy.markdown-preview-enhanced",
             "ms-toolsai.jupyter",
             "mechatroner.rainbow-csv",
             "ms-toolsai.datawrangler"
