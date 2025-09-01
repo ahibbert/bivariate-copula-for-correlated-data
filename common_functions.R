@@ -1039,13 +1039,13 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
 
     if(dist=="GA") {
       timer[1,1]=Sys.time()
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA)))
+      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
       timer[1,2]=Sys.time()
       timer[2,1]=Sys.time()
-      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
-      timer[2,2]=Sys.time()
-      timer[3,1]=Sys.time()
       invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+      timer[2,2]=Sys.time()
+      timer[3,1]=Sys.time()   
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA,method=RS(1000))))
       timer[3,2]=Sys.time()
       timer[4,1]=Sys.time()
       invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
@@ -1090,7 +1090,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       timer[2,2]=Sys.time()
       timer[3,1]=Sys.time()
       #invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(100))))
+      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(1000))))
       timer[3,2]=Sys.time()
       timer[4,1]=Sys.time()
       #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
@@ -1166,7 +1166,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       , model_re_nosig$df.fit
       , model_re_np$df.fit
       , lme_EDF
-      , NA
+      , lme_EDF #GAMM doesn't provide dfs so using GEE as proxy
     )
 
     #Creating summary tables
