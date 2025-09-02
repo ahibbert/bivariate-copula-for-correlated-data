@@ -596,7 +596,6 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
       model_lme4 <- glmer.nb(formula=random_variable~as.factor(time==1) + (1|patient), data=dataset)
 
       model_gamm = gamm(formula=random_variable~as.factor(time==1), random=list(patient=~1), data=dataset, family=nb(link="log"))
-
     }
 
     ###Capturing coefficient values and errors from each model
@@ -675,7 +674,6 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , BIC(model_lme4)
                       , 4)
 
-
     ###Calculating effective degrees of freedom from Donohue
     X<-getME(model_lme4,name="X")
     Z<-getME(model_lme4,name="Z")
@@ -701,7 +699,6 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
                       , BIC(model_lme4)
                       ,lme_EDF)
 
-
     summary_gamm<-c( summary(model_gamm$lme)$coefficients[[1]][1]
                      , summary(model_gamm$lme)$coefficients[[1]][2]
                      , sqrt(diag(model_gamm$lme$varFix))[1]
@@ -722,7 +719,7 @@ fitBivModels_Bt <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals
     eq.mu.1 <- formula(random_variable~1)
     eq.mu.2 <- formula(random_variable.1~1)
     fl <- list(eq.mu.1, eq.mu.2)
-
+  
     if(dist=="NO"){margin_dist="N"}
     if(dist=="GA"){margin_dist="GA"}
     if(dist=="PO"){margin_dist="NBI"}
@@ -1731,4 +1728,92 @@ simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
   return_list=list(colMeans(optim_cov_outputs),sqrt(diag(cov(optim_cov_outputs))*n)/sqrt(n))
   names(return_list)=c("coefficients","ses")
   return(return_list)
+}
+
+# Parallelized version of simCovariateMLEs
+simCovariateMLEs_parallel = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace = FALSE, n_cores = NULL) {
+  
+  # Load required libraries
+  require(parallel)
+  
+  # Determine number of cores to use
+  if (is.null(n_cores)) {
+    n_cores <- max(1, detectCores() - 1)  # Use all cores except one
+  }
+  
+  if (trace) {
+    cat("Using", n_cores, "cores for parallel processing\n")
+    cat("Running", sims, "simulations...\n")
+  }
+  
+  # Function to run a single simulation
+  run_single_sim <- function(sim_id) {
+    repeat {
+      optim_est <- calcTrueCovariateValues(n, a, b, c, mu1, mu2, dist, x1, x2)
+      if (optim_est$convergence == 0) {
+        return(optim_est$par)
+      }
+      # If convergence failed, try again
+    }
+  }
+  
+  # Create cluster
+  cl <- makeCluster(n_cores)
+  
+  # Export necessary functions and variables to cluster
+  clusterExport(cl, c("calcTrueCovariateValues", "generateBivDist_withCov", "generateBivDist",
+                      "logit", "logit_inv", "n", "a", "b", "c", "mu1", "mu2", "dist", "x1", "x2"))
+  
+  # Load required packages on each worker
+  clusterEvalQ(cl, {
+    library(gamlss)
+    library(MASS)
+  })
+  
+  # Run simulations in parallel
+  if (trace) {
+    cat("Starting parallel simulations...\n")
+  }
+  
+  start_time <- Sys.time()
+  results <- parLapply(cl, 1:sims, run_single_sim)
+  end_time <- Sys.time()
+  
+  # Stop cluster
+  stopCluster(cl)
+  
+  if (trace) {
+    cat("Parallel simulations completed in", round(as.numeric(end_time - start_time, units = "secs"), 2), "seconds\n")
+  }
+  
+  # Convert results to matrix
+  optim_cov_outputs <- do.call(rbind, results)
+  colnames(optim_cov_outputs) <- c("mu1", "mu2", "x1", "x2", "s1", "s2")
+  
+  # Calculate return values
+  return_list <- list(
+    coefficients = colMeans(optim_cov_outputs),
+    ses = sqrt(diag(cov(optim_cov_outputs) * n) / sqrt(n))
+  )
+  
+  return(return_list)
+}
+
+# Enhanced wrapper function that automatically chooses between serial and parallel execution
+simCovariateMLEs_auto = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace = FALSE, 
+                                 use_parallel = NULL, n_cores = NULL) {
+  
+  # Auto-decide whether to use parallel processing
+  if (is.null(use_parallel)) {
+    # Use parallel processing if we have more than 1 core and sims >= 50
+    use_parallel <- (detectCores() > 1) && (sims >= 50)
+  }
+  
+  if (use_parallel) {
+    if (trace) cat("Using parallel processing...\n")
+    return(simCovariateMLEs_parallel(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace, n_cores))
+  } else {
+    if (trace) cat("Using serial processing...\n")
+    return(simCovariateMLEs(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace))
+  }
 }
