@@ -76,40 +76,15 @@ score_type_map <- c(
   bic = "BIC",
   logliks = "-2*Log Likelihood"
 )
-get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
-  # Create a unique cache key from all parameters
-  cache_key <- paste(n, a, b, c, mu1, mu2, dist, x1, x2, sep="_")
-  cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
-
-  # Create cache directory if it doesn't exist
-  if (!dir.exists("Cache")) {
-    dir.create("Cache", recursive = TRUE)
-  }
-
-  # Check if cached result exists
-  if (file.exists(cache_file)) {
-    cat("Loading cached true SEs for parameters:", cache_key, "\n")
-    return(readRDS(cache_file))
-  }
-
-  # If not cached, compute and save
-  cat("Computing true SEs for parameters:", cache_key, "(this may take a while...)\n")
-  sim_out <- simCovariateMLEs(sims = 1000, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2, trace = FALSE)
-  ses <- sim_out$ses[1:4]
-  names(ses) <- c("t1", "t2", "x1", "x2")
-
-  # Save to cache
-  saveRDS(ses, cache_file)
-  cat("Cached true SEs to:", cache_file, "\n")
-
-  return(ses)
-}
 
 times_summary_all <- list()
+all_timing_data <- list()  # Store all timing data for combined plot
 for (ds in input_datasets) {
 
   # ---- Load dataset ----
   load(ds$rdata)
+
+  
 
   #Create a summary of mean and standard deviation of times by column and save into a matrix
   times_summary <- matrix(nrow = ncol(times), ncol = 3)
@@ -208,7 +183,7 @@ for (ds in input_datasets) {
          y = "Score Value") +
     theme(legend.position = "none",axis.text.x = element_text(angle = 45, hjust = 1),axis.title.x=element_blank())
   print(p)
-  ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 12, dpi = 900)
+  #ggsave(paste("Charts/Variogram_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = p, width = 9, height = 11, dpi = 900)
 
   # ---- Bottom 4 panels, outliers removed ----
   bottom_four_labels <- tail(levels(score_long$score_type_label), 4)
@@ -245,7 +220,7 @@ for (ds in input_datasets) {
     )
 
   print(p2)
-  ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4_no_outliers.png",sep=""), plot = p2, width = 10, height = 3, dpi = 900)
+  ggsave(paste("Charts/Variogram_p2only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),"_bottom4_no_outliers.png",sep=""), plot = p2, width = 10, height = 2.5, dpi = 900)
 
   # ---- Coefficient plots: all coefficients ----
   results_list=par_estimates
@@ -293,7 +268,7 @@ for (ds in input_datasets) {
     labs(title = paste("Comparison of Models for x1, x2 -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"), y = "Value")
 
   print(q)
-  ggsave(plot=q,file=paste("Charts/AllCoefficients_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 12, height = 12, dpi = 900)
+  #ggsave(plot=q,file=paste("Charts/AllCoefficients_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 12, height = 12, dpi = 900)
 
   # ---- Coefficient plots: only x1, x2, with true lines ----
   ses_out=get_true_ses(n, a, b, c, mu1, mu2, dist, x1, x2)
@@ -353,7 +328,54 @@ for (ds in input_datasets) {
     ) +
     theme(legend.position = "none")
   print(coefplot)
-  ggsave(plot=coefplot,file=paste("Charts/Coef_x1x2_only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 10, height = 3, dpi = 900)
+  ggsave(plot=coefplot,file=paste("Charts/Coef_x1x2_only_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), width = 10, height = 2.5, dpi = 900)
+
+  # ---- Timing boxplot ----
+  # Convert times matrix to long format for ggplot
+  times_df <- as.data.frame(times)
+  times_df$run <- seq_len(nrow(times_df))
+  times_long <- pivot_longer(times_df, -run, names_to = "method", values_to = "time")
+  
+  # Restrict to same models as coefficient plots
+  model_order_timing <- c(
+    "glm", "gee", "re_nosig", "re_np", "lme4", "gamm",
+    "cop_n", "cop", "cop_j", "cop_g", "cop_f"
+  )
+  
+  # Filter to only include models that are in the model_order
+  times_long <- times_long %>%
+    filter(method %in% model_order_timing)
+  
+  # Apply same model renaming as other charts
+  times_long <- times_long %>%
+    mutate(method_label = sapply(as.character(method), rename_model))
+  
+  # Set factor levels to match other charts (using same order as coefficient plots)
+  method_label_order_timing <- sapply(model_order_timing, rename_model)
+  times_long$method_label <- factor(times_long$method_label, levels = method_label_order_timing)
+  
+  # Add distribution information for combined plot
+  times_long$dist <- dist
+  
+  # Store this dataset's timing data for the combined plot
+  all_timing_data[[meta_string]] <- times_long
+  
+  # Create individual timing boxplot (optional - comment out if not needed)
+  # timing_plot <- ggplot(times_long, aes(x = method_label, y = time, fill = method_label)) +
+  #   geom_boxplot(position = position_dodge(width = 0.8)) +
+  #   theme_bw() +
+  #   labs(
+  #     title = paste("Model Computation Times -", dist, "dist (a:", a, "b:", b, "c:", c, "μ1:", mu1, "μ2:", mu2, "x1:", x1, "x2:", x2, "n:", n, ")"),
+  #     y = "Time (seconds)"
+  #   ) +
+  #   theme(
+  #     legend.position = "none",
+  #     axis.text.x = element_text(angle = 45, hjust = 1),
+  #     axis.title.x = element_blank()
+  #   )
+  # 
+  # print(timing_plot)
+  # ggsave(paste("Charts/Timing_",paste(dist,a,b,c,mu1,mu2,x1,x2,n,Sys.Date(),sep="_"),".png",sep=""), plot = timing_plot, width = 9, height = 6, dpi = 900)
 }
 
 # ---- Initialize summary matrices for mean, sd, and convergence ----
@@ -383,9 +405,8 @@ print(times_summary_avg)
 print(times_summary_sd)
 print(times_summary_conv)
 
-# ---- Save summary tables to CSV files with date stamps ----
+# ---- Save timing summary tables to CSV ----
 # Create a timestamp for the files
-timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 date_stamp <- Sys.Date()
 
 # Create Charts directory if it doesn't exist
@@ -393,8 +414,8 @@ if (!dir.exists("Charts")) {
   dir.create("Charts", recursive = TRUE)
 }
 
-# Save timing summary tables
-cat("Saving timing and convergence summary tables...\n")
+# Save individual timing summary tables
+cat("Saving timing summary tables to CSV...\n")
 
 # Save average timing data
 avg_filename <- paste0("Charts/timing_summary_avg_", date_stamp, ".csv")
@@ -407,31 +428,91 @@ write.csv(times_summary_sd, file = sd_filename, row.names = TRUE)
 cat("Saved timing standard deviation summary to:", sd_filename, "\n")
 
 # Save convergence data
-conv_filename <- paste0("Charts/convergence_summary_", date_stamp, ".csv")
+conv_filename <- paste0("Charts/timing_summary_conv_", date_stamp, ".csv")
 write.csv(times_summary_conv, file = conv_filename, row.names = TRUE)
 cat("Saved convergence summary to:", conv_filename, "\n")
 
-# Also save a combined summary with detailed timestamp
-combined_filename <- paste0("Charts/timing_convergence_combined_", timestamp, ".csv")
+# Also create a combined CSV with all three metrics
+combined_timing_filename <- paste0("Charts/timing_summary_combined_", date_stamp, ".csv")
 
 # Create a combined data frame with clear column names
-combined_data <- data.frame(
+combined_timing_data <- data.frame(
   Dataset = rownames(times_summary_avg),
   stringsAsFactors = FALSE
 )
 
-# Add timing averages with clear column names
+# Add timing data with clear column names
 for (method in colnames(times_summary_avg)) {
-  combined_data[[paste0(method, "_avg_time")]] <- times_summary_avg[, method]
-  combined_data[[paste0(method, "_sd_time")]] <- times_summary_sd[, method]
-  combined_data[[paste0(method, "_convergence")]] <- times_summary_conv[, method]
+  combined_timing_data[[paste0(method, "_avg_time")]] <- times_summary_avg[, method]
+  combined_timing_data[[paste0(method, "_sd_time")]] <- times_summary_sd[, method]
+  combined_timing_data[[paste0(method, "_convergence")]] <- times_summary_conv[, method]
 }
 
-write.csv(combined_data, file = combined_filename, row.names = FALSE)
-cat("Saved combined timing and convergence summary to:", combined_filename, "\n")
+write.csv(combined_timing_data, file = combined_timing_filename, row.names = FALSE)
+cat("Saved combined timing summary to:", combined_timing_filename, "\n")
 
-cat("\n=== Summary of exported files ===\n")
+cat("\n=== Timing Summary Files Exported ===\n")
 cat("1. Average timing:", avg_filename, "\n")
 cat("2. Timing std dev:", sd_filename, "\n") 
 cat("3. Convergence rates:", conv_filename, "\n")
-cat("4. Combined data:", combined_filename, "\n")
+cat("4. Combined data:", combined_timing_filename, "\n")
+
+# ---- Combined Timing Plot by Distribution ----
+if (length(all_timing_data) > 0) {
+  cat("Creating combined timing plot by distribution...\n")
+  
+  # Combine all timing data
+  combined_timing <- bind_rows(all_timing_data, .id = "dataset")
+  
+  # Create distribution labels mapping
+  dist_labels <- c(
+    "NO" = "Normal",
+    "PO" = "Negative Binomial", 
+    "GA" = "Gamma",
+    "LO" = "Logistic"
+  )
+  
+  # Add proper distribution labels
+  combined_timing <- combined_timing %>%
+    mutate(
+      dist_label = dist_labels[dist],
+      dist_label = factor(dist_label, levels = dist_labels)
+    )
+  
+  # Create the combined plot
+  combined_timing_plot <- ggplot(combined_timing, aes(x = method_label, y = time, fill = method_label)) +
+    geom_boxplot(position = position_dodge(width = 0.8)) +
+    facet_wrap(~ dist_label, scales = "free_y", ncol = 2) +
+    theme_bw() +
+    labs(
+      title = "Model Computation Times by Distribution",
+      y = "Time (seconds)",
+      x = "Model"
+    ) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(size = 12, face = "bold")
+    )
+  
+  print(combined_timing_plot)
+  
+  # Save the combined plot
+  combined_filename <- paste0("Charts/Combined_Timing_by_Distribution_", Sys.Date(), ".png")
+  ggsave(combined_filename, plot = combined_timing_plot, width = 12, height = 8, dpi = 900)
+  cat("Saved combined timing plot to:", combined_filename, "\n")
+  
+  # Also create a version with log scale for better visualization if times vary greatly
+  combined_timing_plot_log <- combined_timing_plot +
+    scale_y_log10() +
+    labs(
+      title = "Model Computation Times by Distribution (Log Scale)",
+      y = "Time (seconds, log scale)"
+    )
+  
+  print(combined_timing_plot_log)
+  
+  log_filename <- paste0("Charts/Combined_Timing_by_Distribution_LogScale_", Sys.Date(), ".png")
+  ggsave(log_filename, plot = combined_timing_plot_log, width = 12, height = 8, dpi = 900)
+  cat("Saved combined timing plot (log scale) to:", log_filename, "\n")
+}
