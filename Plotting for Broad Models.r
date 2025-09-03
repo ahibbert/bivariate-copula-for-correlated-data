@@ -384,9 +384,6 @@ for (i in 1:nrow(true_params_matrix)) {
   skew_matrix[i,] <- c(mean(skew_vals), mean(corr_vals))
 }
 
-
-########################### THIS IS THE JOB FOR TOMORROW ONCE THE MODELS ARE RUN ###########################
-
 load("input_params_list.RData")
 
 # Convert input_params_list to matrix format
@@ -539,7 +536,7 @@ rename_model <- function(x) {
     cop = "GJRM (C)",
     cop_n = "GJRM (N)",
     cop_j = "GJRM (J)",
-    cop_g = "GJRM (G)",
+    cop_g = "GJRM (G)", 
     cop_f = "GJRM (F)",
     cop_amh = "GJRM (AMH)",
     cop_fgm = "GJRM (FGM)",
@@ -554,6 +551,17 @@ rename_model <- function(x) {
 
 # First, we need to prepare the data by matching parameter sets between 
 # true_params_matrix, mu1_coef_matrix, and skew_matrix using row indices
+
+# Initialize exclusion tracking
+exclusion_summary_global <- data.frame(
+  distribution = character(),
+  model = character(),
+  model_label = character(),
+  total_values = integer(),
+  excluded_values = integer(),
+  exclusion_rate = numeric(),
+  stringsAsFactors = FALSE
+)
 
 # Create a function to prepare plot data for a specific distribution
 prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
@@ -583,11 +591,11 @@ prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
 
   # Make link function adjustments. Apply log for PO and GA and logit for LO
   if(dist_name %in% c("GA")) {
-    true_mu1 <- log(as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$a[dist_rows]))
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$a[dist_rows]))
   } else if (dist_name == "PO") {
-    true_mu1 <- log(as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$b[dist_rows])*as.numeric(true_params_matrix$c[dist_rows]))
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$b[dist_rows])*as.numeric(true_params_matrix$c[dist_rows]))
   } else if(dist_name == "LO") {
-    true_mu1 <- log(as.numeric(true_params_matrix$mu1[dist_rows]) / (1 - as.numeric(true_params_matrix$mu1[dist_rows])))
+    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
   } else {
     true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
   }
@@ -598,10 +606,78 @@ prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
   corr_vals <- skew_matrix[dist_rows, 2]
   
   # Get estimated mu1 values for this distribution and selected models
-  est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
+  if(dist_name %in% c("GA")) {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if (dist_name == "PO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if(dist_name == "LO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])/(1+exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]))
+  } else {
+    est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
+  }
+
+  #est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
   
-  # Calculate relative bias (estimated / true - 1)
-  bias_matrix <- est_mu1_matrix - true_mu1
+  # Apply exclusion logic only for LO distribution
+  est_mu1_matrix_filtered <- est_mu1_matrix
+  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu1_matrix), ncol = ncol(est_mu1_matrix))
+  
+  if(dist_name == "LO") {
+    # Create exclusion mask for values more than 10x different from true values
+    # Calculate exclusion statistics but do not actually apply the exclusion
+    for(i in 1:length(true_mu1)) {
+      if(!is.na(true_mu1[i])) {
+        for(j in 1:ncol(est_mu1_matrix)) {
+          if(!is.na(est_mu1_matrix[i, j])) {
+            ratio <- abs(est_mu1_matrix[i, j] / true_mu1[i])
+            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
+              exclusion_mask[i, j] <- TRUE
+            }
+          }
+        }
+      }
+    }
+    
+    # Do NOT apply exclusion mask - keep all data for plotting
+    # est_mu1_matrix_filtered[exclusion_mask] <- NA
+    
+    # Store exclusion info for summary (global variable) - only for LO
+    if(!exists("exclusion_summary_global")) {
+      exclusion_summary_global <<- data.frame(
+        distribution = character(),
+        model = character(),
+        model_label = character(),
+        total_values = integer(),
+        excluded_values = integer(),
+        exclusion_rate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Calculate exclusion statistics for each model (only for LO)
+    for(j in 1:length(models_to_plot)) {
+      model <- models_to_plot[j]
+      model_label <- rename_model(model)
+      
+      total_non_na <- sum(!is.na(est_mu1_matrix[, j]))
+      excluded_count <- sum(exclusion_mask[, j], na.rm = TRUE)
+      
+      exclusion_info <- data.frame(
+        distribution = dist_name,
+        model = model,
+        model_label = model_label,
+        total_values = total_non_na,
+        excluded_values = excluded_count,
+        exclusion_rate = if(total_non_na > 0) excluded_count / total_non_na else 0,
+        stringsAsFactors = FALSE
+      )
+      
+      exclusion_summary_global <<- rbind(exclusion_summary_global, exclusion_info)
+    }
+  }
+  
+  # Calculate relative bias using filtered data (estimated - true)
+  bias_matrix <- est_mu1_matrix_filtered / rep(true_mu1, each = 1) -1
   
   # Convert to long format for ggplot
   plot_data <- data.frame(
@@ -635,7 +711,7 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
   p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
-    coord_cartesian(ylim = c(-2, 2)) +
+    coord_cartesian(ylim=c(-1,1)) +
     labs(
       title = paste("Distribution:", dist_name),
       x = "Kendall's τ",
@@ -763,5 +839,35 @@ for(model in models_to_plot) {
   } else {
     cat(model, ": not found in data\n")
   }
+}
+
+# Print exclusion summary (only for LO distribution)
+if(exists("exclusion_summary_global") && nrow(exclusion_summary_global) > 0) {
+  cat("\n=== EXCLUSION SUMMARY (LO Distribution Only) ===\n")
+  cat("Values that would be excluded for being >10x or <0.1x the true value:\n")
+  cat("(Note: Exclusions calculated but NOT applied - all data used in plots)\n\n")
+  
+  # Print by distribution and model
+  for(dist in unique(exclusion_summary_global$distribution)) {
+    cat("Distribution:", dist, "\n")
+    dist_data <- exclusion_summary_global[exclusion_summary_global$distribution == dist, ]
+    
+    for(i in 1:nrow(dist_data)) {
+      row <- dist_data[i, ]
+      cat(sprintf("  %s (%s): %d/%d excluded (%.1f%%)\n", 
+                  row$model_label, row$model, row$excluded_values, 
+                  row$total_values, row$exclusion_rate * 100))
+    }
+    cat("\n")
+  }
+  
+  # Overall summary
+  total_excluded <- sum(exclusion_summary_global$excluded_values)
+  total_values <- sum(exclusion_summary_global$total_values)
+  cat(sprintf("OVERALL: %d/%d values excluded (%.1f%%)\n", 
+              total_excluded, total_values, 
+              if(total_values > 0) total_excluded / total_values * 100 else 0))
+} else {
+  cat("\nNo exclusion data available (exclusions only applied to LO distribution).\n")
 }
 
