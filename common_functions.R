@@ -1762,7 +1762,10 @@ simCovariateMLEs_parallel = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, t
   
   # Export necessary functions and variables to cluster
   clusterExport(cl, c("calcTrueCovariateValues", "generateBivDist_withCov", "generateBivDist",
-                      "logit", "logit_inv", "n", "a", "b", "c", "mu1", "mu2", "dist", "x1", "x2"))
+                      "logit", "logit_inv"), envir = environment())
+  
+  # Export parameter values to cluster
+  clusterExport(cl, c("n", "a", "b", "c", "mu1", "mu2", "dist", "x1", "x2"), envir = environment())
   
   # Load required packages on each worker
   clusterEvalQ(cl, {
@@ -1816,4 +1819,33 @@ simCovariateMLEs_auto = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace
     if (trace) cat("Using serial processing...\n")
     return(simCovariateMLEs(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace))
   }
+}
+
+get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
+  # Create a unique cache key from all parameters
+  cache_key <- paste(n, a, b, c, mu1, mu2, dist, x1, x2, sep="_")
+  cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
+
+  # Create cache directory if it doesn't exist
+  if (!dir.exists("Cache")) {
+    dir.create("Cache", recursive = TRUE)
+  }
+
+  # Check if cached result exists
+  if (file.exists(cache_file)) {
+    cat("Loading cached true SEs for parameters:", cache_key, "\n")
+    return(readRDS(cache_file))
+  }
+
+  # If not cached, compute and save
+  cat("Computing true SEs for parameters:", cache_key, "(this may take a while...)\n")
+  sim_out <- simCovariateMLEs_parallel(sims = 1000, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2, trace = FALSE)
+  ses <- sim_out$ses[1:4]
+  names(ses) <- c("t1", "t2", "x1", "x2")
+
+  # Save to cache
+  saveRDS(ses, cache_file)
+  cat("Cached true SEs to:", cache_file, "\n")
+
+  return(ses)
 }
