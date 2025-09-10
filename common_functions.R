@@ -1572,6 +1572,7 @@ plotDist <- function (dataset,dist) {
   margin_fit=list()
 
   for (i in 1:num_margins) {
+
     margin_data[[i]]<-(dataset[dataset[,"time"]==i-1,"random_variable"])
     margin_fit[[i]]<-gamlss(margin_data[[i]]~1,family=dist)
     margin_unif[[i]]<-pnorm(margin_fit[[i]]$residuals)
@@ -1638,7 +1639,7 @@ generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
   return(data_output)
 }
 
-calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
+calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
 
   #n=1000;a=1;b=1;c=.5;mu1=1;mu2=2;dist="NO";x1=1;x2=1;s1=s2=1
   #n=1000;a=1;b=1;c=.5;mu1=.3;mu2=.7;dist="LO";x1=1;x2=1;s1=s2=1
@@ -1674,25 +1675,39 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   } else if (dist=="LO"){dLO}
 
   mu_1_eta=linkFunction(mu1,dist=dist)
-  mu_2_eta=linkFunction(mu1,dist=dist)
+  mu_2_eta=linkFunction(mu2,dist=dist)
 
-  getLogLik=function(par_input,dataset,pdf,linkFunction,linkInvFunction,dist) {
+  getLogLik=function(par_input,dataset,pdf,linkFunction,linkInvFunction,input_dist,bt_mode=TRUE) {
 
-    mu1=linkInvFunction(par_input[1],dist=dist);
-    mu2=linkInvFunction(par_input[2],dist=dist);
+    mu1=par_input[1];
+    mu2=par_input[2];
     x1=par_input[3];
     x2=par_input[4];
     s1=exp(par_input[5]);
     s2=exp(par_input[6]);
+    dist=dist
 
-    mean_estimates=cbind(dataset$time,linkInvFunction(dataset$sex*x1+dataset$age*x2-(dataset$time-1)*linkFunction(mu1,dist)+(dataset$time)*linkFunction(mu2,dist),dist))
+    if(bt_mode==TRUE) {
+      #For mu1/mu2 model
+      mean_estimates_eta=(dataset$sex*x1+dataset$age*x2+mu1+(dataset$time)*mu2)
+    } else {
+      mean_estimates_eta=(dataset$sex*x1+dataset$age*x2-1*(dataset$time-1)*mu1+(dataset$time)*mu2)
+    }
+
+    #print(head(mean_estimates_eta[order(mean_estimates_eta)],n=5))
+
+    mean_estimates=cbind(dataset$time,linkInvFunction(mean_estimates_eta,dist=dist))
+    colnames(mean_estimates)=c("time","mu")
+
+    #print(head(mean_estimates[!mean_estimates[,2]>0,],n=5))
+    #Note the minus is just to flip the sign so that mu1 is the effect of time 0 and mu2 the effect of time 1
 
     if(dist=="LO") {
-      time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2])
-      time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2])
+      time1=pdf(dataset$random_variable[dataset$time==0],mu=mean_estimates[mean_estimates[,1]==0,2])
+      time2=pdf(dataset$random_variable[dataset$time==1],mu=mean_estimates[mean_estimates[,1]==1,2])
     } else {
-      time1=pdf(dataset$random_variable[dataset$time==0],mean_estimates[mean_estimates[,1]==0,2],sigma=(s1))
-      time2=pdf(dataset$random_variable[dataset$time==1],mean_estimates[mean_estimates[,1]==1,2],sigma=(s2))
+      time1=pdf(dataset$random_variable[dataset$time==0],mu=mean_estimates[mean_estimates[,1]==0,2],sigma=(s1))
+      time2=pdf(dataset$random_variable[dataset$time==1],mu=mean_estimates[mean_estimates[,1]==1,2],sigma=(s2))
     }
 
     return(-sum(log(time1))-sum(log(time2)))
@@ -1703,9 +1718,18 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   #Write an optimisation that chooses optim_par such that getLogLik is maximised
   sd_start_1=log(sd(dataset$random_variable[dataset$time==0]))
   sd_start_2=log(sd(dataset$random_variable[dataset$time==1]))
-  optim_par=optim(par=c(mu_1_eta,mu_2_eta,x1,x2,sd_start_1,sd_start_2)
-                  , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, dist=dist
-                  , control=list(maxit=10000, reltol=1e-8, trace=0))
+
+  if(bt_mode==TRUE) {
+    mu_1_eta_start= mu_1_eta
+    mu_2_eta_start= mu_2_eta-mu_1_eta
+  } else {
+    mu_1_eta_start= mu_1_eta
+    mu_2_eta_start= mu_2_eta
+  }
+
+  optim_par=optim(par=c(mu_1_eta_start,mu_2_eta_start,x1,x2,sd_start_1,sd_start_2)
+                  , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, input_dist=dist
+                  , control=list(maxit=100000, reltol=1e-8, trace=0))
 
   return(optim_par)
 
@@ -1796,9 +1820,10 @@ simCovariateMLEs_parallel = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, t
   # Calculate return values
   return_list <- list(
     coefficients = colMeans(optim_cov_outputs),
-    ses = sqrt(diag(cov(optim_cov_outputs) * n) / sqrt(n))
+    ses = diag(cov(optim_cov_outputs))
   )
-  
+  names(return_list) <- c("coefficients", "ses")
+
   return(return_list)
 }
 
