@@ -946,7 +946,7 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   return(dataset)
 }
 
-fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE) {
+fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE,bt_mode=FALSE) {
 
   #dist="NO"; include="ALL"; calc_actuals=FALSE
 
@@ -1034,96 +1034,191 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
 
     ###Non-GJRM models first as GJRM breaks base gamlss
 
-    if(dist=="GA") {
-      timer[1,1]=Sys.time()
-      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
-      timer[1,2]=Sys.time()
-      timer[2,1]=Sys.time()
-      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
-      timer[2,2]=Sys.time()
-      timer[3,1]=Sys.time()   
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA,method=RS(1000))))
-      timer[3,2]=Sys.time()
-      timer[4,1]=Sys.time()
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
-                                                       , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
-      timer[4,2]=Sys.time()
-      timer[5,1]=Sys.time()
-      invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
-      timer[5,2]=Sys.time()
-      timer[6,1]=Sys.time()
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
-      timer[6,2]=Sys.time()
+    if(bt_mode==TRUE) {
 
-    } else if(dist=="NO") {
-      timer[1,1]=Sys.time()
-      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
-      timer[1,2]=Sys.time()
-      timer[2,1]=Sys.time()
-      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
-      timer[2,2]=Sys.time()
-      timer[3,1]=Sys.time()
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NO)))
-      timer[3,2]=Sys.time()
-      timer[4,1]=Sys.time()
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
-                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      timer[4,2]=Sys.time()
-      timer[5,1]=Sys.time()
-      invisible(capture.output(model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)))
-      timer[5,2]=Sys.time()
-      timer[6,1]=Sys.time()
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
-      timer[6,2]=Sys.time()
+      if(dist=="GA") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()   
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA,method=RS(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+        timer[6,2]=Sys.time()
 
-    } else if(dist=="PO") {
-      timer[1,1]=Sys.time()
-      invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
-      #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
-      timer[1,2]=Sys.time()
-      timer[2,1]=Sys.time()
-      model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
-                        family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
-      timer[2,2]=Sys.time()
-      timer[3,1]=Sys.time()
-      #invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(1000))))
-      timer[3,2]=Sys.time()
-      timer[4,1]=Sys.time()
-      #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
-                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      timer[4,2]=Sys.time()
-      timer[5,1]=Sys.time()
-      model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset,control=glmerControl(optCtrl = list(maxfun=200000)))
-      timer[5,2]=Sys.time()
-      timer[6,1]=Sys.time()
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"),control=list(niterEM=1000))
-      timer[6,2]=Sys.time()
-    } else if (dist=="LO") {
-      timer[1,1]=Sys.time()
-      invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
-      timer[1,2]=Sys.time()
-      timer[2,1]=Sys.time()
-      invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
-      #model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)
-      timer[2,2]=Sys.time()
-      timer[3,1]=Sys.time()
-      invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)))
-      #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
-      timer[3,2]=Sys.time()
-      timer[4,1]=Sys.time()
-      invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
-                                                       , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
-      timer[4,2]=Sys.time()
-      timer[5,1]=Sys.time()
-      invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
-      timer[5,2]=Sys.time()
-      timer[6,1]=Sys.time()
-      model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
-      timer[6,2]=Sys.time()
+      } else if(dist=="NO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~ as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~ as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NO)))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- lmer(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
+        timer[6,2]=Sys.time()
+
+      } else if(dist=="PO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm.nb(random_variable~ as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
+        #invisible(capture.output(model_gee<-gee(random_variable~ as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        model_gee<-glmgee(random_variable~ as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
+                          family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        #invisible(capture.output(model_gee<-overglm(random_variable~ as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        #invisible(capture.output(model_re <- gamlss(formula=random_variable~ as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        model_lme4 <- glmer.nb(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset,control=glmerControl(optCtrl = list(maxfun=200000)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"),control=list(niterEM=1000))
+        timer[6,2]=Sys.time()
+      } else if (dist=="LO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~ as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~ as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+        #model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)))
+        #invisible(capture.output(model_re <- gamlss(formula=random_variable~ as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- glmer(formula=random_variable~ as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
+        timer[6,2]=Sys.time()
+      }
+
+    } else if (bt_mode==FALSE) {
+      
+      if(dist=="GA") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=Gamma(link = "log"), maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=Gamma(link = "log"), maxiter=25, corstr = "exchangeable")))
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()   
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=GA,method=RS(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=GA()
+                                                        , g.control = gamlss.control(trace = FALSE,method=CG(1000)), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset, family=Gamma(link="log"))))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=Gamma(link="log"))
+        timer[6,2]=Sys.time()
+
+      } else if(dist=="NO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=gaussian, maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=gaussian, maxiter=25, corstr = "exchangeable")))
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NO)))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= NO()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- lmer(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=gaussian)
+        timer[6,2]=Sys.time()
+
+      } else if(dist=="PO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm.nb(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, maxit=1000)))
+        #invisible(capture.output(model_gee<-gee(random_variable~-1+as.factor(time==1), id=patient, data=dataset, family=negative.binomial, maxiter=25, corstr = "exchangeable")))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, init.beta=model_glm$coefficients,
+                          family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable")
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        #invisible(capture.output(model_gee<-overglm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family="nb1(log)", maxiter=25, corstr = "exchangeable")))
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=PO(), method=CG(1000))))
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family=NBI()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        model_lme4 <- glmer.nb(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age + (1|patient), data=dataset,control=glmerControl(optCtrl = list(maxfun=200000)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=nb(link="log"),control=list(niterEM=1000))
+        timer[6,2]=Sys.time()
+      } else if (dist=="LO") {
+        timer[1,1]=Sys.time()
+        invisible(capture.output(model_glm <- glm(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, data=dataset, family=binomial, maxit=1000)))
+        timer[1,2]=Sys.time()
+        timer[2,1]=Sys.time()
+        invisible(capture.output(model_gee<-glmgee(random_variable~-1+as.factor(time==1)+as.factor(sex)+age, id=patient, data=dataset, family=binomial, maxiter=25, corstr = "exchangeable")))
+        #model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)
+        timer[2,2]=Sys.time()
+        timer[3,1]=Sys.time()
+        invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=BI)))
+        #invisible(capture.output(model_re <- gamlss(formula=random_variable~-1+as.factor(time==1)+random(as.factor(patient)), sigma.formula=~as.factor(time==1), data=dataset, family=NO(), method=CG(1000))))
+        timer[3,2]=Sys.time()
+        timer[4,1]=Sys.time()
+        invisible(capture.output(model_re_np <- gamlssNP(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, sigma.formula=~-1+as.factor(time==1), random=as.factor(dataset$patient), data=dataset, family= BI()
+                                                        , g.control = gamlss.control(trace = FALSE), mixture="gq",K=2)))
+        timer[4,2]=Sys.time()
+        timer[5,1]=Sys.time()
+        invisible(capture.output(model_lme4 <- glmer(formula=random_variable~-1+as.factor(time==1) +as.factor(sex)+age+ (1|patient), data=dataset,family=binomial)))
+        timer[5,2]=Sys.time()
+        timer[6,1]=Sys.time()
+        model_gamm = gamm(formula=random_variable~-1+as.factor(time==1)+as.factor(sex)+age, random=list(patient=~1), data=dataset, family=binomial)
+        timer[6,2]=Sys.time()
+      }
+
     }
-
     results_table=list()
 
     results_table[[1]]=summary(model_glm)$coeff[,1:2]
@@ -1269,12 +1364,23 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
       temp_cop_results=c(copula_models_results[[i]][[1]][,1],copula_models_results[[i]][[2]][,1])
       num_cov=length(temp_cop_results)
       std_copula_models_results[i,c(1)]=temp_cop_results[c(1)] #Intercept
-      std_copula_models_results[i,c(2)]=temp_cop_results[c(4)]#-temp_cop_results[c(1)] #Time
+      if(bt_mode==TRUE) {
+        std_copula_models_results[i,c(2)]=temp_cop_results[c(4)]-temp_cop_results[c(1)] #Time
+      } else if (bt_mode==FALSE) {
+        std_copula_models_results[i,c(2)]=temp_cop_results[c(4)] #Time
+      }
+      #std_copula_models_results[i,c(2)]=temp_cop_results[c(4)]#-temp_cop_results[c(1)] #Time
       std_copula_models_results[i,c(3)]=(temp_cop_results[c(2)]+temp_cop_results[c(5)])/2 #Sex / binary
       std_copula_models_results[i,c(4)]=(temp_cop_results[c(3)]+temp_cop_results[c(6)])/2 #Age / linear
 
       std_copula_se_results[i,c(1)]=sqrt(copula_models_results[[i]][[5]][1,1])
-      std_copula_se_results[i,c(2)]=sqrt(copula_models_results[[i]][[5]][4,4]) #+ copula_models_results[[i]][[5]][1,1] + 2*copula_models_results[[i]][[5]][4,1])
+
+      if(bt_mode==TRUE) {
+        std_copula_se_results[i,c(2)]=sqrt(copula_models_results[[i]][[5]][4,4] + copula_models_results[[i]][[5]][1,1] + 2*copula_models_results[[i]][[5]][4,1])
+      } else if (bt_mode==FALSE) {
+        std_copula_se_results[i,c(2)]=sqrt(copula_models_results[[i]][[5]][4,4]) #+ copula_models_results[[i]][[5]][1,1] + 2*copula_models_results[[i]][[5]][4,1])
+      }
+
       std_copula_se_results[i,c(3)]=sqrt((copula_models_results[[i]][[5]][2,2] + copula_models_results[[i]][[5]][5,5] + 2*copula_models_results[[i]][[5]][2,5]))/2
       std_copula_se_results[i,c(4)]=sqrt((copula_models_results[[i]][[5]][3,3] + copula_models_results[[i]][[5]][6,6] + 2*copula_models_results[[i]][[5]][3,6]))/2
       std_copula_models_logliks[i,1]=copula_models_results[[i]][[3]]
@@ -1326,6 +1432,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     , dist=dist
     , timer=timer
     , conv_check=conv_check
+    , bt_mode=bt_mode
   )
 
   return(output_list)
@@ -1333,14 +1440,18 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
 
 }
 
-sim_model <- function(model,dist,n,coefficients,sigmas,correlations) {
+sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALSE) {
 
   sex <- c(rep(0,n/2),rep(1,n/2))
   age <- rep(1:100,n/100)
 
   #Calculate linear predictor
   lp_1=coefficients[model,1]+coefficients[model,3]*sex + coefficients[model,4]*age
-  lp_2=coefficients[model,2]+coefficients[model,3]*sex + coefficients[model,4]*age
+  if(bt_mode==FALSE || startsWith(model, "cop")) {
+    lp_2=coefficients[model,2]+coefficients[model,3]*sex + coefficients[model,4]*age
+  } else if (bt_mode==TRUE) {
+    lp_2=coefficients[model,1]+coefficients[model,2]+coefficients[model,3]*sex + coefficients[model,4]*age
+  }
 
   if (model == "glm") {
     #model="glm"
@@ -1464,6 +1575,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   ses=fits$ses
   y=fits$y
   n=length(y)/2
+  bt_mode=fits$bt_mode
 
   coefficients=fits$coefficients
   correlations=fits$correlations
@@ -1478,7 +1590,7 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   for(model in model_list) {
     sim_model_out[[model]]=matrix(NA,ncol=vg_sims,nrow=length(y))
     for(i in 1:vg_sims) {
-      sim_model_out[[model]][,i]=sim_model(model,dist,n,coefficients,sigmas,correlations)
+      sim_model_out[[model]][,i]=sim_model(model,dist,n,coefficients,sigmas,correlations,bt_mode)
     }
     if(all(is.na(sim_model_out[[model]]))) {
       model_list_complete=model_list_complete[model_list_complete!=model]
@@ -1696,7 +1808,8 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
 
     #print(head(mean_estimates_eta[order(mean_estimates_eta)],n=5))
 
-    mean_estimates=cbind(dataset$time,linkInvFunction(mean_estimates_eta,dist=dist))
+    link_inv_means=linkInvFunction(mean_estimates_eta,dist=dist)
+    mean_estimates=cbind(dataset$time,link_inv_means)
     colnames(mean_estimates)=c("time","mu")
 
     #print(head(mean_estimates[!mean_estimates[,2]>0,],n=5))
