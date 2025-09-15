@@ -21,38 +21,52 @@ plan(multisession,
 options(future.globals.maxSize = 1024 * 1024^2)  # 1GB max for globals
 options(future.rng.onMisuse = "ignore")
 
+#For the broad mean simulations
+load("input_params_list.RData")
+outer_sims <- 1  # Number of simulations per input set
+mode="broad_mean"
+bt_mode=TRUE
+
+
+# Testing for a single run
+#params <- input_params_list[[1]]
+#test_result <- run_single_simulation(params, 1, 1, bt_mode=TRUE)
+#str(test_result)
+
 # Define the list of input parameter sets as a list of lists
-input_params_list <- list(
-  list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  list(dist="NO", a=1, b=1, c=0.5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  list(dist="LO",a=NA,b=NA,c=.25,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
-  list(dist="LO",a=NA,b=NA,c=.5,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
-  list(dist="GA", a=.5, b=2, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  list(dist="GA", a=.75, b=1.5, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
-  list(dist="PO", a=NA, b=.2, c=5, mu1=1, mu2=1, x1=1, x2=0.01, n=1000), #
-  #list(dist="PO", a=NA, b=5, c=5, mu1=5, mu2=5, x1=1, x2=0.01, n=1000),
-  #list(dist="PO", a=NA, b=2, c=2, mu1=2, mu2=2, x1=1, x2=0.01, n=1000),
-  #list(dist="PO", a=NA, b=1, c=2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
-  #list(dist="PO", a=NA, b=.2, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
-  list(dist="PO", a=NA, b=1, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000)
-  #list(dist="PO", a=NA, b=5, c=.2, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+#input_params_list <- list(
+#  list(dist="NO", a=1, b=1, c=0.25, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+#  list(dist="NO", a=1, b=1, c=0.5, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+#  list(dist="LO",a=NA,b=NA,c=.25,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
+#  list(dist="LO",a=NA,b=NA,c=.5,mu1=.25,mu2=.5,x1=1,x2=0.01,n=1000),
+#  list(dist="GA", a=.5, b=2, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+#  list(dist="GA", a=.75, b=1.5, c=NA, mu1=1, mu2=2, x1=1, x2=0.01, n=1000),
+#  list(dist="PO", a=NA, b=.2, c=5, mu1=1, mu2=1, x1=1, x2=0.01, n=1000),
+#  list(dist="PO", a=NA, b=1, c=1, mu1=1, mu2=1, x1=1, x2=0.01, n=1000)
+#)
+#outer_sims <- 100  # Number of simulations per input set
+#mode="specific_coef"
+#bt_mode=TRUE
 
-  # All parameters different
-  #list(dist="PO", a=NA, b=.2, c=1, mu1=2, mu2=5, x1=1, x2=0.01, n=1000),
-  #list(dist="PO", a=NA, b=5, c=2, mu1=1, mu2=.2, x1=1, x2=0.01, n=1000),
+# Determine parallelization strategy based on outer_sims
+if (outer_sims == 1) {
+  cat("Using parameter-set-level parallelization (parallelizing multiple parameter sets)\n")
+  parallel_strategy <- "parameter_sets"
+  # Use fewer cores per parameter set, more parameter sets in parallel
+  param_cores <- max(1, min(detectCores() - 1, 10))  # Cores for individual parameter sets
+  param_sets_parallel <- max(1, min(n_cores, length(input_params_list)))
+} else {
+  cat("Using simulation-level parallelization (parallelizing multiple simulations within each parameter set)\n")
+  parallel_strategy <- "simulations"
+  param_cores <- n_cores
+  param_sets_parallel <- 1
+}
 
-  # Reverse pairing
-  #list(dist="PO", a=NA, b=1, c=.2, mu1=2, mu2=5, x1=1, x2=0.01, n=1000),
-
-  # Edge cases and more extreme values
-  #list(dist="PO", a=NA, b=.2, c=5, mu1=5, mu2=.2, x1=1, x2=0.01, n=1000),
-  #list(dist="PO", a=NA, b=5, c=.2, mu1=.2, mu2=5, x1=1, x2=0.01, n=1000)
-)
-
-outer_sims <- 100  # Number of simulations per input set
+# Uncomment the next line to test with a smaller subset first
+# input_params_list <- input_params_list[1:4]  # Test with first 4 parameter sets only
 
 # Enhanced function to run a single simulation with better error handling
-run_single_simulation <- function(params, sim_index, param_set_idx) {
+run_single_simulation <- function(params, sim_index, param_set_idx,bt_mode) {
   max_retries <- 5  # Reduced retries to avoid excessive resource usage
   attempt <- 1
   success <- FALSE
@@ -65,22 +79,27 @@ run_single_simulation <- function(params, sim_index, param_set_idx) {
       # This ensures reproducibility: same params + sim_index = same seed
       param_hash <- sum(c(
         match(params$dist, c("NO", "PO", "GA", "LO")) * 1000,
-        ifelse(is.na(params$a), 0, params$a * 100),
-        ifelse(is.na(params$b), 0, params$b * 10),
-        ifelse(is.na(params$c), 0, params$c * 1),
-        params$mu1 * 10000,
-        params$mu2 * 1000,
-        params$x1 * 100000,
-        params$x2 * 1000000,
-        params$n
-      ))
+        ifelse(is.na(params$a), 0, as.numeric(params$a) * 100),
+        ifelse(is.na(params$b), 0, as.numeric(params$b) * 10),
+        ifelse(is.na(params$c), 0, as.numeric(params$c) * 1),
+        as.numeric(params$mu1) * 10000,
+        as.numeric(params$mu2) * 1000,
+        as.numeric(params$x1) * 100000,
+        as.numeric(params$x2) * 1000000,
+        as.numeric(params$n)
+      ), na.rm = TRUE)
       
       # Deterministic seed: parameter hash + param set + simulation index + attempt
-      deterministic_seed <- (param_hash %% 100000) + param_set_idx * 10000 + sim_index * 100 + attempt
+      # This ensures reproducibility: same inputs = same seed = same results
+      # Use modulo and as.integer to ensure valid seed range
+      deterministic_seed <- as.integer((param_hash %% 100000) + param_set_idx * 10000 + sim_index * 100 + attempt)
+      
+      # Ensure seed is within valid range (R requires seeds between 1 and 2^31-1)
+      deterministic_seed <- max(1, min(deterministic_seed, 2147483647))
       
       # Use callr with built-in timeout
       callr::r(
-        func = function(dist, a, b, c, mu1, mu2, x1, x2, n, sim_seed) {
+        func = function(dist, a, b, c, mu1, mu2, x1, x2, n, sim_seed, bt_mode) {
           # Set deterministic seed for reproducibility
           set.seed(sim_seed)
           
@@ -95,13 +114,48 @@ run_single_simulation <- function(params, sim_index, param_set_idx) {
           
           # Set dataset as global as old S3 functions in gamlss and sometimes GJRM break without it
           assign("dataset", dataset, envir = .GlobalEnv)
+          
+          # Debug: Check bt_mode value in subprocess
+          cat("DEBUG - bt_mode in subprocess:", bt_mode, "\n")
+          
           fits = fitBivModels_Bt_withCov(dataset=dataset, dist=dist, include="ALL",
                                          a=a, b=b, c=c, mu1=mu1, mu2=mu2,
-                                         calc_actuals=FALSE, cv=FALSE)
+                                         calc_actuals=FALSE, cv=FALSE,bt_mode=bt_mode)
+          
+          # Debug: Check fits structure
+          if(is.null(fits)) {
+            cat("DEBUG - fits is NULL\n")
+          } else {
+            cat("DEBUG - fits has", length(fits), "components\n")
+            if("coefficients" %in% names(fits)) {
+              cat("DEBUG - coefficients dimensions:", dim(fits$coefficients), "\n")
+            }
+          }
+          
           eval = evaluateModels(fits, vg_sims=100)
+          
+          # Debug: Check eval structure
+          if(is.null(eval)) {
+            cat("DEBUG - eval is NULL\n")
+          } else {
+            cat("DEBUG - eval has", length(eval), "components:", names(eval), "\n")
+          }
+          
           return(eval)
         },
-        args = c(params, list(sim_seed = deterministic_seed)),
+        args = list(
+          dist = params$dist,
+          a = params$a, 
+          b = params$b,
+          c = params$c,
+          mu1 = params$mu1,
+          mu2 = params$mu2,
+          x1 = params$x1,
+          x2 = params$x2,
+          n = params$n,
+          sim_seed = deterministic_seed,
+          bt_mode = bt_mode
+        ),
         # Add process-level resource limits and timeout
         cmdargs = c("--max-ppsize=500000000"),  # 500MB per subprocess
         timeout = 300  # 5 minute timeout per simulation
@@ -143,6 +197,12 @@ run_single_simulation <- function(params, sim_index, param_set_idx) {
     
     if (!is.null(eval)) {
       success <- TRUE
+      # Debug: Check what we got back
+      cat("DEBUG - Simulation succeeded, eval has", length(eval), "components\n")
+      if("coefficients" %in% names(eval)) {
+        cat("DEBUG - coefficients in eval has dimensions:", dim(eval$coefficients), "\n")
+        cat("DEBUG - First few coefficient values:", head(eval$coefficients[1,]), "\n")
+      }
     } else {
       attempt <- attempt + 1
       if (attempt <= max_retries) {
@@ -162,14 +222,44 @@ run_single_simulation <- function(params, sim_index, param_set_idx) {
 }
 
 # Enhanced function to process a single parameter set with chunking
-process_parameter_set <- function(param_set_idx, params, outer_sims) {
+process_parameter_set <- function(param_set_idx, params, outer_sims, parallel_strategy = "simulations", param_cores = NULL, mode = "broad_mean",bt_mode) {
+  # Adjust core usage based on parallel strategy
+  cores_to_use <- if (!is.null(param_cores) && parallel_strategy == "parameter_sets") {
+    param_cores
+  } else {
+    n_cores
+  }
+  
+  cat(sprintf("Parameter set %d using %d cores (strategy: %s)\n", param_set_idx, cores_to_use, parallel_strategy))
+  
   # Check if output file already exists (cache check)
-  base_filename_pattern <- paste0(
-    "Data/CoefSimData_", paste(
-      params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims,
-      sep="_"
-    ), "_*.RData"
-  )
+  if(mode=="broad_mean") {
+    if(bt_mode==TRUE) {
+    base_filename_pattern <- paste0(
+      "Data/broad_sims_bt/CoefSimData_", paste(
+        params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims,
+        sep="_"
+      ), "_*.RData"
+    )
+  } else if(bt_mode==FALSE) {
+    base_filename_pattern <- paste0(
+      "Data/broad_sims/CoefSimData_", paste(
+        params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims,
+        sep="_"
+      ), "_*.RData"
+    )
+    } else {
+      stop("bt_mode must be TRUE or FALSE")
+    }
+  } else {
+    base_filename_pattern <- paste0(
+      "Data/CoefSimData_", paste(
+        params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims,
+        sep="_"
+      ), "_*.RData"
+    )
+  }
+  
   
   existing_files <- Sys.glob(base_filename_pattern)
   
@@ -179,12 +269,34 @@ process_parameter_set <- function(param_set_idx, params, outer_sims) {
   }
   
   # Define the save filename for new file
-  save_filename <- paste0(
-    "Data/CoefSimData_", paste(
-      params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
-      sep="_"
-    ), ".RData"
-  )
+  if(mode == "broad_mean") {
+    if(bt_mode==TRUE) {
+      save_filename <- paste0(
+        "Data/broad_sims_bt/CoefSimData_", paste(
+          params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
+          sep="_"
+        ), ".RData"
+      )
+    } else if(bt_mode==FALSE) {
+      save_filename <- paste0(
+        "Data/broad_sims/CoefSimData_", paste(
+          params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
+          sep="_"
+        ), ".RData"
+      )
+    } else {
+      stop("bt_mode must be TRUE or FALSE")
+    }
+  } else if(mode == "specific_coef") {
+    save_filename <- paste0(
+      "Data/CoefSimData_", paste(
+        params$dist, params$a, params$b, params$c, params$mu1, params$mu2, params$x1, params$x2, params$n, outer_sims, Sys.Date(),
+        sep="_"
+      ), ".RData"
+    )
+  } else {
+    stop("Unknown mode specified")
+  }
   
   cat(sprintf("Input set %d: Processing parameters: %s\n", param_set_idx, paste(unlist(params), collapse=", ")))
   
@@ -215,20 +327,20 @@ process_parameter_set <- function(param_set_idx, params, outer_sims) {
         # Based on parameter set and simulation indices for reproducibility
         param_hash <- sum(c(
           match(params$dist, c("NO", "PO", "GA", "LO")) * 1000,
-          ifelse(is.na(params$a), 0, params$a * 100),
-          ifelse(is.na(params$b), 0, params$b * 10),
-          ifelse(is.na(params$c), 0, params$c * 1),
-          params$mu1 * 10000,
-          params$mu2 * 1000,
-          params$x1 * 100000,
-          params$x2 * 1000000,
-          params$n
-        ))
+          ifelse(is.na(params$a), 0, as.numeric(params$a) * 100),
+          ifelse(is.na(params$b), 0, as.numeric(params$b) * 10),
+          ifelse(is.na(params$c), 0, as.numeric(params$c) * 1),
+          as.numeric(params$mu1) * 10000,
+          as.numeric(params$mu2) * 1000,
+          as.numeric(params$x1) * 100000,
+          as.numeric(params$x2) * 1000000,
+          as.numeric(params$n)
+        ), na.rm = TRUE)
         
         chunk_results <- future_lapply(seq_along(start_idx:end_idx), function(chunk_i) {
           actual_sim_idx <- start_idx + chunk_i - 1
-          run_single_simulation(params, actual_sim_idx, param_set_idx)
-        }, future.seed = NULL)  # Let our deterministic seeding handle this
+          run_single_simulation(params, actual_sim_idx, param_set_idx, bt_mode)
+        }, future.seed = TRUE, future.scheduling = min(cores_to_use, length(start_idx:end_idx)))  # Enable deterministic seeding
         
         # Store results
         for (i in seq_along(chunk_results)) {
@@ -309,10 +421,17 @@ process_parameter_set <- function(param_set_idx, params, outer_sims) {
     if (!is.na(eval_outer[[i]])[1]) {  # Check if simulation was successful
       z <- 1
       for (item in par_item_names) {
-        new_item <- data.frame(eval_outer[[i]][[item]])
-        for (j in seq_len(ncol(new_item))) {
-          par_estimates[[z]][i, ] <- new_item[, j]
-          z <- z + 1
+        if(item %in% names(eval_outer[[i]])) {
+          new_item <- data.frame(eval_outer[[i]][[item]])
+          cat("DEBUG - Processing", item, "for sim", i, "- dimensions:", dim(new_item), "\n")
+          for (j in seq_len(ncol(new_item))) {
+            par_estimates[[z]][i, ] <- new_item[, j]
+            z <- z + 1
+          }
+        } else {
+          cat("DEBUG - Item", item, "not found in eval_outer[[", i, "]], available:", names(eval_outer[[i]]), "\n")
+          # Skip the expected number of z positions
+          z <- z + ifelse(item == "coefficients", 4, ifelse(item == "ses", 4, ifelse(item == "sigmas", 2, 1)))
         }
       }
     }
@@ -358,29 +477,151 @@ cat(sprintf("Using %d cores for parallel processing\n", n_cores))
 completed_sets <- c()
 failed_sets <- c()
 
-for (param_set_idx in seq_along(input_params_list)) {
-  cat(sprintf("\n=== Processing Parameter Set %d/%d ===\n", param_set_idx, length(input_params_list)))
+if (parallel_strategy == "parameter_sets" && outer_sims == 1) {
+  # Parameter-set-level parallelization for outer_sims = 1
+  cat(sprintf("Running %d parameter sets in parallel (batch size: %d)\n", 
+              length(input_params_list), param_sets_parallel))
   
-  params <- input_params_list[[param_set_idx]]
+  # Process parameter sets in batches
+  num_batches <- ceiling(length(input_params_list) / param_sets_parallel)
   
-  tryCatch({
-    result <- process_parameter_set(param_set_idx, params, outer_sims)
-    completed_sets <- c(completed_sets, param_set_idx)
-    cat(sprintf("✓ Parameter set %d completed successfully\n", param_set_idx))
+  for (batch_idx in 1:num_batches) {
+    start_idx <- (batch_idx - 1) * param_sets_parallel + 1
+    end_idx <- min(batch_idx * param_sets_parallel, length(input_params_list))
+    batch_indices <- start_idx:end_idx
     
-  }, error = function(e) {
-    failed_sets <- c(failed_sets, param_set_idx)
-    cat(sprintf("✗ Parameter set %d failed: %s\n", param_set_idx, e$message))
+    cat(sprintf("\n=== Processing Batch %d/%d (Parameter sets %d-%d) ===\n", 
+                batch_idx, num_batches, start_idx, end_idx))
     
-    # Log the failure
-    error_log <- paste0("Error in parameter set ", param_set_idx, " at ", Sys.time(), ":\n", e$message, "\n\n")
-    write(error_log, file = "parameter_set_errors.log", append = TRUE)
-  })
+    # Setup separate future plan for this batch
+    old_plan <- plan(multisession, workers = length(batch_indices))
+    
+    tryCatch({
+      # Run parameter sets in parallel within this batch
+      batch_results <- future_lapply(batch_indices, function(param_set_idx) {
+        
+        # Set deterministic seed for this parameter set worker
+        # This ensures reproducible results regardless of parallel execution order
+        worker_seed <- 12345 + param_set_idx * 1000  # Fixed base + parameter set index
+        set.seed(worker_seed)
+        
+        # Create a wrapper function that handles the parameter set processing
+        tryCatch({
+          params <- input_params_list[[param_set_idx]]
+          cat(sprintf("Starting parameter set %d in parallel worker (seed: %d)\n", param_set_idx, worker_seed))
+          
+          # Call the original process_parameter_set function with explicit parameters
+          result <- process_parameter_set(
+            param_set_idx = param_set_idx, 
+            params = params, 
+            outer_sims = outer_sims, 
+            parallel_strategy = "parameter_sets", 
+            param_cores = param_cores,
+            mode = mode,
+            bt_mode = bt_mode
+          )
+          
+          list(
+            param_set_idx = param_set_idx,
+            result = result,
+            success = TRUE,
+            error = NULL
+          )
+          
+        }, error = function(e) {
+          list(
+            param_set_idx = param_set_idx,
+            result = NULL,
+            success = FALSE,
+            error = e$message
+          )
+        })
+        
+      }, future.packages = c("callr", "parallel", "future", "future.apply"),
+         future.globals = list(
+           input_params_list = input_params_list,
+           process_parameter_set = process_parameter_set,
+           run_single_simulation = run_single_simulation,
+           outer_sims = outer_sims,
+           mode = mode,
+           param_cores = param_cores,
+           n_cores = n_cores,
+           parallel_strategy = parallel_strategy,
+           bt_mode = bt_mode
+         ),
+         future.seed = TRUE)  # Enable deterministic seeding for reproducibility
+      
+      # Process batch results
+      for (batch_result in batch_results) {
+        param_set_idx <- batch_result$param_set_idx
+        
+        if (batch_result$success) {
+          completed_sets <- c(completed_sets, param_set_idx)
+          cat(sprintf("✓ Parameter set %d completed successfully\n", param_set_idx))
+        } else {
+          failed_sets <- c(failed_sets, param_set_idx)
+          cat(sprintf("✗ Parameter set %d failed: %s\n", param_set_idx, batch_result$error))
+          
+          # Log the failure
+          error_log <- paste0("Error in parameter set ", param_set_idx, " at ", Sys.time(), 
+                             ":\n", batch_result$error, "\n\n")
+          write(error_log, file = "parameter_set_errors.log", append = TRUE)
+        }
+      }
+      
+    }, error = function(e) {
+      cat(sprintf("Batch %d failed: %s\n", batch_idx, e$message))
+      # Mark all sets in this batch as failed
+      for (idx in batch_indices) {
+        if (!idx %in% completed_sets) {
+          failed_sets <- c(failed_sets, idx)
+        }
+      }
+    }, finally = {
+      # Restore the original plan
+      plan(old_plan)
+    })
+    
+    # Progress summary after each batch
+    cat(sprintf("Batch %d complete. Progress: %d completed, %d failed, %d remaining\n", 
+                batch_idx, length(completed_sets), length(failed_sets), 
+                length(input_params_list) - length(completed_sets) - length(failed_sets)))
+    
+    # Brief pause between batches for system stability
+    if (batch_idx < num_batches) {
+      Sys.sleep(2)
+      gc()  # Force garbage collection between batches
+    }
+  }
   
-  # Progress summary
-  cat(sprintf("Progress: %d completed, %d failed, %d remaining\n", 
-              length(completed_sets), length(failed_sets), 
-              length(input_params_list) - length(completed_sets) - length(failed_sets)))
+} else {
+  # Original sequential processing for outer_sims > 1
+  cat("Using sequential parameter set processing with simulation-level parallelization\n")
+  
+  for (param_set_idx in seq_along(input_params_list)) {
+    cat(sprintf("\n=== Processing Parameter Set %d/%d ===\n", param_set_idx, length(input_params_list)))
+    
+    params <- input_params_list[[param_set_idx]]
+    
+    tryCatch({
+      result <- process_parameter_set(param_set_idx, params, outer_sims, "simulations", n_cores, mode, bt_mode)
+      completed_sets <- c(completed_sets, param_set_idx)
+      cat(sprintf("✓ Parameter set %d completed successfully\n", param_set_idx))
+      
+    }, error = function(e) {
+      failed_sets <- c(failed_sets, param_set_idx)
+      cat(sprintf("✗ Parameter set %d failed: %s\n", param_set_idx, e$message))
+      
+      # Log the failure
+      error_log <- paste0("Error in parameter set ", param_set_idx, " at ", Sys.time(), ":\n", e$message, "\n\n")
+      write(error_log, file = "parameter_set_errors.log", append = TRUE)
+    })
+    
+    # Progress summary
+    cat(sprintf("Progress: %d completed, %d failed, %d remaining\n", 
+                length(completed_sets), length(failed_sets), 
+                length(input_params_list) - length(completed_sets) - length(failed_sets)))
+  }
 }
 
 # Final summary
