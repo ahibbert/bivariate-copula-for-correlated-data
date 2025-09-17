@@ -9,34 +9,210 @@ library(tidyr)
 library(gridExtra)
 library(cowplot)
 
-# Define get_legend function if cowplot is not available
-if(!exists("get_legend")) {
-  get_legend <- function(plot) {
-    # Extract legend from a ggplot object using a simple approach
+# Add debugging flag for legend issues
+DEBUG_LEGENDS <- TRUE
+
+cat("=== LEGEND DEBUGGING ENABLED ===\n")
+cat("Libraries loaded successfully\n")
+cat("cowplot available:", requireNamespace("cowplot", quietly = TRUE), "\n")
+
+# Helper function to validate legend extraction and create manual legend if needed
+validate_legend <- function(legend_grob, context = "", force_manual = FALSE) {
+  if(DEBUG_LEGENDS) {
+    cat("DEBUG:", context, "- validate_legend called, force_manual =", force_manual, "\n")
+    cat("DEBUG:", context, "- Legend class:", paste(class(legend_grob), collapse = ", "), "\n")
+  }
+  
+  # If force_manual is TRUE, create manual legend immediately
+  if(force_manual) {
+    if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Force manual legend creation\n")
+    manual_legend <- create_model_legend()
+    if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Manual legend created\n")
+    return(manual_legend)
+  }
+  
+  # Check if the legend is valid
+  is_valid <- FALSE
+  
+  if(!is.null(legend_grob)) {
+    if(inherits(legend_grob, "gtable") && nrow(legend_grob) > 0 && ncol(legend_grob) > 0) {
+      is_valid <- TRUE
+      if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Valid gtable with", nrow(legend_grob), "x", ncol(legend_grob), "dimensions\n")
+    } else if(inherits(legend_grob, "grob") && !inherits(legend_grob, "zeroGrob") && !inherits(legend_grob, "nullGrob")) {
+      is_valid <- TRUE
+      if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Valid grob legend\n")
+    } else {
+      if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Invalid or empty legend (", paste(class(legend_grob), collapse = ", "), ")\n")
+    }
+  } else {
+    if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Legend is NULL\n")
+  }
+  
+  # If legend is invalid, create manual replacement
+  if(!is_valid) {
+    if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Creating manual replacement legend\n")
+    manual_legend <- create_model_legend()
+    return(manual_legend)
+  }
+  
+  if(DEBUG_LEGENDS) cat("DEBUG:", context, "- Legend validation passed\n")
+  return(legend_grob)
+}
+
+# Define robust get_legend function with manual legend creation capability
+if(!exists("create_model_legend")) {
+  # Load required libraries
+  library(cowplot)
+  library(ggplot2)
+  library(grid)
+  library(gtable)
+  
+  # Function to create a manual legend based on model colors and names
+  create_model_legend <- function(model_names_input = NULL, model_colors_input = NULL) {
     tryCatch({
-      # Try cowplot approach first
-      if(requireNamespace("cowplot", quietly = TRUE)) {
-        return(cowplot::get_legend(plot))
-      } else {
-        # Fallback approach using grid and ggplot
-        library(grid)
-        library(ggplot2)
+      if(DEBUG_LEGENDS) cat("DEBUG: Creating manual model legend\n")
+      
+      # Use provided inputs or fall back to global variables
+      use_names <- model_names_input
+      use_colors <- model_colors_input
+      
+      # If not provided, try to use global variables
+      if(is.null(use_names) && exists("models_to_plot")) {
+        use_names <- sapply(models_to_plot, function(x) if(exists("rename_model")) rename_model(x) else x)
+      }
+      if(is.null(use_colors) && exists("model_colors")) {
+        use_colors <- model_colors
+      }
+      
+      # Final fallback to common model names
+      if(is.null(use_names)) {
+        use_names <- c("GLM", "GEE", "GAMLSS", "LME4", "GAMM", "GJRM")
+      }
+      if(is.null(use_colors)) {
+        use_colors <- rainbow(length(use_names))
+        names(use_colors) <- use_names
+      }
+      
+      if(DEBUG_LEGENDS) cat("DEBUG: Using", length(use_names), "models for legend:", paste(use_names, collapse = ", "), "\n")
+      
+      # Ensure we have colors for all models
+      legend_colors <- rep("#000000", length(use_names))  # default black
+      names(legend_colors) <- use_names
+      
+      # Map available colors
+      for(i in seq_along(use_names)) {
+        model_name <- use_names[i]
+        if(!is.null(use_colors) && model_name %in% names(use_colors)) {
+          legend_colors[i] <- use_colors[model_name]
+        } else if(!is.null(use_colors) && length(use_colors) >= i) {
+          legend_colors[i] <- use_colors[i]
+        }
+      }
+      
+      # Create legend using grid functions
+      n_models <- length(use_names)
+      
+      # Create a simple legend grob
+      if(requireNamespace("grid", quietly = TRUE)) {
+        legend_grob <- grid::legendGrob(
+          labels = use_names,
+          pch = rep(16, n_models),  # filled circles
+          gp = grid::gpar(col = legend_colors, fontsize = 9),
+          byrow = TRUE,
+          ncol = min(3, ceiling(n_models/2))  # Arrange in columns
+        )
         
-        # Create temporary plot with legend
-        temp_plot <- plot + theme(legend.position = "bottom")
-        
-        # Convert to grob
-        plot_grob <- ggplotGrob(temp_plot)
-        
-        # Find the legend
-        legend_grob <- plot_grob$grobs[[which(plot_grob$layout$name == "guide-box")]]
-        
+        if(DEBUG_LEGENDS) cat("DEBUG: Manual legend created successfully with grid::legendGrob\n")
         return(legend_grob)
       }
+      
+      # If grid legendGrob fails, create using textGrob
+      legend_text <- paste("Models:", paste(use_names, collapse = ", "))
+      return(grid::textGrob(legend_text, gp = grid::gpar(fontsize = 8)))
+      
     }, error = function(e) {
-      # If all else fails, return empty grob
-      return(grid::nullGrob())
+      if(DEBUG_LEGENDS) cat("DEBUG: Manual legend creation failed:", e$message, "\n")
+      return(grid::textGrob("Model Legend", gp = grid::gpar(fontsize = 8)))
     })
+  }
+  
+  # Main get_legend function
+  get_legend <- function(plot, force_manual = FALSE) {
+    if(DEBUG_LEGENDS) cat("DEBUG: get_legend called, force_manual =", force_manual, "\n")
+    
+    # If force_manual is TRUE, skip extraction and create manual legend
+    if(force_manual) {
+      if(DEBUG_LEGENDS) cat("DEBUG: Forcing manual legend creation\n")
+      return(create_model_legend())
+    }
+    
+    tryCatch({
+      # Ensure the plot exists
+      if(is.null(plot)) {
+        if(DEBUG_LEGENDS) cat("DEBUG: NULL plot provided\n")
+        return(create_model_legend())
+      }
+      
+      if(DEBUG_LEGENDS) cat("DEBUG: Plot class:", paste(class(plot), collapse = ", "), "\n")
+      
+      # Force legend to visible position for extraction
+      plot_with_legend <- plot + theme(legend.position = "bottom")
+      if(DEBUG_LEGENDS) cat("DEBUG: Set legend position to bottom\n")
+      
+      # Method 1: Try cowplot approach
+      if(requireNamespace("cowplot", quietly = TRUE)) {
+        if(DEBUG_LEGENDS) cat("DEBUG: Attempting cowplot::get_legend\n")
+        legend_grob <- cowplot::get_legend(plot_with_legend)
+        
+        if(!is.null(legend_grob) && !inherits(legend_grob, "zeroGrob") && 
+           inherits(legend_grob, "gtable") && nrow(legend_grob) > 0) {
+          if(DEBUG_LEGENDS) cat("DEBUG: cowplot extraction successful\n")
+          return(legend_grob)
+        } else {
+          if(DEBUG_LEGENDS) cat("DEBUG: cowplot returned empty/invalid legend\n")
+        }
+      }
+      
+      # Method 2: Try ggplotGrob approach
+      if(DEBUG_LEGENDS) cat("DEBUG: Attempting ggplotGrob extraction\n")
+      plot_grob <- ggplotGrob(plot_with_legend)
+      
+      # Look for guide elements
+      guide_indices <- which(grepl("guide", plot_grob$layout$name, ignore.case = TRUE))
+      if(DEBUG_LEGENDS) cat("DEBUG: Found", length(guide_indices), "guide elements\n")
+      
+      if(length(guide_indices) > 0) {
+        for(idx in guide_indices) {
+          legend_candidate <- plot_grob$grobs[[idx]]
+          if(inherits(legend_candidate, "gtable") && nrow(legend_candidate) > 0) {
+            if(DEBUG_LEGENDS) cat("DEBUG: ggplotGrob extraction successful at index", idx, "\n")
+            return(legend_candidate)
+          }
+        }
+      }
+      
+      # Method 3: Look for any gtable that might be a legend
+      if(DEBUG_LEGENDS) cat("DEBUG: Searching all grobs for potential legends\n")
+      for(i in seq_along(plot_grob$grobs)) {
+        grob <- plot_grob$grobs[[i]]
+        if(inherits(grob, "gtable") && nrow(grob) > 1 && ncol(grob) > 0) {
+          # Check if it contains legend-like elements
+          grob_names <- if(!is.null(names(grob$grobs))) names(grob$grobs) else ""
+          if(any(grepl("legend|key|guide", grob_names, ignore.case = TRUE))) {
+            if(DEBUG_LEGENDS) cat("DEBUG: Found potential legend grob at index", i, "\n")
+            return(grob)
+          }
+        }
+      }
+      
+      if(DEBUG_LEGENDS) cat("DEBUG: No legend found in plot, creating manual legend\n")
+      
+    }, error = function(e) {
+      if(DEBUG_LEGENDS) cat("DEBUG: Error in legend extraction:", e$message, "\n")
+    })
+    
+    # If all extraction methods fail, create manual legend
+    return(create_model_legend())
   }
 }
 
@@ -908,6 +1084,7 @@ create_eval_plot <- function(dist_name, metric_name, metric_matrix, models_to_pl
                        breaks = unique_models,
                        limits = unique_models) +
     coord_cartesian(xlim = c(0.2, 0.8)) +
+    xlim(0.25, 0.75) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "-", y_label),
       x = "Kendall's τ",
@@ -922,6 +1099,21 @@ create_eval_plot <- function(dist_name, metric_name, metric_matrix, models_to_pl
       legend.text = element_text(size = 8),
       legend.position = if(show_legend) "bottom" else "none"
     )
+  
+  if(DEBUG_LEGENDS && show_legend) {
+    cat("DEBUG: create_eval_plot for", dist_name, metric_name, "- plot created with legend position:", if(show_legend) "bottom" else "none", "\n")
+    cat("DEBUG: create_eval_plot for", dist_name, metric_name, "- unique models in plot:", paste(unique_models, collapse = ", "), "\n")
+    if(exists("model_colors") && length(model_colors) > 0) {
+      available_colors <- intersect(unique_models, names(model_colors))
+      cat("DEBUG: create_eval_plot for", dist_name, metric_name, "- available colors:", length(available_colors), "of", length(unique_models), "\n")
+      if(length(available_colors) != length(unique_models)) {
+        missing_colors <- setdiff(unique_models, names(model_colors))
+        cat("DEBUG: create_eval_plot for", dist_name, metric_name, "- missing colors for:", paste(missing_colors, collapse = ", "), "\n")
+      }
+    } else {
+      cat("DEBUG: create_eval_plot for", dist_name, metric_name, "- model_colors not available!\n")
+    }
+  }
   
   return(p)
 }
@@ -1004,29 +1196,56 @@ if(exists("vs2_matrix")) {
     }
     
     if(length(eval_plots) > 0) {
-      # Extract legend from evaluation plot with error handling
-      tryCatch({
-        legend_plot_eval_temp <- create_eval_plot("NO", "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
-        
-        if(!is.null(legend_plot_eval_temp)) {
-          legend_plot_eval_temp <- legend_plot_eval_temp + 
-            theme(legend.position = "bottom", legend.text = element_text(size = 8), legend.title = element_text(size = 9))
-          
-          # Extract the legend
-          shared_legend_eval <- get_legend(legend_plot_eval_temp)
-          
-          if(is.null(shared_legend_eval)) {
-            cat("Warning: Failed to extract legend, proceeding without shared legend\n")
-            shared_legend_eval <- grid::nullGrob()  # Create empty grob
-          }
-        } else {
-          cat("Warning: Failed to create legend plot, proceeding without shared legend\n")
-          shared_legend_eval <- grid::nullGrob()  # Create empty grob
+      # Extract legend from evaluation plot with improved error handling
+      cat("Attempting to extract legend for evaluation plots...\n")
+      
+      # Try to create legend plot with explicit legend settings
+      legend_plot_eval_temp <- NULL
+      shared_legend_eval <- NULL
+      
+      # Try different distributions until we find one that works
+      for(test_dist in c("NO", "PO", "GA", "LO")) {
+        if(test_dist %in% distributions) {
+          tryCatch({
+            cat("Trying to create legend plot with distribution:", test_dist, "\n")
+            legend_plot_eval_temp <- create_eval_plot(test_dist, "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
+            
+            if(!is.null(legend_plot_eval_temp)) {
+              # Ensure legend is visible and properly positioned
+              legend_plot_eval_temp <- legend_plot_eval_temp + 
+                theme(
+                  legend.position = "bottom", 
+                  legend.text = element_text(size = 8), 
+                  legend.title = element_text(size = 9),
+                  legend.box = "horizontal",
+                  legend.margin = margin(t = 10, b = 10)
+                )
+              
+              # Extract the legend with improved method
+              shared_legend_eval <- get_legend(legend_plot_eval_temp, force_manual = FALSE)
+              
+              # Validate and potentially replace with manual legend
+              shared_legend_eval <- validate_legend(shared_legend_eval, paste("Chart 1 - Distribution:", test_dist), force_manual = FALSE)
+              
+              if(!inherits(shared_legend_eval, "nullGrob")) {
+                cat("Successfully created legend using distribution:", test_dist, "\n")
+                break
+              } else {
+                cat("Failed to create valid legend from distribution:", test_dist, "\n")
+                shared_legend_eval <- NULL
+              }
+            }
+          }, error = function(e) {
+            cat("Error creating legend with distribution", test_dist, ":", e$message, "\n")
+          })
         }
-      }, error = function(e) {
-        cat("Error creating legend:", e$message, "\n")
-        shared_legend_eval <- grid::nullGrob()  # Create empty grob
-      })
+      }
+      
+      # If no legend could be created, force manual legend creation
+      if(is.null(shared_legend_eval)) {
+        cat("Warning: Could not create legend from any distribution, creating manual legend\n")
+        shared_legend_eval <- validate_legend(NULL, "Chart 1 - Fallback", force_manual = TRUE)
+      }
       
       # Arrange plots in a 4x4 grid (4 distributions x 4 metrics) with error handling
       tryCatch({
@@ -1221,9 +1440,9 @@ prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
         for(j in 1:ncol(est_mu1_matrix)) {
           if(!is.na(est_mu1_matrix[i, j])) {
             ratio <- abs(est_mu1_matrix[i, j] / true_mu1[i])
-            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
-              exclusion_mask[i, j] <- TRUE
-            }
+            #if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
+              exclusion_mask[i, j] <- FALSE
+            #}
           }
         }
       }
@@ -1307,6 +1526,7 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
                        breaks = unique_models,
                        limits = unique_models) +
     coord_cartesian(ylim = c(-1,1)) +
+    xlim(0.25, 0.75) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Kendall's τ",
@@ -1321,6 +1541,17 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
       legend.text = element_text(size = 10),
       legend.position = if(show_legend) "bottom" else "none"
     )
+  
+  if(DEBUG_LEGENDS && show_legend) {
+    cat("DEBUG: create_dist_plot for", dist_name, "- plot created with legend position:", if(show_legend) "bottom" else "none", "\n")
+    cat("DEBUG: create_dist_plot for", dist_name, "- unique models in plot:", paste(unique_models, collapse = ", "), "\n")
+    if(exists("model_colors") && length(model_colors) > 0) {
+      available_colors <- intersect(unique_models, names(model_colors))
+      cat("DEBUG: create_dist_plot for", dist_name, "- available colors:", length(available_colors), "of", length(unique_models), "\n")
+    } else {
+      cat("DEBUG: create_dist_plot for", dist_name, "- model_colors not available!\n")
+    }
+  }
   
   return(p)
 }
@@ -1483,6 +1714,7 @@ create_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE)
                           breaks = all_models_in_data,
                           limits = all_models_in_data) +
     coord_cartesian(ylim = c(0, 0.4)) +
+    xlim(0.25, 0.75) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
@@ -1534,7 +1766,7 @@ prepare_mu2_plot_data <- function(dist_name, models_to_plot = NULL) {
   } else if (dist_name == "PO") {
     true_mu2 <- log(as.numeric(true_params_matrix$mu2[dist_rows])/as.numeric(true_params_matrix$mu1[dist_rows]))
   } else if(dist_name == "LO") {
-    true_mu2 <- logit_inv(as.numeric(true_params_matrix$mu2[dist_rows])) - logit_inv(as.numeric(true_params_matrix$mu1[dist_rows]))
+    true_mu2 <- logit(as.numeric(true_params_matrix$mu2[dist_rows])) - logit(as.numeric(true_params_matrix$mu1[dist_rows]))
   } else {
     true_mu2 <- as.numeric(true_params_matrix$mu2[dist_rows])- as.numeric(true_params_matrix$mu1[dist_rows])
   }
@@ -1564,9 +1796,9 @@ prepare_mu2_plot_data <- function(dist_name, models_to_plot = NULL) {
         for(j in 1:ncol(est_mu2_matrix)) {
           if(!is.na(est_mu2_matrix[i, j])) {
             ratio <- abs(est_mu2_matrix[i, j] / true_mu2[i])
-            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
-              exclusion_mask[i, j] <- TRUE
-            }
+            #if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
+              exclusion_mask[i, j] <- FALSE
+            #}
           }
         }
       }
@@ -1666,6 +1898,7 @@ create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend =
                        breaks = unique_models,
                        limits = unique_models) +
     coord_cartesian(ylim = c(-1,1)) +
+    xlim(0.25, 0.75) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Kendall's τ",
@@ -1842,6 +2075,7 @@ create_mu2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = T
                           breaks = all_models_in_data,
                           limits = all_models_in_data) +
     coord_cartesian(ylim = c(0, 0.4)) +
+    xlim(0.25, 0.75) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
@@ -1935,17 +2169,36 @@ if(length(bias_plots) > 0 && length(se_plots) > 0) {
   }
   
   if(is.null(legend_dist)) {
-    stop("No valid distribution found for legend extraction")
+    cat("Error: No valid distribution found for legend extraction\n")
+    # Force manual legend creation
+    shared_legend <- validate_legend(NULL, "Chart 2 - Mu1", force_manual = TRUE)
+  } else {
+    cat("Using", legend_dist, "distribution for legend extraction\n")
+    
+    # Extract legend from the working distribution with improved error handling
+    tryCatch({
+      legend_plot_temp <- create_dist_plot(legend_dist, models_to_plot, show_legend = TRUE) + 
+        theme(
+          legend.position = "bottom", 
+          legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 11),
+          legend.box = "horizontal",
+          legend.margin = margin(t = 10, b = 10)
+        )
+      
+      # Extract the legend with improved method
+      shared_legend <- get_legend(legend_plot_temp, force_manual = FALSE)
+      
+      # Validate and potentially replace with manual legend
+      shared_legend <- validate_legend(shared_legend, "Chart 2 - Mu1", force_manual = FALSE)
+      
+      cat("Legend extraction completed for Mu1 plots\n")
+      
+    }, error = function(e) {
+      cat("Error extracting legend:", e$message, "\n")
+      shared_legend <- validate_legend(NULL, "Chart 2 - Mu1", force_manual = TRUE)
+    })
   }
-  
-  cat("Using", legend_dist, "distribution for legend extraction\n")
-  
-  # Extract legend from the working distribution
-  legend_plot_temp <- create_dist_plot(legend_dist, models_to_plot, show_legend = TRUE) + 
-    theme(legend.position = "bottom", legend.text = element_text(size = 10), legend.title = element_text(size = 11))
-  
-  # Extract the legend
-  shared_legend <- get_legend(legend_plot_temp)
   
   # Interleave bias and SE plots for each distribution
   all_plots <- vector("list", length(bias_plots) * 2)
@@ -2101,17 +2354,36 @@ if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
   }
   
   if(is.null(legend_dist_mu2)) {
-    stop("No valid distribution found for mu2 legend extraction")
+    cat("Error: No valid distribution found for mu2 legend extraction\n")
+    # Force manual legend creation
+    shared_legend_mu2 <- validate_legend(NULL, "Chart 3 - Mu2", force_manual = TRUE)
+  } else {
+    cat("Using", legend_dist_mu2, "distribution for mu2 legend extraction\n")
+    
+    # Extract legend from the working distribution with improved error handling
+    tryCatch({
+      legend_plot_temp_mu2 <- create_mu2_dist_plot(legend_dist_mu2, models_to_plot, show_legend = TRUE) + 
+        theme(
+          legend.position = "bottom", 
+          legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 11),
+          legend.box = "horizontal",
+          legend.margin = margin(t = 10, b = 10)
+        )
+      
+      # Extract the legend with improved method
+      shared_legend_mu2 <- get_legend(legend_plot_temp_mu2, force_manual = FALSE)
+      
+      # Validate and potentially replace with manual legend
+      shared_legend_mu2 <- validate_legend(shared_legend_mu2, "Chart 3 - Mu2", force_manual = FALSE)
+      
+      cat("Legend extraction completed for Mu2 plots\n")
+      
+    }, error = function(e) {
+      cat("Error extracting mu2 legend:", e$message, "\n")
+      shared_legend_mu2 <- validate_legend(NULL, "Chart 3 - Mu2", force_manual = TRUE)
+    })
   }
-  
-  cat("Using", legend_dist_mu2, "distribution for mu2 legend extraction\n")
-  
-  # Extract legend from the working distribution
-  legend_plot_temp_mu2 <- create_mu2_dist_plot(legend_dist_mu2, models_to_plot, show_legend = TRUE) + 
-    theme(legend.position = "bottom", legend.text = element_text(size = 10), legend.title = element_text(size = 11))
-  
-  # Extract the legend
-  shared_legend_mu2 <- get_legend(legend_plot_temp_mu2)
   
   # Interleave bias and SE plots for each distribution
   all_plots_mu2 <- vector("list", length(bias_plots_mu2) * 2)
@@ -2178,6 +2450,7 @@ if(exists("exclusion_summary_mu2_global") && nrow(exclusion_summary_mu2_global) 
       row <- dist_data[i, ]
       cat(sprintf("  %s (%s): %d/%d excluded (%.1f%%)\n", 
                   row$model_label, row$model, row$excluded_values, 
+                  
                   row$total_values, row$exclusion_rate * 100))
     }
     cat("\n")
@@ -2191,5 +2464,18 @@ if(exists("exclusion_summary_mu2_global") && nrow(exclusion_summary_mu2_global) 
               if(total_values_mu2 > 0) total_excluded_mu2 / total_values_mu2 * 100 else 0))
 } else {
   cat("\nNo mu2 exclusion data available (exclusions only applied to LO distribution).\n")
+}
+
+# End of script - summarize legend debugging if enabled
+if(DEBUG_LEGENDS) {
+  cat("\n=== LEGEND DEBUGGING SUMMARY ===\n")
+  cat("Script completed with legend debugging enabled\n")
+  cat("If legends are still not showing:\n")
+  cat("1. Check that the plot creation functions (create_eval_plot, create_dist_plot, create_mu2_dist_plot) are working properly\n")
+  cat("2. Ensure models_to_plot contains valid model names\n") 
+  cat("3. Verify that model_colors is properly defined with colors for all models\n")
+  cat("4. Check that data matrices (vs2_matrix, mu1_coef_matrix, mu2_coef_matrix) contain non-missing values\n")
+  cat("5. Try setting DEBUG_LEGENDS <- FALSE to disable debug output\n")
+  cat("=== END LEGEND DEBUGGING ===\n")
 }
 
