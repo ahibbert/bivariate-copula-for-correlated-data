@@ -2467,15 +2467,3 @@ if(exists("exclusion_summary_mu2_global") && nrow(exclusion_summary_mu2_global) 
 }
 
 # End of script - summarize legend debugging if enabled
-if(DEBUG_LEGENDS) {
-  cat("\n=== LEGEND DEBUGGING SUMMARY ===\n")
-  cat("Script completed with legend debugging enabled\n")
-  cat("If legends are still not showing:\n")
-  cat("1. Check that the plot creation functions (create_eval_plot, create_dist_plot, create_mu2_dist_plot) are working properly\n")
-  cat("2. Ensure models_to_plot contains valid model names\n") 
-  cat("3. Verify that model_colors is properly defined with colors for all models\n")
-  cat("4. Check that data matrices (vs2_matrix, mu1_coef_matrix, mu2_coef_matrix) contain non-missing values\n")
-  cat("5. Try setting DEBUG_LEGENDS <- FALSE to disable debug output\n")
-  cat("=== END LEGEND DEBUGGING ===\n")
-}
-
