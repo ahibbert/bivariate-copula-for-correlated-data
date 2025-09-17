@@ -1,3 +1,5 @@
+bt_mode <- TRUE  # Set to TRUE for BT files, FALSE for non-BT files
+
 # EXTRACT ALL THE DATA FROM SAVED SIMULATIONS ----
 
 # Load required libraries
@@ -5,18 +7,43 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(gridExtra)
+library(cowplot)
+
+# Define get_legend function if cowplot is not available
+if(!exists("get_legend")) {
+  get_legend <- function(plot) {
+    # Extract legend from a ggplot object using a simple approach
+    tryCatch({
+      # Try cowplot approach first
+      if(requireNamespace("cowplot", quietly = TRUE)) {
+        return(cowplot::get_legend(plot))
+      } else {
+        # Fallback approach using grid and ggplot
+        library(grid)
+        library(ggplot2)
+        
+        # Create temporary plot with legend
+        temp_plot <- plot + theme(legend.position = "bottom")
+        
+        # Convert to grob
+        plot_grob <- ggplotGrob(temp_plot)
+        
+        # Find the legend
+        legend_grob <- plot_grob$grobs[[which(plot_grob$layout$name == "guide-box")]]
+        
+        return(legend_grob)
+      }
+    }, error = function(e) {
+      # If all else fails, return empty grob
+      return(grid::nullGrob())
+    })
+  }
+}
 
 # Set working directory and paths
-data_path <- "Data/broad_sims"
-cat("Loading broad simulation results from:", data_path, "\n")
-
-# Get list of all RData files in the broad_sims directory
+data_path <- ifelse(bt_mode, "Data/broad_sims_bt", "Data/broad_sims")
 rdata_files <- list.files(data_path, pattern = "\\.RData$", full.names = TRUE)
-cat("Found", length(rdata_files), "RData files to process\n")
-
-if (length(rdata_files) == 0) {
-  stop("No RData files found in ", data_path, ". Please check the path.")
-}
+cat("Loading", length(rdata_files), "files from:", data_path, "\n")
 
 # Initialize containers for results
 all_results <- list()
@@ -133,7 +160,7 @@ x2_coef_matrix <- matrix(NA, nrow = n_param_sets, ncol = n_models,
 
 # Standard Error Matrices
 mu1_se_matrix <- matrix(NA, nrow = n_param_sets, ncol = n_models,
-                        dimnames = list(row_names, model_names))
+                        dimnames = list(row_names, model_names)) ###COME BACK TO THIS
 mu2_se_matrix <- matrix(NA, nrow = n_param_sets, ncol = n_models,
                         dimnames = list(row_names, model_names))
 x1_se_matrix <- matrix(NA, nrow = n_param_sets, ncol = n_models,
@@ -456,8 +483,8 @@ print(sapply(input_params_df, class))
 parameters=input_params_df
 
 # Load true values (old simulations) - to delete ----
-numDerivResults <- readRDS(file="Data/numDerivResults_20231127.rds")
-se_mles <- readRDS("Data/se_mles_20231127_n100sims20_ALL.rds")
+load(file="Data/numDerivResults_20231127.rds")
+load("Data/se_mles_20231127_n100sims20_ALL.rds")
 
 se_sim=se_mles[,c(1,2,3)]/sqrt(10)
 se_nd=numDerivResults[,c(1,2,5)]
@@ -511,7 +538,7 @@ trueSE_PO[,2]=se_2[parameters$dist=="PO"]
 colnames(trueSE_PO)<-c("mu1_se","mu2_se_B2","mu2_se_Bt")
 
 trueSE_PO_final=cbind(parameters[parameters$dist=="PO",],trueSE_PO)
-true_SE_out=rbind(true_SE_GA,trueSE_NO_final,trueSE_PO_final,trueSE_LO)
+true_SE_out=rbind(true_SE_GA,trueSE_NO_final,trueSE_PO_final,true_SE_LO)
 
 # Load true values from file if available ----
 # Load newly computed true SEs (if available) to override the old true_SE_out
@@ -543,33 +570,49 @@ tryCatch({
 
 # Compute true values (new simulations) ----
 
-cat("\n=== Computing True Standard Errors for All Parameter Combinations ===\n")
-
-# Load the get_true_ses function
-source("common_functions.R")
-
-# Create a filename for saving progress
-progress_filename <- paste0("Cache/true_ses_progress_", Sys.Date(), ".rds")
-final_filename <- paste0("Cache/true_ses_complete_", Sys.Date(), ".rds")
-
-# Check if we have previous progress to restore
-if(file.exists(progress_filename)) {
-  cat("Found previous progress file, loading...\n")
-  progress_data <- readRDS(progress_filename)
-  true_ses_matrix <- progress_data$true_ses_matrix
-  completed_rows <- progress_data$completed_rows
-  start_row <- max(completed_rows) + 1
-  cat("Resuming from row", start_row, "of", nrow(true_params_matrix), "\n")
+# Check if we already have a valid true_ses_matrix from the previous loading section
+if(exists("true_ses_matrix") && !is.null(true_ses_matrix) && 
+   is.matrix(true_ses_matrix) && sum(!is.na(true_ses_matrix)) > 0) {
+  cat("\n=== Using Previously Loaded True Standard Errors ===\n")
+  cat("Found valid true_ses_matrix with dimensions:", dim(true_ses_matrix), "\n")
+  cat("Non-missing values:", sum(!is.na(true_ses_matrix)), "/", length(true_ses_matrix), "\n")
+  cat("Skipping computation as valid data already exists.\n")
+  
+  # Apply the transformations that would normally be done at the end
+  cat("Applying transformations to loaded true_ses_matrix...\n")
+  true_ses_matrix <- sqrt(true_ses_matrix)
+  true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
+  cat("Transformations applied successfully.\n")
+  
 } else {
-  cat("Starting fresh computation...\n")
-  # Initialize matrix to store true standard errors
-  # get_true_ses returns SEs for: t1, t2, x1, x2
-  true_ses_matrix <- matrix(NA, nrow = nrow(true_params_matrix), ncol = 4)
-  colnames(true_ses_matrix) <- c("t1_se", "t2_se", "x1_se", "x2_se")
-  rownames(true_ses_matrix) <- rownames(true_params_matrix)
-  completed_rows <- integer(0)
-  start_row <- 1
-}
+  cat("\n=== Computing True Standard Errors for All Parameter Combinations ===\n")
+  cat("No valid true_ses_matrix found, starting computation...\n")
+  
+  # Load the get_true_ses function
+  source("common_functions.R")
+  
+  # Create a filename for saving progress
+  progress_filename <- paste0("Cache/true_ses_progress_", Sys.Date(), ".rds")
+  final_filename <- paste0("Cache/true_ses_complete_", Sys.Date(), ".rds")
+  
+  # Check if we have previous progress to restore
+  if(file.exists(progress_filename)) {
+    cat("Found previous progress file, loading...\n")
+    progress_data <- readRDS(progress_filename)
+    true_ses_matrix <- progress_data$true_ses_matrix
+    completed_rows <- progress_data$completed_rows
+    start_row <- max(completed_rows) + 1
+    cat("Resuming from row", start_row, "of", nrow(true_params_matrix), "\n")
+  } else {
+    cat("Starting fresh computation...\n")
+    # Initialize matrix to store true standard errors
+    # get_true_ses returns SEs for: t1, t2, x1, x2
+    true_ses_matrix <- matrix(NA, nrow = nrow(true_params_matrix), ncol = 4)
+    colnames(true_ses_matrix) <- c("t1_se", "t2_se", "x1_se", "x2_se")
+    rownames(true_ses_matrix) <- rownames(true_params_matrix)
+    completed_rows <- integer(0)
+    start_row <- 1
+  }
 
 cat("Total parameter combinations to process:", nrow(true_params_matrix), "\n")
 cat("Starting from row:", start_row, "\n")
@@ -758,615 +801,19 @@ cat("\nTrue standard errors matrix computation complete!\n")
 cat("Matrix dimensions:", dim(true_ses_matrix), "\n")
 cat("Available in variable: true_ses_matrix\n")
 
-# Plotting ####
+  # Apply transformations only if we computed the matrix
+  cat("Applying transformations to computed true_ses_matrix...\n")
+  true_ses_matrix <- sqrt(true_ses_matrix)
+  true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
+  cat("Transformations applied successfully.\n")
 
-# NOTE: This plotting section can now use either:
-# 1. NEW: true_ses_matrix (computed by get_true_ses function at end of script) - PREFERRED
-# 2. OLD: true_SE_out (pre-computed theoretical SEs) - FALLBACK
-# The code will automatically detect which is available and use the appropriate source
+} # End of computation block
 
-# Check if computed true SEs are available
-if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
-  cat("Using newly computed true SEs from true_ses_matrix\n")
-  cat("True SEs matrix dimensions:", dim(true_ses_matrix), "\n")
-  cat("Available columns:", colnames(true_ses_matrix), "\n")
-} else {
-  cat("Using old pre-computed true SEs from true_SE_out\n")
-  cat("Note: Run the true SE computation section at the end to use improved SEs\n")
-}
+#true_ses_matrix=sqrt(true_ses_matrix)
 
-# Create plots for estimation bias vs correlation for each distribution
-library(ggplot2)
-library(gridExtra)
-library(latex2exp)
+# PLOTTING SECTION ######
 
-# Define model renaming function (moved here to be available for all plots)
-rename_model <- function(x) {
-  main_map <- c(
-    glm = "GLM",
-    gee = "GEE",
-    re_nosig = "GAMLSS",
-    re_np = "GAMLSS NP",
-    lme4 = "LME4",
-    gamm = "GAMM"
-  )
-  cop_map <- c(
-    cop = "GJRM (C)",
-    cop_n = "GJRM (N)",
-    cop_j = "GJRM (J)",
-    cop_g = "GJRM (G)", 
-    cop_f = "GJRM (F)",
-    cop_amh = "GJRM (AMH)",
-    cop_fgm = "GJRM (FGM)",
-    cop_pl = "GJRM (PL)",
-    cop_h = "GJRM (H)",
-    cop_t = "GJRM (T)"
-  )
-  if(x %in% names(main_map)) return(main_map[x])
-  if(x %in% names(cop_map)) return(cop_map[x])
-  return(x)
-}
-
-models_to_plot <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
-
-# Create a consistent color mapping for all models
-all_model_labels <- sapply(models_to_plot, rename_model)
-model_colors <- setNames(scales::hue_pal()(length(all_model_labels)), all_model_labels)
-
-cat("Model color mapping:\n")
-for(i in 1:length(model_colors)) {
-  cat(sprintf("  %s: %s\n", names(model_colors)[i], model_colors[i]))
-}
-
-# First, we need to prepare the data by matching parameter sets between 
-# true_params_matrix, mu1_coef_matrix, and skew_matrix using row indices
-
-# Initialize exclusion tracking
-exclusion_summary_global <- data.frame(
-  distribution = character(),
-  model = character(),
-  model_label = character(),
-  total_values = integer(),
-  excluded_values = integer(),
-  exclusion_rate = numeric(),
-  stringsAsFactors = FALSE
-)
-
-# Create a function to prepare plot data for a specific distribution
-prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
-  
-  # If no models specified, use all available models with non-missing data
-  if(is.null(models_to_plot)) {
-    # Find models with at least some non-missing data
-    non_missing_counts <- colSums(!is.na(mu1_coef_matrix))
-    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
-  }
-  
-  # Define the desired order for models
-  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
-  
-  # Reorder models_to_plot according to desired order
-  models_to_plot <- intersect(desired_order, models_to_plot)
-  
-  # Filter true parameters for this distribution
-  dist_rows <- which(true_params_matrix$dist == dist_name)
-  
-  if(length(dist_rows) == 0) {
-    cat("No data found for distribution:", dist_name, "\n")
-    return(NULL)
-  }
-  
-  # Get true mu1 values for this distribution
-
-  # Make link function adjustments. Apply log for PO and GA and logit for LO
-  if(dist_name %in% c("GA")) {
-    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$a[dist_rows]))
-  } else if (dist_name == "PO") {
-    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$b[dist_rows])*as.numeric(true_params_matrix$c[dist_rows]))
-  } else if(dist_name == "LO") {
-    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
-  } else {
-    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
-  }
-
-  #true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
-  
-  # Get correlation values for this distribution (from skew_matrix column 2)
-  corr_vals <- skew_matrix[dist_rows, 2]
-  
-  # Get estimated mu1 values for this distribution and selected models
-  if(dist_name %in% c("GA")) {
-    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
-  } else if (dist_name == "PO") {
-    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
-  } else if(dist_name == "LO") {
-    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])/(1+exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]))
-  } else {
-    est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
-  }
-
-  #est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
-  
-  # Apply exclusion logic only for LO distribution
-  est_mu1_matrix_filtered <- est_mu1_matrix
-  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu1_matrix), ncol = ncol(est_mu1_matrix))
-  
-  if(dist_name == "LO") {
-    # Create exclusion mask for values more than 10x different from true values
-    # Calculate exclusion statistics but do not actually apply the exclusion
-    for(i in 1:length(true_mu1)) {
-      if(!is.na(true_mu1[i])) {
-        for(j in 1:ncol(est_mu1_matrix)) {
-          if(!is.na(est_mu1_matrix[i, j])) {
-            ratio <- abs(est_mu1_matrix[i, j] / true_mu1[i])
-            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
-              exclusion_mask[i, j] <- TRUE
-            }
-          }
-        }
-      }
-    }
-    
-    # Do NOT apply exclusion mask - keep all data for plotting
-    # est_mu1_matrix_filtered[exclusion_mask] <- NA
-    
-    # Store exclusion info for summary (global variable) - only for LO
-    if(!exists("exclusion_summary_global")) {
-      exclusion_summary_global <<- data.frame(
-        distribution = character(),
-        model = character(),
-        model_label = character(),
-        total_values = integer(),
-        excluded_values = integer(),
-        exclusion_rate = numeric(),
-        stringsAsFactors = FALSE
-      )
-    }
-    
-    # Calculate exclusion statistics for each model (only for LO)
-    for(j in 1:length(models_to_plot)) {
-      model <- models_to_plot[j]
-      model_label <- rename_model(model)
-      
-      total_non_na <- sum(!is.na(est_mu1_matrix[, j]))
-      excluded_count <- sum(exclusion_mask[, j], na.rm = TRUE)
-      
-      exclusion_info <- data.frame(
-        distribution = dist_name,
-        model = model,
-        model_label = model_label,
-        total_values = total_non_na,
-        excluded_values = excluded_count,
-        exclusion_rate = if(total_non_na > 0) excluded_count / total_non_na else 0,
-        stringsAsFactors = FALSE
-      )
-      
-      exclusion_summary_global <<- rbind(exclusion_summary_global, exclusion_info)
-    }
-  }
-  
-  # Calculate relative bias using filtered data (estimated - true)
-  bias_matrix <- est_mu1_matrix_filtered / rep(true_mu1, each = 1) -1
-  
-  # Convert to long format for ggplot
-  plot_data <- data.frame(
-    corr_vals = rep(corr_vals, length(models_to_plot)),
-    bias = as.vector(bias_matrix),
-    model = rep(models_to_plot, each = length(true_mu1)),
-    model_label = rep(sapply(models_to_plot, rename_model), each = length(true_mu1)),
-    dist = dist_name
-  )
-  
-  # Remove rows with missing values
-  plot_data <- plot_data[complete.cases(plot_data), ]
-  
-  return(plot_data)
-}
-
-# Create individual plots for each distribution
-create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
-  
-  plot_data <- prepare_plot_data(dist_name, models_to_plot)
-  
-  if(is.null(plot_data) || nrow(plot_data) == 0) {
-    return(NULL)
-  }
-  
-  # Get unique model labels from the data
-  unique_models <- unique(plot_data$model_label)
-  cat("Unique models in", dist_name, "data:", paste(unique_models, collapse = ", "), "\n")
-  
-  # Create the plot with consistent color mapping
-  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
-    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
-    # Use consistent color mapping, only showing models present in this plot
-    scale_color_manual(values = model_colors[unique_models], 
-                       breaks = unique_models,
-                       limits = unique_models) +
-    coord_cartesian( ylim=c(-1,1)) +
-    labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
-      x = "Kendall's τ",
-      y = TeX("$(\\hat{\\mu_1}/\\mu_1)-1$"),
-      color = "Model"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-      axis.title = element_text(size = 12),
-      legend.title = element_text(size = 11),
-      legend.text = element_text(size = 10),
-      legend.position = if(show_legend) "bottom" else "none"
-    )
-  
-  return(p)
-}
-
-# Create a function to prepare SE plot data for a specific distribution
-prepare_se_plot_data <- function(dist_name, models_to_plot = NULL) {
-  
-  # If no models specified, use all available models with non-missing data
-  if(is.null(models_to_plot)) {
-    # Find models with at least some non-missing data
-    non_missing_counts <- colSums(!is.na(mu1_se_matrix))
-    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
-  }
-  
-  # Define the desired order for models
-  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
-  
-  # Reorder models_to_plot according to desired order
-  models_to_plot <- intersect(desired_order, models_to_plot)
-  
-  # Filter true parameters for this distribution
-  dist_rows <- which(true_params_matrix$dist == dist_name)
-  
-  if(length(dist_rows) == 0) {
-    cat("No SE data found for distribution:", dist_name, "\n")
-    return(NULL)
-  }
-  
-  # Get correlation values for this distribution (from skew_matrix column 2)
-  corr_vals <- skew_matrix[dist_rows, 2]
-  
-  # Get estimated SE values for this distribution and selected models
-  est_se_matrix <- mu1_se_matrix[dist_rows, models_to_plot, drop = FALSE]
-  
-  # OLD CODE: Get theoretical SE values from true_SE_out by matching parameter sets
-  # true_se_vals <- rep(NA, length(dist_rows))
-  # 
-  # # Match each row in true_params_matrix with corresponding row in true_SE_out
-  # for(i in 1:length(dist_rows)) {
-  #   row_idx <- dist_rows[i]
-  #   params <- true_params_matrix[row_idx, ]
-  #   
-  #   # Find matching row in true_SE_out
-  #   matching_rows <- which(
-  #     true_SE_out$dist == params$dist &
-  #     true_SE_out$mu1 == as.numeric(params$mu1) &
-  #     true_SE_out$mu2 == as.numeric(params$mu2) &
-  #     as.numeric(true_SE_out$n) == as.numeric(params$n)
-  #   )
-  #   
-  #   # Handle a, b, c parameters which can be NA
-  #   if(length(matching_rows) > 0) {
-  #     for(param in c("a", "b", "c")) {
-  #       if(!is.na(params[[param]])) {
-  #         matching_rows <- matching_rows[
-  #           abs(as.numeric(true_SE_out[[param]][matching_rows]) - as.numeric(params[[param]])) < 1e-10
-  #         ]
-  #       } else {
-  #         matching_rows <- matching_rows[is.na(true_SE_out[[param]][matching_rows])]
-  #       }
-  #     }
-  #   }
-  #   
-  #   if(length(matching_rows) > 0) {
-  #     true_se_vals[i] <- true_SE_out$mu1_se[matching_rows[1]]
-  #   }
-  # }
-  
-  # NEW CODE: Get theoretical SE values from true_ses_matrix (computed at end of script)
-  # Check if true_ses_matrix is available (computed by get_true_ses function)
-  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
-    # Debug: Check structure of true_ses_matrix
-    cat("Debug - true_ses_matrix structure for", dist_name, ":\n")
-    cat("  Class:", class(true_ses_matrix), "\n")
-    
-    # true_ses_matrix is actually a list - extract the actual matrix
-    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
-      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
-      cat("  Found true_ses_matrix inside list, class:", class(actual_ses_matrix), "\n")
-      if(is.matrix(actual_ses_matrix)) {
-        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
-        cat("  Column names:", colnames(actual_ses_matrix), "\n")
-        cat("  Number of dist_rows:", length(dist_rows), "\n")
-      }
-    } else {
-      actual_ses_matrix <- true_ses_matrix
-    }
-    
-    # Use t1_se from the actual matrix for mu1 theoretical SEs with proper indexing
-    if(is.matrix(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
-      true_se_vals <- actual_ses_matrix[dist_rows, "t1_se"]
-      cat("Using computed true SEs from true_ses_matrix for", dist_name, "distribution\n")
-    } else if(is.data.frame(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
-      true_se_vals <- actual_ses_matrix$t1_se[dist_rows]
-      cat("Using computed true SEs from data.frame for", dist_name, "distribution\n")
-    } else {
-      cat("Warning: t1_se column not found in true_ses_matrix for", dist_name, "\n")
-      true_se_vals <- rep(NA, length(dist_rows))
-    }
-  } else {
-    # Fallback to old method if true_ses_matrix not available
-    cat("Warning: true_ses_matrix not available, using old true_SE_out method for", dist_name, "\n")
-    true_se_vals <- rep(NA, length(dist_rows))
-    
-    # Match each row in true_params_matrix with corresponding row in true_SE_out
-    for(i in 1:length(dist_rows)) {
-      row_idx <- dist_rows[i]
-      params <- true_params_matrix[row_idx, ]
-      
-      # Find matching row in true_SE_out
-      matching_rows <- which(
-        true_SE_out$dist == params$dist &
-        true_SE_out$mu1 == as.numeric(params$mu1) &
-        true_SE_out$mu2 == as.numeric(params$mu2) &
-        as.numeric(true_SE_out$n) == as.numeric(params$n)
-      )
-      
-      # Handle a, b, c parameters which can be NA
-      if(length(matching_rows) > 0) {
-        for(param in c("a", "b", "c")) {
-          if(!is.na(params[[param]])) {
-            matching_rows <- matching_rows[
-              abs(as.numeric(true_SE_out[[param]][matching_rows]) - as.numeric(params[[param]])) < 1e-10
-            ]
-          } else {
-            matching_rows <- matching_rows[is.na(true_SE_out[[param]][matching_rows])]
-          }
-        }
-      }
-      
-      if(length(matching_rows) > 0) {
-        true_se_vals[i] <- true_SE_out$mu1_se[matching_rows[1]]
-      }
-    }
-  }
-  
-  # Convert estimated SEs to long format for ggplot
-  se_plot_data <- data.frame(
-    corr_vals = rep(corr_vals, length(models_to_plot)),
-    se_value = as.vector(est_se_matrix),
-    model = rep(models_to_plot, each = length(corr_vals)),
-    model_label = rep(sapply(models_to_plot, rename_model), each = length(corr_vals)),
-    dist = dist_name,
-    type = "Estimated"
-  )
-  
-  # Add theoretical SE data
-  true_se_data <- data.frame(
-    corr_vals = corr_vals,
-    se_value = true_se_vals,
-    model = "true",
-    model_label = "Theoretical",
-    dist = dist_name,
-    type = "Theoretical"
-  )
-  
-  # Combine estimated and theoretical data
-  combined_se_data <- rbind(se_plot_data, true_se_data)
-  
-  # Remove rows with missing values
-  combined_se_data <- combined_se_data[complete.cases(combined_se_data), ]
-  
-  return(combined_se_data)
-}
-
-# Create SE plots for each distribution
-create_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
-  
-  se_data <- prepare_se_plot_data(dist_name, models_to_plot)
-  
-  if(is.null(se_data) || nrow(se_data) == 0) {
-    return(NULL)
-  }
-  
-  # Get unique model labels from the data
-  unique_models <- unique(se_data$model_label)
-  cat("Unique models in", dist_name, "SE data:", paste(unique_models, collapse = ", "), "\n")
-  
-  # Get unique model labels from the data and estimated model labels
-  all_models_in_data <- unique(se_data$model_label)
-  estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
-  cat("Models in", dist_name, "SE data:", paste(all_models_in_data, collapse = ", "), "\n")
-  
-  # Create the plot with consistent color mapping
-  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
-    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
-    # Manual color scale - only include models present in this plot
-    scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
-                       breaks = all_models_in_data,
-                       limits = all_models_in_data) +
-    # Manual linetype scale - set theoretical to dashed, others to solid
-    scale_linetype_manual(values = c("Theoretical" = "dashed",
-                                    setNames(rep("solid", length(estimated_models)),
-                                            estimated_models)),
-                          breaks = all_models_in_data,
-                          limits = all_models_in_data) +
-    coord_cartesian(ylim = c(0, 0.4)) +
-    labs(
-      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
-      x = "Kendall's τ",
-      y = TeX("SE$(\\hat{\\mu_1})$"),
-      color = "Model"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-      axis.title = element_text(size = 12),
-      legend.title = element_text(size = 11),
-      legend.text = element_text(size = 10),
-      legend.position = if(show_legend) "bottom" else "none"
-    )
-  
-  return(p)
-}
-
-# Create plots for each distribution
-cat("Creating mu1 bias vs correlation plots for each distribution...\n")
-
-# Debug: Check true_ses_matrix structure before plotting
-cat("\n=== DEBUG: Checking true_ses_matrix structure ===\n")
-if(exists("true_ses_matrix")) {
-  cat("true_ses_matrix exists\n")
-  cat("Class:", class(true_ses_matrix), "\n")
-  if(is.matrix(true_ses_matrix)) {
-    cat("Dimensions:", dim(true_ses_matrix), "\n")
-    cat("Column names:", colnames(true_ses_matrix), "\n")
-    cat("Row names (first 5):", head(rownames(true_ses_matrix), 5), "\n")
-  } else if(is.data.frame(true_ses_matrix)) {
-    cat("Dimensions:", dim(true_ses_matrix), "\n")
-    cat("Column names:", colnames(true_ses_matrix), "\n")
-  } else if(is.list(true_ses_matrix)) {
-    cat("List structure with names:", names(true_ses_matrix), "\n")
-  } else {
-    cat("Length:", length(true_ses_matrix), "\n")
-    cat("Names:", names(true_ses_matrix), "\n")
-  }
-} else {
-  cat("true_ses_matrix does not exist\n")
-}
-cat("=== END DEBUG ===\n\n")
-
-# Create bias plots without individual legends (we'll add a shared legend)
-plot_NO_bias <- create_dist_plot("NO", models_to_plot, show_legend = FALSE)
-plot_PO_bias <- create_dist_plot("PO", models_to_plot, show_legend = FALSE) 
-plot_GA_bias <- create_dist_plot("GA", models_to_plot, show_legend = FALSE)
-plot_LO_bias <- create_dist_plot("LO", models_to_plot, show_legend = FALSE)
-
-# Create SE plots without individual legends
-plot_NO_se <- tryCatch(create_se_plot("NO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating NO SE plot:", e$message, "\n"); NULL })
-plot_PO_se <- tryCatch(create_se_plot("PO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating PO SE plot:", e$message, "\n"); NULL })
-plot_GA_se <- tryCatch(create_se_plot("GA", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating GA SE plot:", e$message, "\n"); NULL })
-plot_LO_se <- tryCatch(create_se_plot("LO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating LO SE plot:", e$message, "\n"); NULL })
-
-# Create a plot with legend to extract it
-legend_plot <- create_dist_plot("NO", models_to_plot, show_legend = TRUE)
-
-# Remove NULL plots and organize in pairs
-bias_plots <- list(plot_NO_bias, plot_PO_bias, plot_GA_bias, plot_LO_bias)
-se_plots <- list(plot_NO_se, plot_PO_se, plot_GA_se, plot_LO_se)
-
-# Filter out NULL plots but keep the pairing
-valid_indices <- which(!sapply(bias_plots, is.null) & !sapply(se_plots, is.null))
-bias_plots <- bias_plots[valid_indices]
-se_plots <- se_plots[valid_indices]
-
-if(length(bias_plots) > 0 && length(se_plots) > 0) {
-  # Use gridExtra for plot arrangement with shared legend
-  library(gridExtra)
-  library(grid)
-  
-  # Extract legend from one of the plots
-  legend_plot_temp <- create_dist_plot("NO", models_to_plot, show_legend = TRUE) + 
-    theme(legend.position = "bottom", legend.text = element_text(size = 10), legend.title = element_text(size = 11))
-  
-  # Function to extract legend from ggplot
-  get_legend <- function(myggplot){
-    tmp <- ggplot_gtable(ggplot_build(myggplot))
-    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-    legend <- tmp$grobs[[leg]]
-    return(legend)
-  }
-  
-  # Extract the legend
-  shared_legend <- get_legend(legend_plot_temp)
-  
-  # Interleave bias and SE plots for each distribution
-  all_plots <- vector("list", length(bias_plots) * 2)
-  for(i in 1:length(bias_plots)) {
-    all_plots[2*i-1] <- bias_plots[i]  # Bias plot (left column)
-    all_plots[2*i] <- se_plots[i]      # SE plot (right column)
-  }
-  
-  # Arrange plots in a 4x2 grid (4 rows, 2 columns)
-  plots_grid <- do.call(arrangeGrob, c(all_plots, ncol = 2))
-  
-  # Combine the plots grid with the shared legend at the bottom
-  combined_plot <- arrangeGrob(plots_grid, shared_legend, 
-                              ncol = 1, 
-                              heights = c(10, 1))
-  
-  # Display the combined plot
-  grid.draw(combined_plot)
-  
-  # Save the combined plot to Charts directory
-  chart_filename <- paste0("Charts/Mu1_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
-  
-  ggsave(chart_filename, plot = combined_plot, width = 15, height = 14, dpi = 600)
-  cat("Combined bias and SE plot saved to:", chart_filename, "\n")
-  
-  cat("Mu1 bias and SE vs correlation plots created successfully!\n")
-  cat("Number of bias plots created:", length(bias_plots), "\n")
-  cat("Number of SE plots created:", length(se_plots), "\n")
-  
-} else {
-  cat("No plots could be created - check data availability\n")
-}
-
-# Print some diagnostic information
-cat("\nDiagnostic information:\n")
-cat("Distribution counts in true_params_matrix:\n")
-print(table(true_params_matrix$dist))
-cat("\nSkew matrix dimensions:", dim(skew_matrix), "\n")
-cat("Available models in mu1_coef_matrix:\n")
-print(colnames(mu1_coef_matrix))
-cat("\nNon-missing values in mu1_coef_matrix by model:\n")
-for(model in models_to_plot) {
-  if(model %in% colnames(mu1_coef_matrix)) {
-    non_missing <- sum(!is.na(mu1_coef_matrix[, model]))
-    model_label <- rename_model(model)
-    cat(model_label, "(", model, "):", non_missing, "non-missing values\n")
-  } else {
-    cat(model, ": not found in data\n")
-  }
-}
-
-# Print exclusion summary (only for LO distribution)
-if(exists("exclusion_summary_global") && nrow(exclusion_summary_global) > 0) {
-  cat("\n=== EXCLUSION SUMMARY (LO Distribution Only) ===\n")
-  cat("Values that would be excluded for being >10x or <0.1x the true value:\n")
-  cat("(Note: Exclusions calculated but NOT applied - all data used in plots)\n\n")
-  
-  # Print by distribution and model
-  for(dist in unique(exclusion_summary_global$distribution)) {
-    cat("Distribution:", dist, "\n")
-    dist_data <- exclusion_summary_global[exclusion_summary_global$distribution == dist, ]
-    
-    for(i in 1:nrow(dist_data)) {
-      row <- dist_data[i, ]
-      cat(sprintf("  %s (%s): %d/%d excluded (%.1f%%)\n", 
-                  row$model_label, row$model, row$excluded_values, 
-                  row$total_values, row$exclusion_rate * 100))
-    }
-    cat("\n")
-  }
-  
-  # Overall summary
-  total_excluded <- sum(exclusion_summary_global$excluded_values)
-  total_values <- sum(exclusion_summary_global$total_values)
-  cat(sprintf("OVERALL: %d/%d values excluded (%.1f%%)\n", 
-              total_excluded, total_values, 
-              if(total_values > 0) total_excluded / total_values * 100 else 0))
-} else {
-  cat("\nNo exclusion data available (exclusions only applied to LO distribution).\n")
-}
-
-# PLOTTING SECTION 
-
-## Evaluation Score Plots
+# Evaluation Score Plots ####
 
 cat("\n=== Creating Evaluation Score Plots ===\n")
 
@@ -1486,170 +933,1263 @@ cat("Creating evaluation score plots for all distributions and metrics...\n")
 desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
 
 # Define the models to plot in the desired order (use available models from score matrices)
-available_models <- colnames(vs2_matrix)
-models_to_plot_eval <- intersect(desired_order, available_models)
-
-cat("Models to plot for evaluation scores:", paste(models_to_plot_eval, collapse = ", "), "\n")
-
-# Create plots for each distribution and each metric
-distributions <- c("NO", "PO", "GA", "LO")
-metrics <- list(
-  "VS2" = vs2_matrix,
-  "VS2_Weighted" = vs2_wt_matrix, 
-  "LogLik" = loglik_matrix,
-  "BIC" = bic_matrix
-)
-
-# Initialize list to store all evaluation plots
-eval_plots <- list()
-plot_counter <- 1
-
-for(dist in distributions) {
-  for(metric_name in names(metrics)) {
-    metric_matrix <- metrics[[metric_name]]
-    
-    # Determine which models to use for this metric
-    current_models <- models_to_plot_eval
-    
-    # Exclude GEE and GAMM from LogLik and BIC plots
-    if(metric_name %in% c("LogLik", "BIC")) {
-      current_models <- current_models[!current_models %in% c("gee", "gamm")]
-    }
-    
-    # Exclude GAMLSS NP from VS2 and VS2_Weighted plots
-    if(metric_name %in% c("VS2", "VS2_Weighted")) {
-      current_models <- current_models[current_models != "re_np"]
-    }
-    
-    # TEMPORARY: Exclude GAMM from VS2 and VS2_Weighted plots
-    # To revert: comment out or delete the following 3 lines
-    #if(metric_name %in% c("VS2", "VS2_Weighted")) {
-    #  current_models <- current_models[current_models != "gamm"]
-    #}
-    
-    cat("Creating plot for:", dist, metric_name, "with models:", paste(current_models, collapse = ", "), "\n")
-    
-    # Create plot without individual legend
-    eval_plot <- create_eval_plot(dist, metric_name, metric_matrix, current_models, show_legend = FALSE)
-    
-    if(!is.null(eval_plot)) {
-      eval_plots[[plot_counter]] <- eval_plot
-      names(eval_plots)[plot_counter] <- paste(dist, metric_name, sep = "_")
-      cat("Successfully created plot:", names(eval_plots)[plot_counter], "\n")
-      plot_counter <- plot_counter + 1
-    } else {
-      cat("Failed to create plot for:", dist, metric_name, "\n")
+if(exists("vs2_matrix")) {
+  available_models <- colnames(vs2_matrix)
+  models_to_plot_eval <- intersect(desired_order, available_models)
+  
+  cat("Models to plot for evaluation scores:", paste(models_to_plot_eval, collapse = ", "), "\n")
+  
+  # Create plots for each distribution and each metric
+  distributions <- c("NO", "PO", "GA", "LO")
+  metrics <- list(
+    "VS2" = vs2_matrix,
+    "VS2_Weighted" = vs2_wt_matrix, 
+    "LogLik" = loglik_matrix,
+    "BIC" = bic_matrix
+  )
+  
+  # Initialize list to store all evaluation plots
+  eval_plots <- list()
+  plot_counter <- 1
+  
+  for(dist in distributions) {
+    for(metric_name in names(metrics)) {
+      metric_matrix <- metrics[[metric_name]]
+      
+      # Determine which models to use for this metric
+      current_models <- models_to_plot_eval
+      
+      # Exclude GEE and GAMM from LogLik and BIC plots
+      if(metric_name %in% c("LogLik", "BIC")) {
+        current_models <- current_models[!current_models %in% c("gee", "gamm")]
+      }
+      
+      # Exclude GAMLSS NP from VS2 and VS2_Weighted plots
+      if(metric_name %in% c("VS2", "VS2_Weighted")) {
+        current_models <- current_models[current_models != "re_np"]
+      }
+      
+      cat("Creating plot for:", dist, metric_name, "with models:", paste(current_models, collapse = ", "), "\n")
+      
+      # Create plot without individual legend
+      eval_plot <- create_eval_plot(dist, metric_name, metric_matrix, current_models, show_legend = FALSE)
+      
+      if(!is.null(eval_plot)) {
+        eval_plots[[plot_counter]] <- eval_plot
+        names(eval_plots)[plot_counter] <- paste(dist, metric_name, sep = "_")
+        cat("Successfully created plot:", names(eval_plots)[plot_counter], "\n")
+        plot_counter <- plot_counter + 1
+      } else {
+        cat("Failed to create plot for:", dist, metric_name, "\n")
+      }
     }
   }
+  
+  # Create a plot with legend to extract it for evaluation plots
+  legend_plot_eval <- create_eval_plot("NO", "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
+  
+  if(length(eval_plots) > 0) {
+    # Load required libraries for plot arrangement
+    library(gridExtra)
+    library(grid)
+    
+    # Debug: Check which plots are NULL
+    null_plots <- sapply(eval_plots, is.null)
+    if(any(null_plots)) {
+      cat("Warning: NULL plots found at positions:", which(null_plots), "\n")
+      cat("NULL plot names:", names(eval_plots)[null_plots], "\n")
+      # Remove NULL plots
+      eval_plots <- eval_plots[!null_plots]
+      cat("Proceeding with", length(eval_plots), "non-NULL plots\n")
+    }
+    
+    if(length(eval_plots) > 0) {
+      # Extract legend from evaluation plot with error handling
+      tryCatch({
+        legend_plot_eval_temp <- create_eval_plot("NO", "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
+        
+        if(!is.null(legend_plot_eval_temp)) {
+          legend_plot_eval_temp <- legend_plot_eval_temp + 
+            theme(legend.position = "bottom", legend.text = element_text(size = 8), legend.title = element_text(size = 9))
+          
+          # Extract the legend
+          shared_legend_eval <- get_legend(legend_plot_eval_temp)
+          
+          if(is.null(shared_legend_eval)) {
+            cat("Warning: Failed to extract legend, proceeding without shared legend\n")
+            shared_legend_eval <- grid::nullGrob()  # Create empty grob
+          }
+        } else {
+          cat("Warning: Failed to create legend plot, proceeding without shared legend\n")
+          shared_legend_eval <- grid::nullGrob()  # Create empty grob
+        }
+      }, error = function(e) {
+        cat("Error creating legend:", e$message, "\n")
+        shared_legend_eval <- grid::nullGrob()  # Create empty grob
+      })
+      
+      # Arrange plots in a 4x4 grid (4 distributions x 4 metrics) with error handling
+      tryCatch({
+        eval_plots_grid <- do.call(arrangeGrob, c(eval_plots, ncol = 4))
+        
+        # Combine the plots grid with the shared legend at the bottom
+        combined_eval_plot <- arrangeGrob(eval_plots_grid, shared_legend_eval, 
+                                         ncol = 1, 
+                                         heights = c(10, 1))
+        
+        # Display the combined evaluation plot
+        grid.draw(combined_eval_plot)
+        
+        # Save the combined evaluation plot to Charts directory
+        eval_chart_filename <- paste0("Charts/Evaluation_Scores_vs_Correlation_", Sys.Date(), ".png")
+        
+        ggsave(eval_chart_filename, plot = combined_eval_plot, width = 16, height = 12, dpi = 600)
+        cat("Combined evaluation scores plot saved to:", eval_chart_filename, "\n")
+        
+        cat("Evaluation score plots created successfully!\n")
+        cat("Number of evaluation plots created:", length(eval_plots), "\n")
+        cat("Metrics plotted:", paste(names(metrics), collapse = ", "), "\n")
+        cat("Distributions plotted:", paste(distributions, collapse = ", "), "\n")
+        
+      }, error = function(e) {
+        cat("Error arranging evaluation plots:", e$message, "\n")
+        cat("Attempting to save individual plots instead...\n")
+        
+        # Save individual plots if grid arrangement fails
+        for(i in 1:length(eval_plots)) {
+          if(!is.null(eval_plots[[i]])) {
+            plot_name <- names(eval_plots)[i]
+            if(is.null(plot_name) || plot_name == "") plot_name <- paste0("eval_plot_", i)
+            
+            individual_filename <- paste0("Charts/", plot_name, "_", Sys.Date(), ".png")
+            #ggsave(individual_filename, plot = eval_plots[[i]], width = 8, height = 6, dpi = 300)
+            cat("Individual plot saved:", individual_filename, "\n")
+          }
+        }
+      })
+    } else {
+      cat("No valid evaluation plots remaining after removing NULL plots\n")
+    }
+  } else {
+    cat("No evaluation plots could be created - check data availability\n")
+  }
+  
+  # Print evaluation data summary
+  cat("\nEvaluation Data Summary:\n")
+  for(metric_name in names(metrics)) {
+    metric_matrix <- metrics[[metric_name]]
+    if(!is.null(metric_matrix)) {
+      non_missing <- sum(!is.na(metric_matrix))
+      total <- length(metric_matrix)
+      cat(sprintf("%s: %d/%d non-missing values (%.1f%%)\n", 
+                  metric_name, non_missing, total, 
+                  if(total > 0) non_missing / total * 100 else 0))
+    }
+  }
+} else {
+  cat("vs2_matrix not found - skipping evaluation score plots\n")
 }
 
-# Create a plot with legend to extract it for evaluation plots
-legend_plot_eval <- create_eval_plot("NO", "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
-
-# Function to extract legend from ggplot (needed for evaluation plots)
-get_legend <- function(myggplot){
-  tmp <- ggplot_gtable(ggplot_build(myggplot))
-  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-  legend <- tmp$grobs[[leg]]
-  return(legend)
+# Check if computed true SEs are available
+if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+  cat("Using newly computed true SEs from true_ses_matrix\n")
+  cat("True SEs matrix dimensions:", dim(true_ses_matrix), "\n")
+  cat("Available columns:", colnames(true_ses_matrix), "\n")
+} else {
+  cat("Using old pre-computed true SEs from true_SE_out\n")
+  cat("Note: Run the true SE computation section at the end to use improved SEs\n")
 }
 
-if(length(eval_plots) > 0) {
-  # Load required libraries for plot arrangement
+# Create plots for estimation bias vs correlation for each distribution
+library(ggplot2)
+library(gridExtra)
+library(latex2exp)
+
+# Define model renaming function (moved here to be available for all plots)
+rename_model <- function(x) {
+  main_map <- c(
+    glm = "GLM",
+    gee = "GEE",
+    re_nosig = "GAMLSS",
+    re_np = "GAMLSS NP",
+    lme4 = "LME4",
+    gamm = "GAMM"
+  )
+  cop_map <- c(
+    cop = "GJRM (C)",
+    cop_n = "GJRM (N)",
+    cop_j = "GJRM (J)",
+    cop_g = "GJRM (G)", 
+    cop_f = "GJRM (F)",
+    cop_amh = "GJRM (AMH)",
+    cop_fgm = "GJRM (FGM)",
+    cop_pl = "GJRM (PL)",
+    cop_h = "GJRM (H)",
+    cop_t = "GJRM (T)"
+  )
+  if(x %in% names(main_map)) return(main_map[x])
+  if(x %in% names(cop_map)) return(cop_map[x])
+  return(x)
+}
+
+models_to_plot <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+
+# Create a consistent color mapping for all models
+all_model_labels <- sapply(models_to_plot, rename_model)
+model_colors <- setNames(scales::hue_pal()(length(all_model_labels)), all_model_labels)
+
+cat("Model color mapping:\n")
+for(i in 1:length(model_colors)) {
+  cat(sprintf("  %s: %s\n", names(model_colors)[i], model_colors[i]))
+}
+
+# First, we need to prepare the data by matching parameter sets between 
+# true_params_matrix, mu1_coef_matrix, and skew_matrix using row indices
+
+# Initialize exclusion tracking
+exclusion_summary_global <- data.frame(
+  distribution = character(),
+  model = character(),
+  model_label = character(),
+  total_values = integer(),
+  excluded_values = integer(),
+  exclusion_rate = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# MU1 functions ####
+# Create a function to prepare plot data for a specific distribution
+prepare_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    # Find models with at least some non-missing data
+    non_missing_counts <- colSums(!is.na(mu1_coef_matrix))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get true mu1 values for this distribution
+
+  # Make link function adjustments. Apply log for PO and GA and logit for LO
+  if(dist_name %in% c("GA")) {
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$a[dist_rows]))
+  } else if (dist_name == "PO") {
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$b[dist_rows])*as.numeric(true_params_matrix$c[dist_rows]))
+  } else if(dist_name == "LO") {
+    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
+  } else {
+    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
+  }
+
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated mu1 values for this distribution and selected models
+  if(dist_name %in% c("GA")) {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if (dist_name == "PO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if(dist_name == "LO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE])/(1+exp(mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]))
+  } else {
+    est_mu1_matrix <- mu1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
+  }
+
+  # Apply exclusion logic only for LO distribution
+  est_mu1_matrix_filtered <- est_mu1_matrix
+  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu1_matrix), ncol = ncol(est_mu1_matrix))
+  
+  if(dist_name == "LO") {
+    # Create exclusion mask for values more than 10x different from true values
+    # Calculate exclusion statistics but do not actually apply the exclusion
+    for(i in 1:length(true_mu1)) {
+      if(!is.na(true_mu1[i])) {
+        for(j in 1:ncol(est_mu1_matrix)) {
+          if(!is.na(est_mu1_matrix[i, j])) {
+            ratio <- abs(est_mu1_matrix[i, j] / true_mu1[i])
+            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
+              exclusion_mask[i, j] <- TRUE
+            }
+          }
+        }
+      }
+    }
+    
+    # Do NOT apply exclusion mask - keep all data for plotting
+    # est_mu1_matrix_filtered[exclusion_mask] <- NA
+    
+    # Store exclusion info for summary (global variable) - only for LO
+    if(!exists("exclusion_summary_global")) {
+      exclusion_summary_global <<- data.frame(
+        distribution = character(),
+        model = character(),
+        model_label = character(),
+        total_values = integer(),
+        excluded_values = integer(),
+        exclusion_rate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Calculate exclusion statistics for each model (only for LO)
+    for(j in 1:length(models_to_plot)) {
+      model <- models_to_plot[j]
+      model_label <- rename_model(model)
+      
+      total_non_na <- sum(!is.na(est_mu1_matrix[, j]))
+      excluded_count <- sum(exclusion_mask[, j], na.rm = TRUE)
+      
+      exclusion_info <- data.frame(
+        distribution = dist_name,
+        model = model,
+        model_label = model_label,
+        total_values = total_non_na,
+        excluded_values = excluded_count,
+        exclusion_rate = if(total_non_na > 0) excluded_count / total_non_na else 0,
+        stringsAsFactors = FALSE
+      )
+      
+      exclusion_summary_global <<- rbind(exclusion_summary_global, exclusion_info)
+    }
+  }
+  
+  # Calculate relative bias using filtered data (estimated - true)
+  bias_matrix <- est_mu1_matrix_filtered / rep(true_mu1, each = 1) -1
+  
+  # Convert to long format for ggplot
+  plot_data <- data.frame(
+    corr_vals = rep(corr_vals, length(models_to_plot)),
+    bias = as.vector(bias_matrix),
+    model = rep(models_to_plot, each = length(true_mu1)),
+    model_label = rep(sapply(models_to_plot, rename_model), each = length(true_mu1)),
+    dist = dist_name
+  )
+  
+  # Remove rows with missing values
+  plot_data <- plot_data[complete.cases(plot_data), ]
+  
+  return(plot_data)
+}
+
+# Create individual plots for each distribution
+create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  plot_data <- prepare_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(plot_data$model_label)
+  cat("Unique models in", dist_name, "data:", paste(unique_models, collapse = ", "), "\n")
+  
+  # Create the plot with consistent color mapping
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    # Use consistent color mapping, only showing models
+    scale_color_manual(values = model_colors[unique_models], 
+                       breaks = unique_models,
+                       limits = unique_models) +
+    coord_cartesian(ylim = c(-1,1)) +
+    labs(
+      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      x = "Kendall's τ",
+      y = TeX("$(\\hat{\\mu_1}/\\mu_1)-1$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# Create a function to prepare SE plot data for a specific distribution
+prepare_se_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    # Find models with at least some non-missing data
+    non_missing_counts <- colSums(!is.na(mu1_se_matrix))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No SE data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated SE values for this distribution and selected models
+  est_se_matrix <- mu1_se_matrix[dist_rows, models_to_plot, drop = FALSE]
+  
+  # NEW CODE: Get theoretical SE values from true_ses_matrix (computed at end of script)
+  # Check if true_ses_matrix is available (computed by get_true_ses function)
+  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+    # Debug: Check structure of true_ses_matrix
+    cat("Debug - true_ses_matrix structure for", dist_name, ":\n")
+    cat("  Class:", class(true_ses_matrix), "\n")
+    
+    # true_ses_matrix is actually a list - extract the actual matrix
+    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
+      cat("  Found true_ses_matrix inside list, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    } else {
+      actual_ses_matrix <- true_ses_matrix
+      cat("  Using true_ses_matrix directly, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    }
+
+    # Use t1_se from the actual matrix for mu1 theoretical SEs with proper indexing
+    if(is.matrix(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
+      # Check if dist_rows are within bounds
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix[dist_rows, "t1_se"]
+        cat("Using computed true SEs from true_ses_matrix for", dist_name, "distribution\n")
+      } else {
+        cat("Error: dist_rows out of bounds for", dist_name, "- max dist_row:", max(dist_rows), "matrix rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else if(is.data.frame(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix$t1_se[dist_rows]
+        cat("Using computed true SEs from data.frame for", dist_name, "distribution\n")
+      } else {
+        cat("Error: dist_rows out of bounds for", dist_name, "- max dist_row:", max(dist_rows), "data.frame rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else {
+      cat("Warning: t1_se column not found in true_ses_matrix for", dist_name, "\n")
+      if(is.matrix(actual_ses_matrix) || is.data.frame(actual_ses_matrix)) {
+        cat("  Available columns:", colnames(actual_ses_matrix), "\n")
+      }
+      true_se_vals <- rep(NA, length(dist_rows))
+    }
+  } else {
+    # Fallback to old method if true_ses_matrix not available
+    cat("Warning: true_ses_matrix not available, using old true_SE_out method for", dist_name, "\n")
+    true_se_vals <- rep(NA, length(dist_rows))
+  }
+  
+  # Create long format data combining estimated and theoretical SEs
+  n_models <- length(models_to_plot)
+  n_obs <- length(dist_rows)
+  
+  # Estimated SEs
+  estimated_data <- data.frame(
+    corr_vals = rep(corr_vals, n_models),
+    se_value = as.vector(est_se_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    type = "Estimated",
+    dist = dist_name
+  )
+  
+  # Theoretical SEs - only add if we have non-NA values
+  if(any(!is.na(true_se_vals))) {
+    theoretical_data <- data.frame(
+      corr_vals = corr_vals,
+      se_value = true_se_vals,
+      model = "theoretical",
+      model_label = "Theoretical",
+      type = "Theoretical",
+      dist = dist_name
+    )
+    
+    # Combine estimated and theoretical data
+    combined_se_data <- rbind(estimated_data, theoretical_data)
+  } else {
+    # Only use estimated data if no theoretical SEs available
+    combined_se_data <- estimated_data
+    cat("No theoretical SEs available for", dist_name, ", using only estimated SEs\n")
+  }
+  
+  # Remove rows with missing se_value
+  combined_se_data <- combined_se_data[complete.cases(combined_se_data$se_value), ]
+  
+  return(combined_se_data)
+}
+
+# Create SE plots for each distribution
+create_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  se_data <- prepare_se_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(se_data) || nrow(se_data) == 0) {
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(se_data$model_label)
+  cat("Unique models in", dist_name, "SE data:", paste(unique_models, collapse = ", "), "\n")
+  
+  # Get unique model labels from the data and estimated model labels
+  all_models_in_data <- unique(se_data$model_label)
+  estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
+  cat("Models in", dist_name, "SE data:", paste(all_models_in_data, collapse = ", "), "\n")
+  
+  # Create the plot with consistent color mapping
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    # Manual color scale - only include models present in this plot
+    scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
+                       breaks = all_models_in_data,
+                       limits = all_models_in_data) +
+    # Manual linetype scale - set theoretical to dashed, others to solid
+    scale_linetype_manual(values = c("Theoretical" = "dashed",
+                                    setNames(rep("solid", length(estimated_models)),
+                                            estimated_models)),
+                          breaks = all_models_in_data,
+                          limits = all_models_in_data) +
+    coord_cartesian(ylim = c(0, 0.4)) +
+    labs(
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+      x = "Kendall's τ",
+      y = TeX("SE$(\\hat{\\mu_1})$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# MU2 PLOTTING FUNCTIONS ####
+
+# Function to prepare mu2 plot data for a specific distribution
+prepare_mu2_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    # Find models with at least some non-missing data
+    non_missing_counts <- colSums(!is.na(mu2_coef_matrix))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get true mu2 values for this distribution
+  # Make link function adjustments. Apply log for PO and GA and logit for LO
+  if(dist_name %in% c("GA")) {
+    true_mu2 <- log(as.numeric(true_params_matrix$mu2[dist_rows])/as.numeric(true_params_matrix$mu1[dist_rows]))
+  } else if (dist_name == "PO") {
+    true_mu2 <- log(as.numeric(true_params_matrix$mu2[dist_rows])/as.numeric(true_params_matrix$mu1[dist_rows]))
+  } else if(dist_name == "LO") {
+    true_mu2 <- logit_inv(as.numeric(true_params_matrix$mu2[dist_rows])) - logit_inv(as.numeric(true_params_matrix$mu1[dist_rows]))
+  } else {
+    true_mu2 <- as.numeric(true_params_matrix$mu2[dist_rows])- as.numeric(true_params_matrix$mu1[dist_rows])
+  }
+
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated mu2 values for this distribution and selected models
+  if(dist_name %in% c("GA")) {
+    est_mu2_matrix <- (mu2_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if (dist_name == "PO") {
+    est_mu2_matrix <- (mu2_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else if(dist_name == "LO") {
+    est_mu2_matrix <- (mu2_coef_matrix[dist_rows, models_to_plot, drop = FALSE])
+  } else {
+    est_mu2_matrix <- mu2_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
+  }
+
+  # Apply exclusion logic only for LO distribution
+  est_mu2_matrix_filtered <- est_mu2_matrix
+  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu2_matrix), ncol = ncol(est_mu2_matrix))
+  
+  if(dist_name == "LO") {
+    # Create exclusion mask for values more than 10x different from true values
+    for(i in 1:length(true_mu2)) {
+      if(!is.na(true_mu2[i])) {
+        for(j in 1:ncol(est_mu2_matrix)) {
+          if(!is.na(est_mu2_matrix[i, j])) {
+            ratio <- abs(est_mu2_matrix[i, j] / true_mu2[i])
+            if(ratio > 10 || ratio < 0.1) { # Using 10x and 0.1x threshold
+              exclusion_mask[i, j] <- TRUE
+            }
+          }
+        }
+      }
+    }
+    
+    # Store exclusion info for summary (global variable) - only for LO
+    if(!exists("exclusion_summary_mu2_global")) {
+      exclusion_summary_mu2_global <<- data.frame(
+        distribution = character(),
+        model = character(),
+        model_label = character(),
+        total_values = integer(),
+        excluded_values = integer(),
+        exclusion_rate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Calculate exclusion statistics for each model (only for LO)
+    for(j in 1:length(models_to_plot)) {
+      model_name <- models_to_plot[j]
+      model_label <- rename_model(model_name)
+      
+      total_vals <- sum(!is.na(est_mu2_matrix[, j]))
+      excluded_vals <- sum(exclusion_mask[, j], na.rm = TRUE)
+      exclusion_rate <- if(total_vals > 0) excluded_vals / total_vals else 0
+      
+      exclusion_summary_mu2_global <<- rbind(exclusion_summary_mu2_global, data.frame(
+        distribution = dist_name,
+        model = model_name,
+        model_label = model_label,
+        total_values = total_vals,
+        excluded_values = excluded_vals,
+        exclusion_rate = exclusion_rate,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+  
+  # Calculate bias: (estimated - true) / true
+  bias_matrix <- matrix(NA, nrow = nrow(est_mu2_matrix_filtered), ncol = ncol(est_mu2_matrix_filtered))
+  
+  for(i in 1:length(true_mu2)) {
+    if(!is.na(true_mu2[i]) && true_mu2[i] != 0) {
+      for(j in 1:ncol(est_mu2_matrix_filtered)) {
+        if(!is.na(est_mu2_matrix_filtered[i, j])) {
+          bias_matrix[i, j] <- (est_mu2_matrix_filtered[i, j] / true_mu2[i]) - 1
+        }
+      }
+    }
+  }
+  
+  # Create long format data
+  n_models <- length(models_to_plot)
+  n_obs <- nrow(bias_matrix)
+  
+  plot_data <- data.frame(
+    corr_vals = rep(corr_vals, n_models),
+    bias = as.vector(bias_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    dist = dist_name
+  )
+  
+  # Remove rows with missing bias values
+  plot_data <- plot_data[complete.cases(plot_data$bias), ]
+  
+  # Print summary statistics
+  cat("Mu2 plot data for", dist_name, ":\n")
+  cat("  Total observations:", nrow(plot_data), "\n")
+  cat("  Models:", paste(unique(plot_data$model), collapse = ", "), "\n")
+  cat("  Correlation range:", round(range(plot_data$corr_vals, na.rm = TRUE), 3), "\n")
+  cat("  Bias range:", round(range(plot_data$bias, na.rm = TRUE), 3), "\n")
+  
+  return(plot_data)
+}
+
+# Function to create mu2 bias plot for a specific distribution
+create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  plot_data <- prepare_mu2_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(plot_data$model_label)
+  cat("Unique models in", dist_name, "mu2 data:", paste(unique_models, collapse = ", "), "\n")
+  
+  # Create the plot with consistent color mapping
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    # Use consistent color mapping, only showing models present in this plot
+    scale_color_manual(values = model_colors[unique_models], 
+                       breaks = unique_models,
+                       limits = unique_models) +
+    coord_cartesian(ylim = c(-1,1)) +
+    labs(
+      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      x = "Kendall's τ",
+      y = TeX("$(\\hat{\\mu_2}/\\mu_2)-1$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# Function to prepare mu2 SE plot data
+prepare_mu2_se_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    # Find models with at least some non-missing data
+    non_missing_counts <- colSums(!is.na(mu2_se_matrix))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No mu2 SE data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated SE values for this distribution and selected models
+  est_se_matrix <- mu2_se_matrix[dist_rows, models_to_plot, drop = FALSE]
+  
+  # Get theoretical SE values from true_ses_matrix (computed at end of script)
+  # Check if true_ses_matrix is available (computed by get_true_ses function)
+  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+    # Debug: Check structure of true_ses_matrix
+    cat("Debug - true_ses_matrix structure for mu2", dist_name, ":\n")
+    cat("  Class:", class(true_ses_matrix), "\n")
+    
+    # true_ses_matrix is actually a list - extract the actual matrix
+    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
+      cat("  Found true_ses_matrix inside list, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    } else {
+      actual_ses_matrix <- true_ses_matrix
+      cat("  Using true_ses_matrix directly, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    }
+
+    # Use t2_se from the actual matrix for mu2 theoretical SEs with proper indexing
+    if(is.matrix(actual_ses_matrix) && "t2_se" %in% colnames(actual_ses_matrix)) {
+      # Check if dist_rows are within bounds
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix[dist_rows, "t2_se"]
+        cat("Using computed true SEs from true_ses_matrix for mu2", dist_name, "distribution\n")
+      } else {
+        cat("Error: dist_rows out of bounds for mu2", dist_name, "- max dist_row:", max(dist_rows), "matrix rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else if(is.data.frame(actual_ses_matrix) && "t2_se" %in% colnames(actual_ses_matrix)) {
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix$t2_se[dist_rows]
+        cat("Using computed true SEs from data.frame for mu2", dist_name, "distribution\n")
+      } else {
+        cat("Error: dist_rows out of bounds for mu2", dist_name, "- max dist_row:", max(dist_rows), "data.frame rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else {
+      cat("Warning: t2_se column not found in true_ses_matrix for mu2", dist_name, "\n")
+      if(is.matrix(actual_ses_matrix) || is.data.frame(actual_ses_matrix)) {
+        cat("  Available columns:", colnames(actual_ses_matrix), "\n")
+      }
+      true_se_vals <- rep(NA, length(dist_rows))
+    }
+  } else {
+    # Fallback to old method if true_ses_matrix not available
+    cat("Warning: true_ses_matrix not available, using old true_SE_out method for mu2", dist_name, "\n")
+    true_se_vals <- rep(NA, length(dist_rows))
+  }
+  
+  # Create long format data combining estimated and theoretical SEs
+  n_models <- length(models_to_plot)
+  n_obs <- length(dist_rows)
+  
+  # Estimated SEs
+  estimated_data <- data.frame(
+    corr_vals = rep(corr_vals, n_models),
+    se_value = as.vector(est_se_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    type = "Estimated",
+    dist = dist_name
+  )
+  
+  # Theoretical SEs - only add if we have non-NA values
+  if(any(!is.na(true_se_vals))) {
+    theoretical_data <- data.frame(
+      corr_vals = corr_vals,
+      se_value = true_se_vals,
+      model = "theoretical",
+      model_label = "Theoretical",
+      type = "Theoretical",
+      dist = dist_name
+    )
+    
+    # Combine estimated and theoretical data
+    combined_se_data <- rbind(estimated_data, theoretical_data)
+  } else {
+    # Only use estimated data if no theoretical SEs available
+    combined_se_data <- estimated_data
+    cat("No theoretical SEs available for mu2", dist_name, ", using only estimated SEs\n")
+  }
+  
+  # Remove rows with missing se_value
+  combined_se_data <- combined_se_data[complete.cases(combined_se_data$se_value), ]
+  
+  return(combined_se_data)
+}
+
+# Function to create mu2 SE plot for a specific distribution
+create_mu2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  se_data <- prepare_mu2_se_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(se_data) || nrow(se_data) == 0) {
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(se_data$model_label)
+  cat("Unique models in", dist_name, "mu2 SE data:", paste(unique_models, collapse = ", "), "\n")
+  
+  # Get unique model labels from the data and estimated model labels
+  all_models_in_data <- unique(se_data$model_label)
+  estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
+  cat("Models in", dist_name, "mu2 SE data:", paste(all_models_in_data, collapse = ", "), "\n")
+  
+  # Create the plot with consistent color mapping
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    # Manual color scale - only include models present in this plot
+    scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
+                       breaks = all_models_in_data,
+                       limits = all_models_in_data) +
+    # Manual linetype scale - set theoretical to dashed, others to solid
+    scale_linetype_manual(values = c("Theoretical" = "dashed",
+                                    setNames(rep("solid", length(estimated_models)),
+                                            estimated_models)),
+                          breaks = all_models_in_data,
+                          limits = all_models_in_data) +
+    coord_cartesian(ylim = c(0, 0.4)) +
+    labs(
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+      x = "Kendall's τ",
+      y = TeX("SE$(\\hat{\\mu_1})$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# Create mu1 BIAS AND SE CHARTS VS CORRELATION ----
+
+# Create plots for each distribution
+cat("Creating mu1 bias vs correlation plots for each distribution...\n")
+
+# Debug: Check true_ses_matrix structure before plotting
+cat("\n=== DEBUG: Checking true_ses_matrix structure ===\n")
+if(exists("true_ses_matrix")) {
+  cat("true_ses_matrix exists\n")
+  cat("Class:", class(true_ses_matrix), "\n")
+  if(is.matrix(true_ses_matrix)) {
+    cat("Dimensions:", dim(true_ses_matrix), "\n")
+    cat("Column names:", colnames(true_ses_matrix), "\n")
+    cat("Row names (first 5):", head(rownames(true_ses_matrix), 5), "\n")
+  } else if(is.data.frame(true_ses_matrix)) {
+    cat("Dimensions:", dim(true_ses_matrix), "\n")
+    cat("Column names:", colnames(true_ses_matrix), "\n")
+  } else if(is.list(true_ses_matrix)) {
+    cat("List structure with names:", names(true_ses_matrix), "\n")
+  } else {
+    cat("Length:", length(true_ses_matrix), "\n")
+    cat("Names:", names(true_ses_matrix), "\n")
+  }
+} else {
+  cat("true_ses_matrix does not exist\n")
+}
+cat("=== END DEBUG ===\n\n")
+
+# Create bias plots without individual legends (we'll add a shared legend)
+plot_NO_bias <- create_dist_plot("NO", models_to_plot, show_legend = FALSE)
+plot_PO_bias <- create_dist_plot("PO", models_to_plot, show_legend = FALSE) 
+plot_GA_bias <- create_dist_plot("GA", models_to_plot, show_legend = FALSE)
+plot_LO_bias <- create_dist_plot("LO", models_to_plot, show_legend = FALSE)
+
+# Create SE plots without individual legends
+plot_NO_se <- tryCatch(create_se_plot("NO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating NO SE plot:", e$message, "\n"); NULL })
+plot_PO_se <- tryCatch(create_se_plot("PO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating PO SE plot:", e$message, "\n"); NULL })
+plot_GA_se <- tryCatch(create_se_plot("GA", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating GA SE plot:", e$message, "\n"); NULL })
+plot_LO_se <- tryCatch(create_se_plot("LO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating LO SE plot:", e$message, "\n"); NULL })
+
+# Create a plot with legend to extract it for mu1
+legend_plot <- create_dist_plot("NO", models_to_plot, show_legend = TRUE)
+
+# Remove NULL plots and organize in pairs
+bias_plots <- list(plot_NO_bias, plot_PO_bias, plot_GA_bias, plot_LO_bias)
+se_plots <- list(plot_NO_se, plot_PO_se, plot_GA_se, plot_LO_se)
+
+# Filter out NULL plots but keep the pairing
+valid_indices <- which(!sapply(bias_plots, is.null) & !sapply(se_plots, is.null))
+bias_plots <- bias_plots[valid_indices]
+se_plots <- se_plots[valid_indices]
+
+if(length(bias_plots) > 0 && length(se_plots) > 0) {
+  # Use gridExtra for plot arrangement with shared legend
   library(gridExtra)
   library(grid)
   
-  # Debug: Check which plots are NULL
-  null_plots <- sapply(eval_plots, is.null)
-  if(any(null_plots)) {
-    cat("Warning: NULL plots found at positions:", which(null_plots), "\n")
-    cat("NULL plot names:", names(eval_plots)[null_plots], "\n")
-    # Remove NULL plots
-    eval_plots <- eval_plots[!null_plots]
-    cat("Proceeding with", length(eval_plots), "non-NULL plots\n")
+  # First, check what distributions are available
+  available_dists <- unique(true_params_matrix$dist)
+  cat("Available distributions:", paste(available_dists, collapse = ", "), "\n")
+  
+  # Find the first distribution that has data for legend extraction
+  legend_dist <- NULL
+  for(dist in c("GA", "NO", "PO", "LO")) {
+    if(dist %in% available_dists) {
+      test_plot <- create_dist_plot(dist, models_to_plot, show_legend = TRUE)
+
+      if(!is.null(test_plot)) {
+        legend_dist <- dist
+        break
+      }
+    }
   }
   
-  if(length(eval_plots) > 0) {
-    # Extract legend from evaluation plot with error handling
-    tryCatch({
-      legend_plot_eval_temp <- create_eval_plot("NO", "VS2", vs2_matrix, models_to_plot_eval, show_legend = TRUE)
-      
-      if(!is.null(legend_plot_eval_temp)) {
-        legend_plot_eval_temp <- legend_plot_eval_temp + 
-          theme(legend.position = "bottom", legend.text = element_text(size = 8), legend.title = element_text(size = 9))
-        
-        # Extract the legend
-        shared_legend_eval <- get_legend(legend_plot_eval_temp)
-        
-        if(is.null(shared_legend_eval)) {
-          cat("Warning: Failed to extract legend, proceeding without shared legend\n")
-          shared_legend_eval <- grid::nullGrob()  # Create empty grob
-        }
-      } else {
-        cat("Warning: Failed to create legend plot, proceeding without shared legend\n")
-        shared_legend_eval <- grid::nullGrob()  # Create empty grob
-      }
-    }, error = function(e) {
-      cat("Error creating legend:", e$message, "\n")
-      shared_legend_eval <- grid::nullGrob()  # Create empty grob
-    })
-    
-    # Arrange plots in a 4x4 grid (4 distributions x 4 metrics) with error handling
-    tryCatch({
-      eval_plots_grid <- do.call(arrangeGrob, c(eval_plots, ncol = 4))
-      
-      # Combine the plots grid with the shared legend at the bottom
-      combined_eval_plot <- arrangeGrob(eval_plots_grid, shared_legend_eval, 
-                                       ncol = 1, 
-                                       heights = c(10, 1))
-      
-      # Display the combined evaluation plot
-      grid.draw(combined_eval_plot)
-      
-      # Save the combined evaluation plot to Charts directory
-      eval_chart_filename <- paste0("Charts/Evaluation_Scores_vs_Correlation_", Sys.Date(), ".png")
-      
-      ggsave(eval_chart_filename, plot = combined_eval_plot, width = 16, height = 12, dpi = 600)
-      cat("Combined evaluation scores plot saved to:", eval_chart_filename, "\n")
-      
-      cat("Evaluation score plots created successfully!\n")
-      cat("Number of evaluation plots created:", length(eval_plots), "\n")
-      cat("Metrics plotted:", paste(names(metrics), collapse = ", "), "\n")
-      cat("Distributions plotted:", paste(distributions, collapse = ", "), "\n")
-      
-    }, error = function(e) {
-      cat("Error arranging evaluation plots:", e$message, "\n")
-      cat("Attempting to save individual plots instead...\n")
-      
-      # Save individual plots if grid arrangement fails
-      for(i in 1:length(eval_plots)) {
-        if(!is.null(eval_plots[[i]])) {
-          plot_name <- names(eval_plots)[i]
-          if(is.null(plot_name) || plot_name == "") plot_name <- paste0("eval_plot_", i)
-          
-          individual_filename <- paste0("Charts/", plot_name, "_", Sys.Date(), ".png")
-          ggsave(individual_filename, plot = eval_plots[[i]], width = 8, height = 6, dpi = 300)
-          cat("Individual plot saved:", individual_filename, "\n")
-        }
-      }
-    })
+  if(is.null(legend_dist)) {
+    stop("No valid distribution found for legend extraction")
+  }
+  
+  cat("Using", legend_dist, "distribution for legend extraction\n")
+  
+  # Extract legend from the working distribution
+  legend_plot_temp <- create_dist_plot(legend_dist, models_to_plot, show_legend = TRUE) + 
+    theme(legend.position = "bottom", legend.text = element_text(size = 10), legend.title = element_text(size = 11))
+  
+  # Extract the legend
+  shared_legend <- get_legend(legend_plot_temp)
+  
+  # Interleave bias and SE plots for each distribution
+  all_plots <- vector("list", length(bias_plots) * 2)
+  for(i in 1:length(bias_plots)) {
+    all_plots[2*i-1] <- bias_plots[i]  # Bias plot (left column)
+    all_plots[2*i] <- se_plots[i]      # SE plot (right column)
+  }
+  
+  # Arrange plots in a 4x2 grid (4 rows, 2 columns)
+  plots_grid <- do.call(arrangeGrob, c(all_plots, ncol = 2))
+  
+  # Combine the plots grid with the shared legend at the bottom
+  combined_plot <- arrangeGrob(plots_grid, shared_legend, 
+                              ncol = 1, 
+                              heights = c(10, 1))
+  
+  # Display the combined plot
+  grid.draw(combined_plot)
+  
+  # Save the combined plot to Charts directory
+  chart_filename <- paste0("Charts/Mu1_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
+  
+  ggsave(chart_filename, plot = combined_plot, width = 15, height = 14, dpi = 600)
+  cat("Combined bias and SE plot saved to:", chart_filename, "\n")
+  
+  cat("Mu1 bias and SE vs correlation plots created successfully!\n")
+  cat("Number of bias plots created:", length(bias_plots), "\n")
+  cat("Number of SE plots created:", length(se_plots), "\n")
+  
+} else {
+  cat("No plots could be created - check data availability\n")
+}
+
+# Print some diagnostic information
+cat("\nDiagnostic information:\n")
+cat("Distribution counts in true_params_matrix:\n")
+print(table(true_params_matrix$dist))
+cat("\nSkew matrix dimensions:", dim(skew_matrix), "\n")
+cat("Available models in mu1_coef_matrix:\n")
+print(colnames(mu1_coef_matrix))
+cat("\nNon-missing values in mu1_coef_matrix by model:\n")
+for(model in models_to_plot) {
+  if(model %in% colnames(mu1_coef_matrix)) {
+    non_missing <- sum(!is.na(mu1_coef_matrix[, model]))
+    model_label <- rename_model(model)
+    cat(model_label, "(", model, "):", non_missing, "non-missing values\n")
   } else {
-    cat("No valid evaluation plots remaining after removing NULL plots\n")
+    cat(model, ": not found in data\n")
+  }
+}
+
+# Print exclusion summary (only for LO distribution)
+if(exists("exclusion_summary_global") && nrow(exclusion_summary_global) > 0) {
+  cat("\n=== EXCLUSION SUMMARY (LO Distribution Only) ===\n")
+  cat("Values that would be excluded for being >10x or <0.1x the true value:\n")
+  cat("(Note: Exclusions calculated but NOT applied - all data used in plots)\n\n")
+  
+  # Print by distribution and model
+  for(dist in unique(exclusion_summary_global$distribution)) {
+    cat("Distribution:", dist, "\n")
+    dist_data <- exclusion_summary_global[exclusion_summary_global$distribution == dist, ]
+    
+    for(i in 1:nrow(dist_data)) {
+      row <- dist_data[i, ]
+      cat(sprintf("  %s (%s): %d/%d excluded (%.1f%%)\n", 
+                  row$model_label, row$model, row$excluded_values, 
+                  
+                  row$total_values, row$exclusion_rate * 100))
+    }
+    cat("\n")
+  }
+  
+  # Overall summary
+  total_excluded <- sum(exclusion_summary_global$excluded_values)
+  total_values <- sum(exclusion_summary_global$total_values)
+  cat(sprintf("OVERALL: %d/%d values excluded (%.1f%%)\n", 
+              total_excluded, total_values, 
+              if(total_values > 0) total_excluded / total_values * 100 else 0))
+} else {
+  cat("\nNo exclusion data available (exclusions only applied to LO distribution).\n")
+}
+
+# Create mu2 bias and SE plots for each distribution
+cat("Creating mu2 bias and SE plots for each distribution...\n")
+
+# Debug: Check true_ses_matrix structure before mu2 plotting
+cat("\n=== DEBUG: Checking true_ses_matrix structure for mu2 ===\n")
+if(exists("true_ses_matrix")) {
+  cat("true_ses_matrix exists\n")
+  cat("Class:", class(true_ses_matrix), "\n")
+  if(is.matrix(true_ses_matrix)) {
+    cat("Dimensions:", dim(true_ses_matrix), "\n")
+    cat("Column names:", colnames(true_ses_matrix), "\n")
+    cat("Row names (first 5):", head(rownames(true_ses_matrix), 5), "\n")
+  } else if(is.data.frame(true_ses_matrix)) {
+    cat("Dimensions:", dim(true_ses_matrix), "\n")
+    cat("Column names:", colnames(true_ses_matrix), "\n")
+  } else if(is.list(true_ses_matrix)) {
+    cat("List structure with names:", names(true_ses_matrix), "\n")
+  } else {
+    cat("Length:", length(true_ses_matrix), "\n")
+    cat("Names:", names(true_ses_matrix), "\n")
   }
 } else {
-  cat("No evaluation plots could be created - check data availability\n")
+  cat("true_ses_matrix does not exist\n")
+}
+cat("=== END DEBUG for mu2 ===\n\n")
+
+# Create mu2 bias plots without individual legends (we'll add a shared legend)
+plot_NO_mu2_bias <- create_mu2_dist_plot("NO", models_to_plot, show_legend = FALSE)
+plot_PO_mu2_bias <- create_mu2_dist_plot("PO", models_to_plot, show_legend = FALSE) 
+plot_GA_mu2_bias <- create_mu2_dist_plot("GA", models_to_plot, show_legend = FALSE)
+plot_LO_mu2_bias <- create_mu2_dist_plot("LO", models_to_plot, show_legend = FALSE)
+
+# Create mu2 SE plots without individual legends
+plot_NO_mu2_se <- tryCatch(create_mu2_se_plot("NO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating NO mu2 SE plot:", e$message, "\n"); NULL })
+plot_PO_mu2_se <- tryCatch(create_mu2_se_plot("PO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating PO mu2 SE plot:", e$message, "\n"); NULL })
+plot_GA_mu2_se <- tryCatch(create_mu2_se_plot("GA", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating GA mu2 SE plot:", e$message, "\n"); NULL })
+plot_LO_mu2_se <- tryCatch(create_mu2_se_plot("LO", models_to_plot, show_legend = FALSE), error = function(e) { cat("Error creating LO mu2 SE plot:", e$message, "\n"); NULL })
+
+# Create a plot with legend to extract it for mu2
+legend_plot_mu2 <- create_mu2_dist_plot("NO", models_to_plot, show_legend = TRUE)
+
+# Remove NULL plots and organize in pairs
+bias_plots_mu2 <- list(plot_NO_mu2_bias, plot_PO_mu2_bias, plot_GA_mu2_bias, plot_LO_mu2_bias)
+se_plots_mu2 <- list(plot_NO_mu2_se, plot_PO_mu2_se, plot_GA_mu2_se, plot_LO_mu2_se)
+
+# Filter out NULL plots but keep the pairing
+valid_indices_mu2 <- which(!sapply(bias_plots_mu2, is.null) & !sapply(se_plots_mu2, is.null))
+bias_plots_mu2 <- bias_plots_mu2[valid_indices_mu2]
+se_plots_mu2 <- se_plots_mu2[valid_indices_mu2]
+
+if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
+  # Use gridExtra for plot arrangement with shared legend
+  library(gridExtra)
+  library(grid)
+  
+  # First, check what distributions are available for mu2
+  available_dists_mu2 <- unique(true_params_matrix$dist)
+  cat("Available distributions for mu2:", paste(available_dists_mu2, collapse = ", "), "\n")
+  
+  # Find the first distribution that has data for legend extraction
+  legend_dist_mu2 <- NULL
+  for(dist in c("GA", "NO", "PO", "LO")) {
+    if(dist %in% available_dists_mu2) {
+      test_plot_mu2 <- create_mu2_dist_plot(dist, models_to_plot, show_legend = TRUE)
+
+      if(!is.null(test_plot_mu2)) {
+        legend_dist_mu2 <- dist
+        break
+      }
+    }
+  }
+  
+  if(is.null(legend_dist_mu2)) {
+    stop("No valid distribution found for mu2 legend extraction")
+  }
+  
+  cat("Using", legend_dist_mu2, "distribution for mu2 legend extraction\n")
+  
+  # Extract legend from the working distribution
+  legend_plot_temp_mu2 <- create_mu2_dist_plot(legend_dist_mu2, models_to_plot, show_legend = TRUE) + 
+    theme(legend.position = "bottom", legend.text = element_text(size = 10), legend.title = element_text(size = 11))
+  
+  # Extract the legend
+  shared_legend_mu2 <- get_legend(legend_plot_temp_mu2)
+  
+  # Interleave bias and SE plots for each distribution
+  all_plots_mu2 <- vector("list", length(bias_plots_mu2) * 2)
+  for(i in 1:length(bias_plots_mu2)) {
+    all_plots_mu2[2*i-1] <- bias_plots_mu2[i]  # Bias plot (left column)
+    all_plots_mu2[2*i] <- se_plots_mu2[i]      # SE plot (right column)
+  }
+  
+  # Arrange plots in a 4x2 grid (4 rows, 2 columns)
+  plots_grid_mu2 <- do.call(arrangeGrob, c(all_plots_mu2, ncol = 2))
+  
+  # Combine the plots grid with the shared legend at the bottom
+  combined_plot_mu2 <- arrangeGrob(plots_grid_mu2, shared_legend_mu2, 
+                              ncol = 1, 
+                              heights = c(10, 1))
+  
+  # Display the combined plot
+  grid.draw(combined_plot_mu2)
+  
+  # Save the combined plot to Charts directory
+  chart_filename_mu2 <- paste0("Charts/Mu2_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
+  
+  ggsave(chart_filename_mu2, plot = combined_plot_mu2, width = 15, height = 14, dpi = 600)
+  cat("Combined mu2 bias and SE plot saved to:", chart_filename_mu2, "\n")
+  
+  cat("Mu2 bias and SE vs correlation plots created successfully!\n")
+  cat("Number of mu2 bias plots created:", length(bias_plots_mu2), "\n")
+  cat("Number of mu2 SE plots created:", length(se_plots_mu2), "\n")
+  
+} else {
+  cat("No mu2 plots could be created - check data availability\n")
 }
 
-# Print evaluation data summary
-cat("\nEvaluation Data Summary:\n")
-for(metric_name in names(metrics)) {
-  metric_matrix <- metrics[[metric_name]]
-  non_missing <- sum(!is.na(metric_matrix))
-  total <- length(metric_matrix)
-  cat(sprintf("%s: %d/%d non-missing values (%.1f%%)\n", 
-              metric_name, non_missing, total, 
-              if(total > 0) non_missing / total * 100 else 0))
+# Print some diagnostic information for mu2
+cat("\nDiagnostic information for mu2:\n")
+cat("Distribution counts in true_params_matrix:\n")
+print(table(true_params_matrix$dist))
+cat("\nSkew matrix dimensions:", dim(skew_matrix), "\n")
+cat("Available models in mu2_coef_matrix:\n")
+print(colnames(mu2_coef_matrix))
+cat("\nNon-missing values in mu2_coef_matrix by model:\n")
+for(model in models_to_plot) {
+  if(model %in% colnames(mu2_coef_matrix)) {
+    non_missing <- sum(!is.na(mu2_coef_matrix[, model]))
+    model_label <- rename_model(model)
+    cat(model_label, "(", model, "):", non_missing, "non-missing values\n")
+  } else {
+    cat(model, ": not found in mu2 data\n")
+  }
 }
 
-# Note: true_ses_matrix loading has been moved to earlier in the script (after true_SE_out creation)
-# The plotting functions will automatically use true_ses_matrix if available, otherwise fall back to true_SE_out
+# Print exclusion summary for mu2 (only for LO distribution)
+if(exists("exclusion_summary_mu2_global") && nrow(exclusion_summary_mu2_global) > 0) {
+  cat("\n=== MU2 EXCLUSION SUMMARY (LO Distribution Only) ===\n")
+  cat("Values that would be excluded for being >10x or <0.1x the true value:\n")
+  cat("(Note: Exclusions calculated but NOT applied - all data used in plots)\n\n")
+  
+  # Print by distribution and model
+  for(dist in unique(exclusion_summary_mu2_global$distribution)) {
+    cat("Distribution:", dist, "\n")
+    dist_data <- exclusion_summary_mu2_global[exclusion_summary_mu2_global$distribution == dist, ]
+    
+    for(i in 1:nrow(dist_data)) {
+      row <- dist_data[i, ]
+      cat(sprintf("  %s (%s): %d/%d excluded (%.1f%%)\n", 
+                  row$model_label, row$model, row$excluded_values, 
+                  row$total_values, row$exclusion_rate * 100))
+    }
+    cat("\n")
+  }
+  
+  # Overall summary for mu2
+  total_excluded_mu2 <- sum(exclusion_summary_mu2_global$excluded_values)
+  total_values_mu2 <- sum(exclusion_summary_mu2_global$total_values)
+  cat(sprintf("OVERALL MU2: %d/%d values excluded (%.1f%%)\n", 
+              total_excluded_mu2, total_values_mu2, 
+              if(total_values_mu2 > 0) total_excluded_mu2 / total_values_mu2 * 100 else 0))
+} else {
+  cat("\nNo mu2 exclusion data available (exclusions only applied to LO distribution).\n")
+}
+
