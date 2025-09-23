@@ -24,11 +24,129 @@ if(length(missing_objects) > 0) {
   cat("All required data objects found. Proceeding with x1 plotting...\n")
 }
 
+# OUTLIER REMOVAL FOR X1 PLOTS ----
+cat("\n=== APPLYING OUTLIER REMOVAL FOR X1 PLOTS ===\n")
+
+# Function to remove outliers using conservative 3*IQR method
+remove_outliers_x1 <- function(matrix_data, matrix_name = "matrix", iqr_multiplier = 3, 
+                           remove_global_outliers = TRUE, verbose = TRUE) {
+  
+  if(verbose) cat("Processing", matrix_name, "for outlier removal...\n")
+  
+  # Make a copy to work with
+  cleaned_matrix <- matrix_data
+  total_removed <- 0
+  
+  # Step 1: Remove global outliers (computational failures)
+  if(remove_global_outliers) {
+    # Find infinite, NaN, or extremely large values
+    global_outliers <- is.infinite(cleaned_matrix) | is.nan(cleaned_matrix) | 
+                      abs(cleaned_matrix) > 1000 * median(abs(cleaned_matrix), na.rm = TRUE)
+    
+    global_count <- sum(global_outliers, na.rm = TRUE)
+    if(global_count > 0) {
+      cleaned_matrix[global_outliers] <- NA
+      total_removed <- total_removed + global_count
+      if(verbose) cat("  Removed", global_count, "global outliers (inf/nan/extreme values)\n")
+    }
+  }
+  
+  # Step 2: Distribution-specific outlier removal using 3*IQR
+  # Get unique distributions
+  distributions <- unique(true_params_matrix[, "dist"])
+  distributions <- distributions[!is.na(distributions)]
+  
+  for(dist in distributions) {
+    if(verbose) cat("  Processing distribution:", dist, "\n")
+    
+    # Get rows for this distribution
+    dist_rows <- which(true_params_matrix[, "dist"] == dist)
+    
+    if(length(dist_rows) == 0) next
+    
+    # Process each model column separately
+    for(j in 1:ncol(cleaned_matrix)) {
+      model_name <- colnames(cleaned_matrix)[j]
+      
+      # Get data for this distribution and model
+      dist_model_data <- cleaned_matrix[dist_rows, j]
+      
+      # Skip if all missing
+      if(all(is.na(dist_model_data))) next
+      
+      # Calculate IQR-based bounds
+      q1 <- quantile(dist_model_data, 0.25, na.rm = TRUE)
+      q3 <- quantile(dist_model_data, 0.75, na.rm = TRUE)
+      iqr <- q3 - q1
+      
+      # Skip if IQR is 0 (no variation)
+      if(iqr == 0 || is.na(iqr)) next
+      
+      # Define outlier bounds using 3*IQR (conservative)
+      lower_bound <- q1 - iqr_multiplier * iqr
+      upper_bound <- q3 + iqr_multiplier * iqr
+      
+      # Identify outliers
+      outliers <- !is.na(dist_model_data) & 
+                 (dist_model_data < lower_bound | dist_model_data > upper_bound)
+      
+      outlier_count <- sum(outliers)
+      
+      if(outlier_count > 0) {
+        # Remove outliers
+        cleaned_matrix[dist_rows[outliers], j] <- NA
+        total_removed <- total_removed + outlier_count
+        
+        if(verbose) {
+          cat("    ", model_name, "- removed", outlier_count, "outliers",
+              "(bounds: [", round(lower_bound, 3), ",", round(upper_bound, 3), "])\n")
+        }
+      }
+    }
+  }
+  
+  if(verbose) {
+    cat("  Total outliers removed from", matrix_name, ":", total_removed, "\n")
+    cat("  Percentage removed:", round(100 * total_removed / length(matrix_data), 2), "%\n")
+  }
+  
+  return(cleaned_matrix)
+}
+
+# Apply outlier removal to X1 coefficient and SE matrices
+cat("\nApplying outlier removal to X1 coefficient and SE matrices...\n")
+x1_coef_matrix_clean <- remove_outliers_x1(x1_coef_matrix, "x1_coef_matrix")
+x1_se_matrix_clean <- remove_outliers_x1(x1_se_matrix, "x1_se_matrix")
+
+# Summary of outlier removal for X1
+cat("\n=== X1 OUTLIER REMOVAL SUMMARY ===\n")
+
+matrices_info_x1 <- list(
+  "x1_coef" = list(original = x1_coef_matrix, cleaned = x1_coef_matrix_clean),
+  "x1_se" = list(original = x1_se_matrix, cleaned = x1_se_matrix_clean)
+)
+
+for(matrix_name in names(matrices_info_x1)) {
+  orig <- matrices_info_x1[[matrix_name]]$original
+  clean <- matrices_info_x1[[matrix_name]]$cleaned
+  
+  orig_missing <- sum(is.na(orig))
+  clean_missing <- sum(is.na(clean))
+  additional_missing <- clean_missing - orig_missing
+  
+  cat(matrix_name, ": originally", orig_missing, "missing,", 
+      additional_missing, "additional removed,", 
+      clean_missing, "total missing\n")
+}
+
+cat("\nX1 outlier removal complete! Using cleaned matrices for plotting.\n")
+
 # Load required libraries
 library(ggplot2)
 library(latex2exp)  # For TeX labels
 library(gridExtra)
 library(grid)
+library(gtable)     # For legend creation
 library(cowplot)    # For get_legend
 
 # Source common functions for model renaming
@@ -51,93 +169,15 @@ if(file.exists("common_functions.R")) {
   }
 }
 
-# DEBUG flag for legend extraction
-DEBUG_LEGENDS <- TRUE
-
-# Create enhanced legend extraction functions (copied from main file)
-get_legend <- function(plot_obj, force_manual = FALSE) {
-  if(force_manual) {
-    cat("Forcing manual legend creation\n")
-    return(create_manual_legend())
-  }
-  
-  tryCatch({
-    legend_obj <- cowplot::get_legend(plot_obj)
-    
-    if(is.null(legend_obj)) {
-      cat("get_legend returned NULL, trying manual approach\n")
-      return(create_manual_legend())
-    }
-    
-    # Check if legend is empty (sometimes happens with cowplot)
-    if("zeroGrob" %in% class(legend_obj) || 
-       (is.list(legend_obj) && length(legend_obj) == 0)) {
-      cat("get_legend returned empty object, trying manual approach\n") 
-      return(create_manual_legend())
-    }
-    
-    return(legend_obj)
-    
-  }, error = function(e) {
-    cat("Error in get_legend:", e$message, "\n")
-    cat("Falling back to manual legend creation\n")
-    return(create_manual_legend())
-  })
-}
-
-create_manual_legend <- function() {
-  tryCatch({
-    # Use the models that are actually being plotted
-    legend_models <- models_to_plot
-    legend_labels <- sapply(legend_models, rename_model)
-    legend_colors <- model_colors[legend_labels]
-    
-    # Create a simple data frame for legend
-    legend_data <- data.frame(
-      x = 1,
-      y = 1:length(legend_labels),
-      model = names(legend_colors)
-    )
-    
-    # Create a minimal plot just for the legend
-    legend_plot <- ggplot(legend_data, aes(x = x, y = y, color = model)) +
-      geom_point() +
-      scale_color_manual(values = legend_colors, breaks = names(legend_colors), limits = names(legend_colors)) +
-      theme_void() +
-      theme(legend.position = "bottom",
-            legend.title = element_text(size = 11),
-            legend.text = element_text(size = 10),
-            legend.box = "horizontal",
-            legend.margin = margin(t = 10, b = 10)) +
-      labs(color = "Model")
-    
-    return(cowplot::get_legend(legend_plot))
-    
-  }, error = function(e) {
-    cat("Error creating manual legend:", e$message, "\n")
-    return(grid::textGrob("Legend unavailable", gp = grid::gpar(fontsize = 10)))
-  })
-}
-
-validate_legend <- function(legend_obj, chart_name, force_manual = FALSE) {
-  if(force_manual || is.null(legend_obj) || 
-     "zeroGrob" %in% class(legend_obj) || 
-     (is.list(legend_obj) && length(legend_obj) == 0)) {
-    
-    cat("Legend validation failed for", chart_name, ". Creating manual legend...\n")
-    return(create_manual_legend())
-  }
-  
-  cat("Legend validation passed for", chart_name, "\n")
-  return(legend_obj)
-}
+# Use the legend handling functions from main plotting file
+# (get_legend and validate_legend are defined in the main plotting script)
 
 # Function to prepare x1 bias plot data for a specific distribution
 prepare_x1_plot_data <- function(dist_name, models_to_plot = NULL) {
   
   # If no models specified, use all available models with non-missing data
   if(is.null(models_to_plot)) {
-    non_missing_counts <- colSums(!is.na(x1_coef_matrix))
+    non_missing_counts <- colSums(!is.na(x1_coef_matrix_clean))
     models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
   }
   
@@ -163,7 +203,7 @@ prepare_x1_plot_data <- function(dist_name, models_to_plot = NULL) {
   
   # Get estimated x1 values for this distribution and selected models
   # Note: x1 coefficients should not need link function transformations like mu1
-  est_x1_matrix <- x1_coef_matrix[dist_rows, models_to_plot, drop = FALSE]
+  est_x1_matrix <- x1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
   
   # Calculate relative bias using (estimated - true) / true
   bias_matrix <- est_x1_matrix / rep(true_x1, each = 1) - 1
@@ -205,7 +245,7 @@ create_x1_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = 
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
-    coord_cartesian(ylim = c(-1, 1), xlim = c(0.2, 0.7)) +
+    coord_cartesian(xlim = c(0.2, 0.7)) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Kendall's τ",
@@ -240,7 +280,7 @@ prepare_x1_se_plot_data <- function(dist_name, models_to_plot = NULL) {
   
   # If no models specified, use all available models with non-missing data
   if(is.null(models_to_plot)) {
-    non_missing_counts <- colSums(!is.na(x1_se_matrix))
+    non_missing_counts <- colSums(!is.na(x1_se_matrix_clean))
     models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
   }
   
@@ -262,7 +302,7 @@ prepare_x1_se_plot_data <- function(dist_name, models_to_plot = NULL) {
   corr_vals <- skew_matrix[dist_rows, 2]
   
   # Get estimated SE values for this distribution and selected models
-  est_se_matrix <- x1_se_matrix[dist_rows, models_to_plot, drop = FALSE]
+  est_se_matrix <- x1_se_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
   
   # Get theoretical SE values from true_ses_matrix if available
   true_se_vals <- rep(NA, length(dist_rows))
@@ -356,7 +396,7 @@ create_x1_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TR
                                             estimated_models)),
                           breaks = all_models_in_data,
                           limits = all_models_in_data) +
-    coord_cartesian(ylim = c(0, 0.4), xlim = c(0.2, 0.7)) +
+    coord_cartesian(xlim = c(0.2, 0.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
@@ -405,7 +445,7 @@ bias_plots_x1 <- bias_plots_x1[valid_indices_x1]
 se_plots_x1 <- se_plots_x1[valid_indices_x1]
 
 if(length(bias_plots_x1) > 0 && length(se_plots_x1) > 0) {
-  # Use gridExtra for plot arrangement with shared legend
+  # Use gridExtra for plot arrangement with shared legend (same as MU1/MU2 plots)
   library(gridExtra)
   library(grid)
   
@@ -413,7 +453,7 @@ if(length(bias_plots_x1) > 0 && length(se_plots_x1) > 0) {
   available_dists_x1 <- unique(true_params_matrix$dist)
   cat("Available distributions for x1:", paste(available_dists_x1, collapse = ", "), "\n")
   
-  # Find the first distribution that has data for legend extraction
+  # Find the first distribution that has data for legend extraction (same approach as MU1/MU2)
   legend_dist_x1 <- NULL
   for(dist in c("GA", "NO", "PO", "LO")) {
     if(dist %in% available_dists_x1) {
@@ -428,12 +468,12 @@ if(length(bias_plots_x1) > 0 && length(se_plots_x1) > 0) {
   
   if(is.null(legend_dist_x1)) {
     cat("Error: No valid distribution found for x1 legend extraction\n")
-    # Force manual legend creation
-    shared_legend_x1 <- validate_legend(NULL, "X1 Plots", force_manual = TRUE)
+    # Force manual legend creation (same as MU1/MU2 approach)
+    shared_legend_x1 <- validate_legend(NULL, "Chart X1", force_manual = TRUE)
   } else {
     cat("Using", legend_dist_x1, "distribution for x1 legend extraction\n")
     
-    # Extract legend from the working distribution with improved error handling
+    # Extract legend from the working distribution with improved error handling (same as MU1/MU2)
     tryCatch({
       legend_plot_temp_x1 <- create_x1_dist_plot(legend_dist_x1, models_to_plot, show_legend = TRUE) + 
         theme(
@@ -444,17 +484,17 @@ if(length(bias_plots_x1) > 0 && length(se_plots_x1) > 0) {
           legend.margin = margin(t = 10, b = 10)
         )
       
-      # Extract the legend with improved method
+      # Extract the legend with improved method (same as MU1/MU2)
       shared_legend_x1 <- get_legend(legend_plot_temp_x1, force_manual = FALSE)
       
-      # Validate and potentially replace with manual legend
-      shared_legend_x1 <- validate_legend(shared_legend_x1, "X1 Plots", force_manual = FALSE)
+      # Validate and potentially replace with manual legend (same as MU1/MU2)
+      shared_legend_x1 <- validate_legend(shared_legend_x1, "Chart X1", force_manual = FALSE)
       
-      cat("Legend extraction completed for x1 plots\n")
+      cat("Legend extraction completed for X1 plots\n")
       
     }, error = function(e) {
       cat("Error extracting x1 legend:", e$message, "\n")
-      shared_legend_x1 <- validate_legend(NULL, "X1 Plots", force_manual = TRUE)
+      shared_legend_x1 <- validate_legend(NULL, "Chart X1", force_manual = TRUE)
     })
   }
   
@@ -504,8 +544,8 @@ cat("Available models in x1_coef_matrix:\n")
 print(colnames(x1_coef_matrix))
 cat("\nNon-missing values in x1_coef_matrix by model:\n")
 for(model in models_to_plot) {
-  if(model %in% colnames(x1_coef_matrix)) {
-    non_missing <- sum(!is.na(x1_coef_matrix[, model]))
+  if(model %in% colnames(x1_coef_matrix_clean)) {
+    non_missing <- sum(!is.na(x1_coef_matrix_clean[, model]))
     model_label <- rename_model(model)
     cat(model_label, "(", model, "):", non_missing, "non-missing values\n")
   } else {
@@ -515,8 +555,8 @@ for(model in models_to_plot) {
 
 cat("\nNon-missing values in x1_se_matrix by model:\n")
 for(model in models_to_plot) {
-  if(model %in% colnames(x1_se_matrix)) {
-    non_missing <- sum(!is.na(x1_se_matrix[, model]))
+  if(model %in% colnames(x1_se_matrix_clean)) {
+    non_missing <- sum(!is.na(x1_se_matrix_clean[, model]))
     model_label <- rename_model(model)
     cat(model_label, "(", model, "):", non_missing, "non-missing SE values\n")
   } else {
