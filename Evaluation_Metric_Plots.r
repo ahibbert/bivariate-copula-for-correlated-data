@@ -281,13 +281,19 @@ create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label
   unique_models <- unique(plot_data$model_label)
   cat("Unique models in", dist_name, metric_name, "data:", paste(unique_models, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(plot_data, aes(x = corr_vals, y = metric_value, color = model_label)) +
+  # Add line type mapping for different models
+  #plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "solid",
+  #                       ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "dotted"))
+ # 
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(plot_data, aes(x = corr_vals, y = metric_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     # Use consistent color mapping, only showing models present in this plot
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
+    # Add line type scale
+    #scale_linetype_identity() +
     coord_cartesian(xlim = c(.2, .7)) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
