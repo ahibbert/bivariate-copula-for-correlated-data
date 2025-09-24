@@ -137,7 +137,6 @@ for (filename in files)
   
   loglik[,"summary_gamm"]=aic[,"summary_gamm"]=bic[,"summary_gamm"]=aic_4[,"summary_gamm"]=adj_bic[,"summary_gamm"]=NA #Temporary until we fix this in calculations
   
-  
   #Theoretical errors
   if(dist=="GA") {
     #Parameters
@@ -436,4 +435,8 @@ for (i in 1:3) {
   colnames(summary)<-c("tau","skew","bias")
   bias_table_list[[i]]<-round(xtabs(summary[,"bias"] ~ summary[,"tau"] + summary[,"skew"]),2)
 }
+
+
+
+
 
