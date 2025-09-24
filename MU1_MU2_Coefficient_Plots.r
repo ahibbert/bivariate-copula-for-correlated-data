@@ -872,6 +872,671 @@ create_mu2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = T
   return(p)
 }
 
+# SKEWNESS-BASED PLOTTING FUNCTIONS ####
+# These functions are identical to the correlation-based functions above
+# but use skewness (skew_matrix[, 1]) instead of correlation (skew_matrix[, 2])
+
+# MU1 Skewness functions ####
+# Create a function to prepare mu1 plot data vs skewness for a specific distribution
+prepare_plot_data_skew <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    # Find models with at least some non-missing data
+    non_missing_counts <- colSums(!is.na(mu1_coef_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get true mu1 values for this distribution (same logic as correlation version)
+  if(dist_name %in% c("GA")) {
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$a[dist_rows]))
+  } else if (dist_name == "PO") {
+    true_mu1 <- (as.numeric(true_params_matrix$mu1[dist_rows])*as.numeric(true_params_matrix$b[dist_rows])*as.numeric(true_params_matrix$c[dist_rows]))
+  } else if(dist_name == "LO") {
+    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
+  } else {
+    true_mu1 <- as.numeric(true_params_matrix$mu1[dist_rows])
+  }
+
+  # Get skewness values for this distribution (from skew_matrix column 1)
+  skew_vals <- skew_matrix[dist_rows, 1]
+  
+  # Get estimated mu1 values for this distribution and selected models (same logic as correlation version)
+  if(dist_name %in% c("GA")) {
+    est_mu1_matrix <- exp(mu1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])
+  } else if (dist_name == "PO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])
+  } else if(dist_name == "LO") {
+    est_mu1_matrix <- exp(mu1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])/(1+exp(mu1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]))
+  } else {
+    est_mu1_matrix <- mu1_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  }
+
+  # Apply same exclusion logic as correlation version
+  est_mu1_matrix_filtered <- est_mu1_matrix
+  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu1_matrix), ncol = ncol(est_mu1_matrix))
+  
+  if(dist_name == "LO") {
+    for(i in 1:length(true_mu1)) {
+      for(j in 1:length(models_to_plot)) {
+        if(!is.na(est_mu1_matrix[i, j])) {
+          ratio <- est_mu1_matrix[i, j] / true_mu1[i]
+          if(ratio > 10 || ratio < 0.1) {
+            exclusion_mask[i, j] <- TRUE
+          }
+        }
+      }
+    }
+    
+    # Calculate exclusion statistics for each model (only for LO)
+    for(j in 1:length(models_to_plot)) {
+      model <- models_to_plot[j]
+      model_label <- rename_model(model)
+      
+      total_non_na <- sum(!is.na(est_mu1_matrix[, j]))
+      excluded_count <- sum(exclusion_mask[, j], na.rm = TRUE)
+      
+      exclusion_info <- data.frame(
+        distribution = dist_name,
+        model = model,
+        model_label = model_label,
+        total_values = total_non_na,
+        excluded_values = excluded_count,
+        exclusion_rate = if(total_non_na > 0) excluded_count / total_non_na else 0,
+        stringsAsFactors = FALSE
+      )
+      
+      exclusion_summary_global <<- rbind(exclusion_summary_global, exclusion_info)
+    }
+  }
+  
+  # Calculate relative bias using filtered data (estimated - true)
+  bias_matrix <- est_mu1_matrix_filtered / rep(true_mu1, each = 1) -1
+  
+  # Convert to long format for ggplot
+  plot_data <- data.frame(
+    skew_vals = rep(skew_vals, length(models_to_plot)),
+    bias = as.vector(bias_matrix),
+    model = rep(models_to_plot, each = length(true_mu1)),
+    model_label = rep(sapply(models_to_plot, rename_model), each = length(true_mu1)),
+    dist = dist_name
+  )
+  
+  # Remove rows with missing bias values
+  plot_data <- plot_data[complete.cases(plot_data$bias), ]
+  
+  return(plot_data)
+}
+
+# Create individual mu1 plots vs skewness for each distribution
+create_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  # Prepare data using the skewness version
+  plot_data <- prepare_plot_data_skew(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    cat("No data available for", dist_name, "distribution\n")
+    return(NULL)
+  }
+  
+  # Create the plot with consistent color mapping
+  unique_models <- unique(plot_data$model_label)
+  
+  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
+    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", alpha = 0.7) +
+    scale_color_manual(values = model_colors[unique_models]) +
+    labs(
+      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      x = "Skewness",
+      y = TeX("Bias in $\\hat{\\mu_1}$ (Relative)"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# Create a function to prepare mu1 SE plot data vs skewness for a specific distribution
+prepare_se_plot_data_skew <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    non_missing_counts <- colSums(!is.na(mu1_se_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No SE data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get skewness values for this distribution (from skew_matrix column 1)
+  skew_vals <- skew_matrix[dist_rows, 1]
+  
+  # Get estimated SE values for this distribution and selected models
+  est_se_matrix <- mu1_se_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  
+  # Get theoretical SE values from true_ses_matrix (same logic as correlation version)
+  # Check if true_ses_matrix is available (computed by get_true_ses function)
+  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+    # Debug: Check structure of true_ses_matrix
+    cat("Debug - true_ses_matrix structure for", dist_name, "(skewness):\n")
+    cat("  Class:", class(true_ses_matrix), "\n")
+    
+    # true_ses_matrix is actually a list - extract the actual matrix
+    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
+      cat("  Found true_ses_matrix inside list, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    } else {
+      actual_ses_matrix <- true_ses_matrix
+      cat("  Using true_ses_matrix directly, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    }
+
+    # Use t1_se from the actual matrix for mu1 theoretical SEs with proper indexing
+    if(is.matrix(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
+      # Check if dist_rows are within bounds
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix[dist_rows, "t1_se"]
+        cat("Using computed true SEs from true_ses_matrix for", dist_name, "distribution (skewness)\n")
+      } else {
+        cat("Error: dist_rows out of bounds for", dist_name, "(skewness) - max dist_row:", max(dist_rows), "matrix rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else if(is.data.frame(actual_ses_matrix) && "t1_se" %in% colnames(actual_ses_matrix)) {
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix$t1_se[dist_rows]
+        cat("Using computed true SEs from data.frame for", dist_name, "distribution (skewness)\n")
+      } else {
+        cat("Error: dist_rows out of bounds for", dist_name, "(skewness) - max dist_row:", max(dist_rows), "data.frame rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else {
+      cat("Warning: t1_se column not found in true_ses_matrix for", dist_name, "(skewness)\n")
+      if(is.matrix(actual_ses_matrix) || is.data.frame(actual_ses_matrix)) {
+        cat("  Available columns:", colnames(actual_ses_matrix), "\n")
+      }
+      true_se_vals <- rep(NA, length(dist_rows))
+    }
+  } else {
+    # Fallback to old method if true_ses_matrix not available
+    cat("Warning: true_ses_matrix not available, using old true_SE_out method for", dist_name, "(skewness)\n")
+    true_se_vals <- rep(NA, length(dist_rows))
+  }
+  
+  # Create long format data combining estimated and theoretical SEs
+  n_models <- length(models_to_plot)
+  n_obs <- length(dist_rows)
+  
+  # Estimated SEs
+  estimated_data <- data.frame(
+    skew_vals = rep(skew_vals, n_models),
+    se_value = as.vector(est_se_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    type = "Estimated",
+    dist = dist_name
+  )
+  
+  # Theoretical SEs - only add if we have non-NA values
+  if(any(!is.na(true_se_vals))) {
+    theoretical_data <- data.frame(
+      skew_vals = skew_vals,
+      se_value = true_se_vals,
+      model = "theoretical",
+      model_label = "Theoretical",
+      type = "Theoretical",
+      dist = dist_name
+    )
+    
+    # Combine estimated and theoretical data
+    combined_se_data <- rbind(estimated_data, theoretical_data)
+  } else {
+    # Only use estimated data if no theoretical SEs available
+    combined_se_data <- estimated_data
+    cat("No theoretical SEs available for", dist_name, "(skewness), using only estimated SEs\n")
+  }
+  
+  # Remove rows with missing se_value
+  combined_se_data <- combined_se_data[complete.cases(combined_se_data$se_value), ]
+  
+  return(combined_se_data)
+}
+
+# Create mu1 SE plots vs skewness for each distribution
+create_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  # Prepare data using the skewness version
+  se_data <- prepare_se_plot_data_skew(dist_name, models_to_plot)
+  
+  if(is.null(se_data) || nrow(se_data) == 0) {
+    cat("No SE data available for", dist_name, "distribution (skewness)\n")
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(se_data$model_label)
+  cat("Unique models in", dist_name, "SE data (skewness):", paste(unique_models, collapse = ", "), "\n")
+  
+  # Get unique model labels from the data and estimated model labels
+  all_models_in_data <- unique(se_data$model_label)
+  estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
+  cat("Models in", dist_name, "SE data (skewness):", paste(all_models_in_data, collapse = ", "), "\n")
+  
+  # Create the plot with consistent color mapping
+  p <- ggplot(se_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = model_label)) +
+    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+    # Manual color scale - only include models present in this plot
+    scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
+                       breaks = all_models_in_data,
+                       limits = all_models_in_data) +
+    # Manual linetype scale - set theoretical to dashed, others to solid
+    scale_linetype_manual(values = c("Theoretical" = "dashed",
+                                    setNames(rep("solid", length(estimated_models)),
+                                            estimated_models)),
+                          breaks = all_models_in_data,
+                          limits = all_models_in_data) +
+    labs(
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+      x = "Skewness",
+      y = TeX("SE$(\\hat{\\mu_1})$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# MU2 Skewness functions ####
+# Function to prepare mu2 plot data vs skewness for a specific distribution
+prepare_mu2_plot_data_skew <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    non_missing_counts <- colSums(!is.na(mu2_coef_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get true mu2 values for this distribution (same logic as correlation version)
+  if(dist_name %in% c("GA")) {
+    true_mu2 <- (as.numeric(true_params_matrix$mu2[dist_rows])*as.numeric(true_params_matrix$b[dist_rows]))
+  } else if (dist_name == "PO") {
+    true_mu2 <- as.numeric(true_params_matrix$mu2[dist_rows])
+  } else if(dist_name == "LO") {
+    true_mu2 <- as.numeric(true_params_matrix$mu2[dist_rows])
+  } else {
+    true_mu2 <- as.numeric(true_params_matrix$mu2[dist_rows])
+  }
+
+  # Get skewness values for this distribution (from skew_matrix column 1)
+  skew_vals <- skew_matrix[dist_rows, 1]
+  
+  # Get estimated mu2 values for this distribution and selected models (same logic as correlation version)
+  if(dist_name %in% c("GA")) {
+    est_mu2_matrix <- exp(mu2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])
+  } else if (dist_name == "PO") {
+    est_mu2_matrix <- exp(mu2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])
+  } else if(dist_name == "LO") {
+    est_mu2_matrix <- exp(mu2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE])/(1+exp(mu2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]))
+  } else {
+    est_mu2_matrix <- mu2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  }
+
+  # Apply same exclusion logic as correlation version
+  est_mu2_matrix_filtered <- est_mu2_matrix
+  exclusion_mask <- matrix(FALSE, nrow = nrow(est_mu2_matrix), ncol = ncol(est_mu2_matrix))
+  
+  if(dist_name == "LO") {
+    for(i in 1:length(true_mu2)) {
+      for(j in 1:length(models_to_plot)) {
+        if(!is.na(est_mu2_matrix[i, j])) {
+          ratio <- est_mu2_matrix[i, j] / true_mu2[i]
+          if(ratio > 10 || ratio < 0.1) {
+            exclusion_mask[i, j] <- TRUE
+          }
+        }
+      }
+    }
+    
+    # Initialize the global exclusion summary if it doesn't exist
+    if(!exists("exclusion_summary_mu2_global")) {
+      exclusion_summary_mu2_global <<- data.frame(
+        distribution = character(),
+        model = character(),
+        model_label = character(),
+        total_values = integer(),
+        excluded_values = integer(),
+        exclusion_rate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Calculate exclusion statistics for each model (only for LO)
+    for(j in 1:length(models_to_plot)) {
+      model <- models_to_plot[j]
+      model_label <- rename_model(model)
+      
+      total_non_na <- sum(!is.na(est_mu2_matrix[, j]))
+      excluded_count <- sum(exclusion_mask[, j], na.rm = TRUE)
+      
+      exclusion_info <- data.frame(
+        distribution = dist_name,
+        model = model,
+        model_label = model_label,
+        total_values = total_non_na,
+        excluded_values = excluded_count,
+        exclusion_rate = if(total_non_na > 0) excluded_count / total_non_na else 0,
+        stringsAsFactors = FALSE
+      )
+      
+      exclusion_summary_mu2_global <<- rbind(exclusion_summary_mu2_global, exclusion_info)
+    }
+  }
+  
+  # Calculate relative bias using filtered data
+  bias_matrix <- est_mu2_matrix_filtered / rep(true_mu2, each = 1) -1
+  
+  # Convert to long format for ggplot
+  plot_data <- data.frame(
+    skew_vals = rep(skew_vals, length(models_to_plot)),
+    bias = as.vector(bias_matrix),
+    model = rep(models_to_plot, each = length(true_mu2)),
+    model_label = rep(sapply(models_to_plot, rename_model), each = length(true_mu2)),
+    dist = dist_name
+  )
+  
+  # Remove rows with missing bias values
+  plot_data <- plot_data[complete.cases(plot_data$bias), ]
+  
+  return(plot_data)
+}
+
+# Function to create mu2 bias plot vs skewness for a specific distribution
+create_mu2_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  # Prepare data using the skewness version
+  plot_data <- prepare_mu2_plot_data_skew(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    cat("No mu2 data available for", dist_name, "distribution\n")
+    return(NULL)
+  }
+  
+  # Create the plot with consistent color mapping
+  unique_models <- unique(plot_data$model_label)
+  
+  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
+    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", alpha = 0.7) +
+    scale_color_manual(values = model_colors[unique_models]) +
+    labs(
+      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      x = "Skewness",
+      y = TeX("Bias in $\\hat{\\mu_2}$ (Relative)"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# Function to prepare mu2 SE plot data vs skewness
+prepare_mu2_se_plot_data_skew <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    non_missing_counts <- colSums(!is.na(mu2_se_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No mu2 SE data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get skewness values for this distribution (from skew_matrix column 1)
+  skew_vals <- skew_matrix[dist_rows, 1]
+  
+  # Get estimated SE values for this distribution and selected models
+  est_se_matrix <- mu2_se_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  
+  # Get theoretical SE values from true_ses_matrix (same logic as correlation version)
+  # Check if true_ses_matrix is available (computed by get_true_ses function)
+  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+    # Debug: Check structure of true_ses_matrix
+    cat("Debug - true_ses_matrix structure for mu2", dist_name, "(skewness):\n")
+    cat("  Class:", class(true_ses_matrix), "\n")
+    
+    # true_ses_matrix is actually a list - extract the actual matrix
+    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
+      cat("  Found true_ses_matrix inside list, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    } else {
+      actual_ses_matrix <- true_ses_matrix
+      cat("  Using true_ses_matrix directly, class:", class(actual_ses_matrix), "\n")
+      if(is.matrix(actual_ses_matrix)) {
+        cat("  Matrix dimensions:", dim(actual_ses_matrix), "\n")
+        cat("  Column names:", colnames(actual_ses_matrix), "\n")
+        cat("  Number of dist_rows:", length(dist_rows), "\n")
+      }
+    }
+
+    # Use t2_se from the actual matrix for mu2 theoretical SEs with proper indexing
+    if(is.matrix(actual_ses_matrix) && "t2_se" %in% colnames(actual_ses_matrix)) {
+      # Check if dist_rows are within bounds
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix[dist_rows, "t2_se"]
+        cat("Using computed true SEs from true_ses_matrix for mu2", dist_name, "distribution (skewness)\n")
+      } else {
+        cat("Error: dist_rows out of bounds for mu2", dist_name, "(skewness) - max dist_row:", max(dist_rows), "matrix rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else if(is.data.frame(actual_ses_matrix) && "t2_se" %in% colnames(actual_ses_matrix)) {
+      if(max(dist_rows) <= nrow(actual_ses_matrix)) {
+        true_se_vals <- actual_ses_matrix$t2_se[dist_rows]
+        cat("Using computed true SEs from data.frame for mu2", dist_name, "distribution (skewness)\n")
+      } else {
+        cat("Error: dist_rows out of bounds for mu2", dist_name, "(skewness) - max dist_row:", max(dist_rows), "data.frame rows:", nrow(actual_ses_matrix), "\n")
+        true_se_vals <- rep(NA, length(dist_rows))
+      }
+    } else {
+      cat("Warning: t2_se column not found in true_ses_matrix for mu2", dist_name, "(skewness)\n")
+      if(is.matrix(actual_ses_matrix) || is.data.frame(actual_ses_matrix)) {
+        cat("  Available columns:", colnames(actual_ses_matrix), "\n")
+      }
+      true_se_vals <- rep(NA, length(dist_rows))
+    }
+  } else {
+    # Fallback to old method if true_ses_matrix not available
+    cat("Warning: true_ses_matrix not available, using old true_SE_out method for mu2", dist_name, "(skewness)\n")
+    true_se_vals <- rep(NA, length(dist_rows))
+  }
+  
+  # Create long format data combining estimated and theoretical SEs
+  n_models <- length(models_to_plot)
+  n_obs <- length(dist_rows)
+  
+  # Estimated SEs
+  estimated_data <- data.frame(
+    skew_vals = rep(skew_vals, n_models),
+    se_value = as.vector(est_se_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    type = "Estimated",
+    dist = dist_name
+  )
+  
+  # Theoretical SEs - only add if we have non-NA values
+  if(any(!is.na(true_se_vals))) {
+    theoretical_data <- data.frame(
+      skew_vals = skew_vals,
+      se_value = true_se_vals,
+      model = "theoretical",
+      model_label = "Theoretical",
+      type = "Theoretical",
+      dist = dist_name
+    )
+    
+    # Combine estimated and theoretical data
+    combined_se_data <- rbind(estimated_data, theoretical_data)
+  } else {
+    # Only use estimated data if no theoretical SEs available
+    combined_se_data <- estimated_data
+    cat("No theoretical SEs available for mu2", dist_name, "(skewness), using only estimated SEs\n")
+  }
+  
+  # Remove rows with missing se_value
+  combined_se_data <- combined_se_data[complete.cases(combined_se_data$se_value), ]
+  
+  return(combined_se_data)
+}
+
+# Function to create mu2 SE plot vs skewness for a specific distribution
+create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  # Prepare data using the skewness version
+  plot_data <- prepare_mu2_se_plot_data_skew(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    cat("No mu2 SE data available for", dist_name, "distribution\n")
+    return(NULL)
+  }
+  
+  # Check if we have theoretical data
+  has_theoretical <- "Theoretical" %in% plot_data$type
+  
+  if(has_theoretical) {
+    # Create plot with both estimated and theoretical data
+    p <- ggplot(plot_data, aes(x = skew_vals)) +
+      geom_smooth(data = subset(plot_data, type == "Estimated"),
+                  aes(y = se_value, color = model_label), 
+                  method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+      geom_smooth(data = subset(plot_data, type == "Theoretical"),
+                  aes(y = se_value), 
+                  method = "loess", se = FALSE, span = 0.75, linewidth = 1.2,
+                  color = "black", linetype = "dashed") +
+      scale_color_manual(values = model_colors, name = "Model") +
+      scale_linetype_manual(values = c("Estimated" = "solid", "Theoretical" = "dashed"), 
+                           name = "Data Type") +
+      guides(color = guide_legend(title = "Model", override.aes = list(linetype = "solid")),
+             linetype = guide_legend(title = "Data Type", 
+                                   override.aes = list(color = c("Estimated" = "darkgray", "Theoretical" = "black")))) +
+      labs(
+        title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+        x = "Skewness",
+        y = TeX("SE$(\\hat{\\mu_2})$"),
+        color = "Model"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 10),
+        legend.position = if(show_legend) "bottom" else "none"
+      )
+  } else {
+    # Create plot with only estimated data (fallback)
+    unique_models <- unique(plot_data$model_label)
+    
+    p <- ggplot(plot_data, aes(x = skew_vals, y = se_value, color = model_label)) +
+      geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+      scale_color_manual(values = model_colors[unique_models]) +
+      labs(
+        title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+        x = "Skewness",
+        y = TeX("SE$(\\hat{\\mu_2})$"),
+        color = "Model"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 10),
+        legend.position = if(show_legend) "bottom" else "none"
+      )
+  }
+  
+  return(p)
+}
+
 # Create mu1 BIAS AND SE CHARTS VS CORRELATION ----
 
 # Create plots for each distribution
@@ -1193,6 +1858,200 @@ if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
   
 } else {
   cat("No mu2 plots could be created - check data availability\n")
+}
+
+# Create mu1 BIAS AND SE CHARTS VS SKEWNESS ----
+
+# Create plots for each distribution
+cat("Creating mu1 bias vs skewness plots for each distribution...\n")
+
+distributions <- c("NO", "GA", "LO", "PO")
+
+# Create mu1 bias plots without individual legends (we'll add a shared legend)
+bias_plots_skew <- lapply(distributions, function(dist) {
+  create_dist_plot_skew(dist, models_to_plot, show_legend = FALSE)
+})
+names(bias_plots_skew) <- distributions
+
+# Create mu1 SE plots without individual legends
+se_plots_skew <- lapply(distributions, function(dist) {
+  create_se_plot_skew(dist, models_to_plot, show_legend = FALSE)
+})
+names(se_plots_skew) <- distributions
+
+# Remove NULL plots
+valid_indices_skew <- which(!sapply(bias_plots_skew, is.null) & !sapply(se_plots_skew, is.null))
+bias_plots_skew <- bias_plots_skew[valid_indices_skew]
+se_plots_skew <- se_plots_skew[valid_indices_skew]
+
+if(length(bias_plots_skew) > 0 && length(se_plots_skew) > 0) {
+  
+  # Try to extract legend from the first valid bias plot
+  shared_legend_skew <- NULL
+  
+  if(DEBUG_LEGENDS) cat("DEBUG: Attempting to extract legend for MU1 skewness plots\n")
+  
+  for(i in 1:length(bias_plots_skew)) {
+    if(!is.null(bias_plots_skew[[i]])) {
+      temp_plot_with_legend <- bias_plots_skew[[i]] + theme(legend.position = "bottom")
+      
+      if(DEBUG_LEGENDS) {
+        cat("DEBUG: Trying legend extraction from", names(bias_plots_skew)[i], "plot\n")
+      }
+      
+      legend_attempt <- validate_legend(
+        get_legend(temp_plot_with_legend), 
+        context = paste("MU1 skewness", names(bias_plots_skew)[i])
+      )
+      
+      if(!is.null(legend_attempt)) {
+        shared_legend_skew <- legend_attempt
+        if(DEBUG_LEGENDS) {
+          cat("DEBUG: Successfully extracted legend from", names(bias_plots_skew)[i], "\n")
+        }
+        break
+      }
+    }
+  }
+  
+  if(is.null(shared_legend_skew)) {
+    if(DEBUG_LEGENDS) cat("DEBUG: Creating manual legend for MU1 skewness plots\n")
+    shared_legend_skew <- validate_legend(NULL, context = "MU1 skewness manual", force_manual = TRUE)
+  }
+  
+  if(!is.null(shared_legend_skew)) {
+    if(DEBUG_LEGENDS) {
+      cat("Legend extraction completed for MU1 skewness plots\n")
+    }
+    
+    # Interleave bias and SE plots for each distribution
+    all_plots_skew <- vector("list", length(bias_plots_skew) * 2)
+    for(i in 1:length(bias_plots_skew)) {
+      all_plots_skew[2*i-1] <- bias_plots_skew[i]  # Bias plot (left column)
+      all_plots_skew[2*i] <- se_plots_skew[i]      # SE plot (right column)
+    }
+    
+    # Arrange plots in a 4x2 grid (4 rows, 2 columns)
+    plots_grid_skew <- do.call(arrangeGrob, c(all_plots_skew, ncol = 2))
+    
+    # Combine the plots grid with the shared legend at the bottom
+    combined_plot_skew <- arrangeGrob(plots_grid_skew, shared_legend_skew, 
+                                    ncol = 1, 
+                                    heights = c(10, 1))
+    
+    # Display the combined plot
+    grid.draw(combined_plot_skew)
+    
+    # Save the combined plot to Charts directory
+    chart_filename_skew <- paste0("Charts/Mu1_Bias_and_SE_vs_Skewness_Combined_", Sys.Date(), ".png")
+    
+    ggsave(chart_filename_skew, plot = combined_plot_skew, width = 15, height = 14, dpi = 600)
+    cat("Combined mu1 bias and SE vs skewness plot saved to:", chart_filename_skew, "\n")
+    
+    cat("Mu1 bias and SE vs skewness plots created successfully!\n")
+    cat("Number of bias plots created:", length(bias_plots_skew), "\n")
+    cat("Number of SE plots created:", length(se_plots_skew), "\n")
+    
+  } else {
+    cat("No plots could be created - check data availability\n")
+  }
+} else {
+  cat("No mu1 skewness plots could be created - check data availability\n")
+}
+
+# Create mu2 bias and SE plots vs skewness for each distribution
+cat("Creating mu2 bias and SE vs skewness plots for each distribution...\n")
+
+# Create mu2 bias plots without individual legends (we'll add a shared legend)
+bias_plots_mu2_skew <- lapply(distributions, function(dist) {
+  create_mu2_dist_plot_skew(dist, models_to_plot, show_legend = FALSE)
+})
+names(bias_plots_mu2_skew) <- distributions
+
+# Create mu2 SE plots without individual legends
+se_plots_mu2_skew <- lapply(distributions, function(dist) {
+  create_mu2_se_plot_skew(dist, models_to_plot, show_legend = FALSE)
+})
+names(se_plots_mu2_skew) <- distributions
+
+# Remove NULL plots
+valid_indices_mu2_skew <- which(!sapply(bias_plots_mu2_skew, is.null) & !sapply(se_plots_mu2_skew, is.null))
+bias_plots_mu2_skew <- bias_plots_mu2_skew[valid_indices_mu2_skew]
+se_plots_mu2_skew <- se_plots_mu2_skew[valid_indices_mu2_skew]
+
+if(length(bias_plots_mu2_skew) > 0 && length(se_plots_mu2_skew) > 0) {
+  
+  # Try to extract legend from the first valid bias plot
+  shared_legend_mu2_skew <- NULL
+  
+  if(DEBUG_LEGENDS) cat("DEBUG: Attempting to extract legend for MU2 skewness plots\n")
+  
+  for(i in 1:length(bias_plots_mu2_skew)) {
+    if(!is.null(bias_plots_mu2_skew[[i]])) {
+      temp_plot_with_legend <- bias_plots_mu2_skew[[i]] + theme(legend.position = "bottom")
+      
+      if(DEBUG_LEGENDS) {
+        cat("DEBUG: Trying legend extraction from", names(bias_plots_mu2_skew)[i], "plot\n")
+      }
+      
+      legend_attempt <- validate_legend(
+        get_legend(temp_plot_with_legend), 
+        context = paste("MU2 skewness", names(bias_plots_mu2_skew)[i])
+      )
+      
+      if(!is.null(legend_attempt)) {
+        shared_legend_mu2_skew <- legend_attempt
+        if(DEBUG_LEGENDS) {
+          cat("DEBUG: Successfully extracted legend from", names(bias_plots_mu2_skew)[i], "\n")
+        }
+        break
+      }
+    }
+  }
+  
+  if(is.null(shared_legend_mu2_skew)) {
+    if(DEBUG_LEGENDS) cat("DEBUG: Creating manual legend for MU2 skewness plots\n")
+    shared_legend_mu2_skew <- validate_legend(NULL, context = "MU2 skewness manual", force_manual = TRUE)
+  }
+  
+  if(!is.null(shared_legend_mu2_skew)) {
+    if(DEBUG_LEGENDS) {
+      cat("Legend extraction completed for MU2 skewness plots\n")
+    }
+    
+    # Interleave bias and SE plots for each distribution
+    all_plots_mu2_skew <- vector("list", length(bias_plots_mu2_skew) * 2)
+    for(i in 1:length(bias_plots_mu2_skew)) {
+      all_plots_mu2_skew[2*i-1] <- bias_plots_mu2_skew[i]  # Bias plot (left column)
+      all_plots_mu2_skew[2*i] <- se_plots_mu2_skew[i]      # SE plot (right column)
+    }
+    
+    # Arrange plots in a 4x2 grid (4 rows, 2 columns)
+    plots_grid_mu2_skew <- do.call(arrangeGrob, c(all_plots_mu2_skew, ncol = 2))
+    
+    # Combine the plots grid with the shared legend at the bottom
+    combined_plot_mu2_skew <- arrangeGrob(plots_grid_mu2_skew, shared_legend_mu2_skew, 
+                                        ncol = 1, 
+                                        heights = c(10, 1))
+    
+    # Display the combined plot
+    grid.draw(combined_plot_mu2_skew)
+    
+    # Save the combined plot to Charts directory
+    chart_filename_mu2_skew <- paste0("Charts/Mu2_Bias_and_SE_vs_Skewness_Combined_", Sys.Date(), ".png")
+    
+    ggsave(chart_filename_mu2_skew, plot = combined_plot_mu2_skew, width = 15, height = 14, dpi = 600)
+    cat("Combined mu2 bias and SE vs skewness plot saved to:", chart_filename_mu2_skew, "\n")
+    
+    cat("Mu2 bias and SE vs skewness plots created successfully!\n")
+    cat("Number of mu2 bias plots created:", length(bias_plots_mu2_skew), "\n")
+    cat("Number of mu2 SE plots created:", length(se_plots_mu2_skew), "\n")
+    
+  } else {
+    cat("No mu2 skewness plots could be created - check data availability\n")
+  }
+} else {
+  cat("No mu2 skewness plots could be created - check data availability\n")
 }
 
 # Print some diagnostic information for mu2
