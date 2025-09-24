@@ -1002,7 +1002,8 @@ if(exists("loglik_matrix")) {
 }
 
 #Run the plotting files
-source("Evaluation_plots.R")
+#source("Evaluation_plots.R")
 source("MU1_MU2_Coefficient_Plots.R")
 source("X1_Coefficient_Plots.R")
 source("X2_Coefficient_Plots.R")
+source("Evaluation_Metric_Plots.r")
