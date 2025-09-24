@@ -302,7 +302,7 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
   # Create the plot with consistent color mapping
   p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
     # Use consistent color mapping, only showing models
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
@@ -672,7 +672,7 @@ create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend =
   # Create the plot with consistent color mapping
   p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
     # Use consistent color mapping, only showing models present in this plot
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
@@ -997,9 +997,11 @@ create_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend 
   unique_models <- unique(plot_data$model_label)
   
   p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
-    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", alpha = 0.7) +
-    scale_color_manual(values = model_colors[unique_models]) +
+    geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
+    scale_color_manual(values = model_colors[unique_models], 
+                       breaks = unique_models,
+                       limits = unique_models) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Skewness",
@@ -1007,6 +1009,7 @@ create_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend 
       color = "Model"
     ) +
     theme_minimal() +
+    coord_cartesian(ylim=c(-1,1)) +
     theme(
       plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
       axis.title = element_text(size = 12),
@@ -1163,7 +1166,7 @@ create_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = 
   
   # Create the plot with consistent color mapping
   p <- ggplot(se_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = model_label)) +
-    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+    geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
     # Manual color scale - only include models present in this plot
     scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
                        breaks = all_models_in_data,
@@ -1323,15 +1326,18 @@ create_mu2_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_leg
   unique_models <- unique(plot_data$model_label)
   
   p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
-    geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", alpha = 0.7) +
-    scale_color_manual(values = model_colors[unique_models]) +
+    geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +    
+    scale_color_manual(values = model_colors[unique_models], 
+                       breaks = unique_models,
+                       limits = unique_models) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Skewness",
       y = TeX("Bias in $\\hat{\\mu_2}$ (Relative)"),
       color = "Model"
     ) +
+    coord_cartesian(ylim = c(-1, 1)) +
     theme_minimal() +
     theme(
       plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
@@ -1481,17 +1487,23 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
   # Check if we have theoretical data
   has_theoretical <- "Theoretical" %in% plot_data$type
   
+  # Get unique estimated models in the proper order
+  estimated_models <- unique(plot_data$model_label[plot_data$type == "Estimated"])
+  
   if(has_theoretical) {
     # Create plot with both estimated and theoretical data
     p <- ggplot(plot_data, aes(x = skew_vals)) +
       geom_smooth(data = subset(plot_data, type == "Estimated"),
                   aes(y = se_value, color = model_label), 
-                  method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
+                  method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
       geom_smooth(data = subset(plot_data, type == "Theoretical"),
                   aes(y = se_value), 
                   method = "loess", se = FALSE, span = 0.75, linewidth = 1.2,
                   color = "black", linetype = "dashed") +
-      scale_color_manual(values = model_colors, name = "Model") +
+      scale_color_manual(values = model_colors[estimated_models], 
+                         breaks = estimated_models,
+                         limits = estimated_models,
+                         name = "Model") +
       scale_linetype_manual(values = c("Estimated" = "solid", "Theoretical" = "dashed"), 
                            name = "Data Type") +
       guides(color = guide_legend(title = "Model", override.aes = list(linetype = "solid")),
@@ -1517,7 +1529,9 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
     
     p <- ggplot(plot_data, aes(x = skew_vals, y = se_value, color = model_label)) +
       geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
-      scale_color_manual(values = model_colors[unique_models]) +
+      scale_color_manual(values = model_colors[unique_models], 
+                         breaks = unique_models,
+                         limits = unique_models) +
       labs(
         title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
         x = "Skewness",
@@ -1865,7 +1879,7 @@ if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
 # Create plots for each distribution
 cat("Creating mu1 bias vs skewness plots for each distribution...\n")
 
-distributions <- c("NO", "GA", "LO", "PO")
+distributions <- c("NO","PO", "GA", "LO")
 
 # Create mu1 bias plots without individual legends (we'll add a shared legend)
 bias_plots_skew <- lapply(distributions, function(dist) {
