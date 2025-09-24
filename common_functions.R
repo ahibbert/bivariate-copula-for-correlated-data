@@ -1848,24 +1848,24 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
 
 }
 
-simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
-  optim_cov_outputs=matrix(NA,ncol=6,nrow=sims)
-  counter=0
-  while (counter < sims) {
-    optim_est=calcTrueCovariateValues(n,a,b,c,mu1,mu2,dist,x1,x2)
-    if(optim_est$convergence==0) {
-      counter=counter+1
-      optim_cov_outputs[counter,]=optim_est$par
-    }
-    if(trace==TRUE) {
-      print(counter)
-    }
-  }
-  colnames(optim_cov_outputs)=c("mu1","mu2","x1","x2","s1","s2")
-  return_list=list(colMeans(optim_cov_outputs),sqrt(diag(cov(optim_cov_outputs))*n)/sqrt(n))
-  names(return_list)=c("coefficients","ses")
-  return(return_list)
-}
+#simCovariateMLEs = function(sims,n,a,b,c,mu1,mu2,dist,x1,x2,trace) {
+#  optim_cov_outputs=matrix(NA,ncol=6,nrow=sims)
+#  counter=0
+#  while (counter < sims) {
+#    optim_est=calcTrueCovariateValues(n,a,b,c,mu1,mu2,dist,x1,x2)
+#    if(optim_est$convergence==0) {
+#      counter=counter+1
+#      optim_cov_outputs[counter,]=optim_est$par
+#    }
+#    if(trace==TRUE) {
+#      print(counter)
+#    }
+#  }
+#  colnames(optim_cov_outputs)=c("mu1","mu2","x1","x2","s1","s2")
+#  return_list=list(colMeans(optim_cov_outputs),sqrt(diag(cov(optim_cov_outputs))*n)/sqrt(n))
+#  names(return_list)=c("coefficients","ses")
+#  return(return_list)
+#}
 
 # Parallelized version of simCovariateMLEs
 simCovariateMLEs_parallel = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace = FALSE, n_cores = NULL) {
@@ -1959,7 +1959,7 @@ simCovariateMLEs_auto = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace
   }
 }
 
-get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
+get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=1000) {
   # Create a unique cache key from all parameters
   cache_key <- paste(n, a, b, c, mu1, mu2, dist, x1, x2, sep="_")
   cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
@@ -1977,7 +1977,7 @@ get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2) {
 
   # If not cached, compute and save
   cat("Computing true SEs for parameters:", cache_key, "(this may take a while...)\n")
-  sim_out <- simCovariateMLEs_parallel(sims = 1000, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2, trace = FALSE)
+  sim_out <- simCovariateMLEs_parallel(sims = sims, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2, trace = FALSE)
   ses <- sim_out$ses[1:4]
   names(ses) <- c("t1", "t2", "x1", "x2")
 
