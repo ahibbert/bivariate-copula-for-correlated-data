@@ -59,7 +59,7 @@ remove_outliers_eval <- function(matrix_data, matrix_name = "matrix", iqr_multip
       
       # Only apply extreme value filter if MAD is not zero
       if(!is.na(mad_val) && mad_val > 0) {
-        extreme_outliers <- !is.na(col_data) & abs(col_data - median_val) > 1000 * mad_val
+        extreme_outliers <- !is.na(col_data) & abs(col_data - median_val) > 1000000 * mad_val
         global_outliers[, j] <- global_outliers[, j] | extreme_outliers
       }
     }
@@ -269,7 +269,7 @@ prepare_eval_data <- function(dist_name, metric_matrix, metric_name, models_to_u
 # Function to create individual distribution plot for a metric
 create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label, 
                                   models_to_use = NULL, show_legend = TRUE, 
-                                  y_limits = NULL, lower_is_better = TRUE) {
+                                  y_limits = NULL, lower_is_better = TRUE, use_log_scale = FALSE) {
   
   plot_data <- prepare_eval_data(dist_name, metric_matrix, metric_name, models_to_use)
   
@@ -282,9 +282,9 @@ create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label
   cat("Unique models in", dist_name, metric_name, "data:", paste(unique_models, collapse = ", "), "\n")
   
   # Add line type mapping for different models
-  #plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "solid",
-  #                       ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "dotted"))
- # 
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "solid",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "dotted"))
+  
   # Create the plot with consistent color mapping and line types for GJRM models
   p <- ggplot(plot_data, aes(x = corr_vals, y = metric_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
@@ -293,7 +293,9 @@ create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label
                        breaks = unique_models,
                        limits = unique_models) +
     # Add line type scale
-    #scale_linetype_identity() +
+    scale_linetype_identity() +
+    # Add log scale if requested
+    {if(use_log_scale) scale_y_log10() else NULL} +
     coord_cartesian(xlim = c(.2, .7)) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
@@ -331,7 +333,7 @@ create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label
 
 # Function to create a 4-panel plot for a specific metric
 create_eval_metric_plot <- function(metric_matrix, metric_name, main_title, y_label, 
-                                   models_to_use = NULL, y_limits = NULL, lower_is_better = TRUE) {
+                                   models_to_use = NULL, y_limits = NULL, lower_is_better = TRUE, use_log_scale = FALSE) {
   
   cat("\n=== Creating", metric_name, "plots ===\n")
   
@@ -354,7 +356,8 @@ create_eval_metric_plot <- function(metric_matrix, metric_name, main_title, y_la
       models_to_use = models_to_use,
       show_legend = show_legend_this_plot,
       y_limits = y_limits,
-      lower_is_better = lower_is_better
+      lower_is_better = lower_is_better,
+      use_log_scale = use_log_scale
     )
     
     if(!is.null(plot)) {
@@ -381,7 +384,8 @@ create_eval_metric_plot <- function(metric_matrix, metric_name, main_title, y_la
       models_to_use = models_to_use,
       show_legend = TRUE,
       y_limits = y_limits,
-      lower_is_better = lower_is_better
+      lower_is_better = lower_is_better,
+      use_log_scale = use_log_scale
     )
     
     if(!is.null(test_plot)) {
@@ -407,7 +411,8 @@ create_eval_metric_plot <- function(metric_matrix, metric_name, main_title, y_la
         models_to_use = models_to_use,
         show_legend = TRUE,
         y_limits = y_limits,
-        lower_is_better = lower_is_better
+        lower_is_better = lower_is_better,
+        use_log_scale = use_log_scale
       ) + 
         theme(
           legend.position = "bottom", 
@@ -459,11 +464,12 @@ if(exists("vs2_matrix_clean") && !is.null(vs2_matrix_clean)) {
   vs2_plot <- create_eval_metric_plot(
     metric_matrix = vs2_matrix_clean,
     metric_name = "VS2",
-    main_title = "Variogram Score (VS2) by Distribution",
-    y_label = "VS2 Score",
+    main_title = "Variogram Score (VS2) by Distribution (Log Scale)",
+    y_label = "VS2 Score (Log Scale)",
     models_to_use = eval_models_to_plot,
     y_limits = NULL,  # Auto-scale
-    lower_is_better = TRUE
+    lower_is_better = TRUE,
+    use_log_scale = TRUE
   )
 } else {
   cat("Warning: Cleaned VS2 (unweighted) matrix not available, using original data\n")
@@ -471,11 +477,12 @@ if(exists("vs2_matrix_clean") && !is.null(vs2_matrix_clean)) {
     vs2_plot <- create_eval_metric_plot(
       metric_matrix = vs2_matrix,
       metric_name = "VS2",
-      main_title = "Variogram Score (VS2) by Distribution",
-      y_label = "VS2 Score",
+      main_title = "Variogram Score (VS2) by Distribution (Log Scale)",
+      y_label = "VS2 Score (Log Scale)",
       models_to_use = eval_models_to_plot,
       y_limits = NULL,  # Auto-scale
-      lower_is_better = TRUE
+      lower_is_better = TRUE,
+      use_log_scale = TRUE
     )
   } else {
     cat("Error: VS2 matrix not found\n")
@@ -506,22 +513,24 @@ if(exists("vs2_wt_matrix_clean") && !is.null(vs2_wt_matrix_clean)) {
   vs2_wt_plot <- create_eval_metric_plot(
     metric_matrix = vs2_wt_matrix_clean,
     metric_name = "VS2_Weighted",
-    main_title = "Weighted Variogram Score (VS2) by Distribution",
-    y_label = "VS2 Weighted Score",
+    main_title = "Weighted Variogram Score (VS2) by Distribution (Log Scale)",
+    y_label = "VS2 Weighted Score (Log Scale)",
     models_to_use = eval_models_to_plot,
     y_limits = NULL,  # Auto-scale
-    lower_is_better = TRUE
+    lower_is_better = TRUE,
+    use_log_scale = TRUE
   )
 } else {
   cat("Warning: Cleaned VS2 weighted matrix not available, using original data\n")
   vs2_wt_plot <- create_eval_metric_plot(
     metric_matrix = vs2_wt_matrix,
     metric_name = "VS2_Weighted",
-    main_title = "Weighted Variogram Score (VS2) by Distribution",
-    y_label = "VS2 Weighted Score",
+    main_title = "Weighted Variogram Score (VS2) by Distribution (Log Scale)",
+    y_label = "VS2 Weighted Score (Log Scale)",
     models_to_use = eval_models_to_plot,
     y_limits = NULL,  # Auto-scale
-    lower_is_better = TRUE
+    lower_is_better = TRUE,
+    use_log_scale = TRUE
   )
 }
 
