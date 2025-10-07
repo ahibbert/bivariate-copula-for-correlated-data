@@ -1,4 +1,4 @@
-bt_mode <- FALSE  # Set to TRUE for BT files, FALSE for non-BT files
+bt_mode <- TRUE  # Set to TRUE for BT files, FALSE for non-BT files
 
 # EXTRACT ALL THE DATA FROM SAVED SIMULATIONS ----
 
@@ -660,34 +660,7 @@ print(sapply(input_params_df, class))
 
 parameters=input_params_df
 
-# Load true values from file if available ----
-# Load newly computed true SEs (if available) to override the old true_SE_out
-# This uses the get_true_ses function results computed at the end of this script
-#tryCatch({
-#  cat("Attempting to load computed true SEs...\n")
-#  
-#  # Try to find the most recent true_ses_complete file
-#  cache_files <- list.files("Cache", pattern = "true_ses_complete_.*\\.rds$", full.names = TRUE)
-#  if(length(cache_files) > 0) {
-#    # Use the most recent file
-#    cache_file <- cache_files[which.max(file.mtime(cache_files))]
-#    cat("Loading true SEs from:", basename(cache_file), "\n")
-#    
-#    final_data <- readRDS(cache_file)
-#    true_ses_matrix <- final_data$true_ses_matrix
-#    cat("Successfully loaded true_ses_matrix with dimensions:", dim(true_ses_matrix), "\n")
-#    cat("Available SE columns:", colnames(true_ses_matrix), "\n")
-#    cat("Non-missing t1_se values:", sum(!is.na(true_ses_matrix[, "t1_se"])), "\n")
-#  } else {
-#    cat("No true_ses_complete files found in Cache directory\n")
-#    true_ses_matrix <- NULL
-#  }
-#}, error = function(e) {
-#  cat("Could not load computed true SEs:", e$message, "\n")
-#  cat("Will use old true_SE_out method instead\n")
-#  true_ses_matrix <- NULL
-#})
-# Compute true values (new simulations) ----
+# Compute true values (new simulations) - or load cached from file if available ----
 
 # Check if we already have a valid true_ses_matrix from the previous loading section
 if(exists("true_ses_matrix") && !is.null(true_ses_matrix) && 
@@ -700,7 +673,7 @@ if(exists("true_ses_matrix") && !is.null(true_ses_matrix) &&
   # Apply the transformations that would normally be done at the end
   cat("Applying transformations to loaded true_ses_matrix...\n")
   true_ses_matrix <- sqrt(true_ses_matrix)
-  true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
+  #true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
   cat("Transformations applied successfully.\n")
   
 } else {
@@ -763,7 +736,7 @@ for(i in start_row:nrow(true_params_matrix)) {
   tryCatch({
     # Call get_true_ses function
     true_ses_result <- get_true_ses(
-      n = as.numeric(params$n),
+      n = as.numeric(params$n),  # Scale down n for faster computation and more reliable estimates
       a = as.numeric(params$a),
       b = as.numeric(params$b), 
       c = as.numeric(params$c),
@@ -772,7 +745,7 @@ for(i in start_row:nrow(true_params_matrix)) {
       dist = params$dist,
       x1 = as.numeric(params$x1),
       x2 = as.numeric(params$x2)
-    )
+    )  # Scale down SEs accordingly
     
     # Store results in matrix
     if(is.vector(true_ses_result) && length(true_ses_result) >= 4) {
@@ -884,7 +857,7 @@ cat("Total computation time:",
     else paste(round(total_computation_time/60, 1), "hours"), "\n")
 
 final_data <- list(
-  true_ses_matrix = true_ses_matrix,
+  true_ses_matrix = (true_ses_matrix),
   true_params_matrix = true_params_matrix,
   completed_rows = completed_rows,
   computation_time = Sys.time(),
@@ -920,15 +893,12 @@ cat("\nTrue standard errors matrix computation complete!\n")
 cat("Matrix dimensions:", dim(true_ses_matrix), "\n")
 cat("Available in variable: true_ses_matrix\n")
 
-  # Apply transformations only if we computed the matrix
-  cat("Applying transformations to computed true_ses_matrix...\n")
-  true_ses_matrix <- sqrt(true_ses_matrix)
-  true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
-  cat("Transformations applied successfully.\n")
+# Apply transformations only if we computed the matrix
+cat("Applying transformations to computed true_ses_matrix...\n")
+true_ses_matrix <- sqrt(true_ses_matrix)
+cat("Transformations applied successfully.\n")
 
 } # End of computation block
-
-#true_ses_matrix=sqrt(true_ses_matrix)
 
 # PLOTTING SECTION ######
 
@@ -1003,7 +973,7 @@ if(exists("loglik_matrix")) {
 
 #Run the plotting files
 #source("Evaluation_plots.R")
+source("Evaluation_Metric_Plots.r")
 source("MU1_MU2_Coefficient_Plots.R")
 source("X1_Coefficient_Plots.R")
 source("X2_Coefficient_Plots.R")
-source("Evaluation_Metric_Plots.r")
