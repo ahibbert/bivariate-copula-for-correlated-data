@@ -946,7 +946,7 @@ generateBivDist_withCov <- function(n,a,b,c,mu1,mu2,dist,x1,x2) {
   return(dataset)
 }
 
-fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,cv=FALSE,bt_mode=FALSE) {
+fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc_actuals=TRUE,bt_mode=FALSE) {
 
   #dist="NO"; include="ALL"; calc_actuals=FALSE
 
@@ -1751,13 +1751,17 @@ generateMvtDist<-function(dist,mu_vector,sigma_vector,rho_vector) {
   return(data_output)
 }
 
-calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
+calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE,true_data=FALSE,data_input=NA) {
 
   #n=1000;a=1;b=1;c=.5;mu1=1;mu2=2;dist="NO";x1=1;x2=1;s1=s2=1
   #n=1000;a=1;b=1;c=.5;mu1=.3;mu2=.7;dist="LO";x1=1;x2=1;s1=s2=1
 
-  dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2);
-
+  if(true_data==TRUE) {     
+    dataset=data_input
+  } else {
+    dataset=generateBivDist_withCov(n=n,a=a,b=b,c=c,mu1=mu1,mu2=mu2,dist=dist,x1=x1,x2=x2);
+  }
+  
   linkFunction=function(input_rv,dist="NO") {
     if(dist=="NO") {
       output_rv=input_rv
@@ -1791,19 +1795,22 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
 
   getLogLik=function(par_input,dataset,pdf,linkFunction,linkInvFunction,input_dist,bt_mode=TRUE) {
 
-    mu1=par_input[1];
-    mu2=par_input[2];
-    x1=par_input[3];
-    x2=par_input[4];
-    s1=exp(par_input[5]);
-    s2=exp(par_input[6]);
-    dist=dist
+    dist=input_dist
+    mu1_in=par_input[1];
+    mu2_in=par_input[2];
+    x1_in=par_input[3];
+    x2_in=par_input[4];
+    s1_in=exp(par_input[5]);
+    
+    if(dist=="GA"){s2_in=s1_in}else{
+
+      s2_in=exp(par_input[6])}
 
     if(bt_mode==TRUE) {
       #For mu1/mu2 model
-      mean_estimates_eta=(dataset$sex*x1+dataset$age*x2+mu1+(dataset$time)*mu2)
+      mean_estimates_eta=(dataset$sex*x1_in+dataset$age*x2_in+mu1_in+(dataset$time)*mu2_in)
     } else {
-      mean_estimates_eta=(dataset$sex*x1+dataset$age*x2-1*(dataset$time-1)*mu1+(dataset$time)*mu2)
+      mean_estimates_eta=(dataset$sex*x1_in+dataset$age*x2_in-1*(dataset$time-1)*mu1_in+(dataset$time)*mu2_in)
     }
 
     #print(head(mean_estimates_eta[order(mean_estimates_eta)],n=5))
@@ -1819,30 +1826,52 @@ calcTrueCovariateValues = function(n,a,b,c,mu1,mu2,dist,x1,x2,bt_mode=TRUE) {
       time1=pdf(dataset$random_variable[dataset$time==0],mu=mean_estimates[mean_estimates[,1]==0,2])
       time2=pdf(dataset$random_variable[dataset$time==1],mu=mean_estimates[mean_estimates[,1]==1,2])
     } else {
-      time1=pdf(dataset$random_variable[dataset$time==0],mu=mean_estimates[mean_estimates[,1]==0,2],sigma=(s1))
-      time2=pdf(dataset$random_variable[dataset$time==1],mu=mean_estimates[mean_estimates[,1]==1,2],sigma=(s2))
+      time1=pdf(dataset$random_variable[dataset$time==0],mu=mean_estimates[mean_estimates[,1]==0,2],sigma=(s1_in))
+      time2=pdf(dataset$random_variable[dataset$time==1],mu=mean_estimates[mean_estimates[,1]==1,2],sigma=(s2_in))
     }
 
-    return(-sum(log(time1))-sum(log(time2)))
+    out=-sum(log(time1))-sum(log(time2))
+    #if(is.infinite(out) | is.nan(out)) {out=1e10}
+
+    return(out)
 
   }
   #getLogLik(par=c(mu1_eta,mu2_eta,x1,x2,s1,s2),dataset,pdf,linkFunction,linkInvFunction,dist)
 
-  #Write an optimisation that chooses optim_par such that getLogLik is maximised
-  sd_start_1=log(sd(dataset$random_variable[dataset$time==0]))
-  sd_start_2=log(sd(dataset$random_variable[dataset$time==1]))
+  sd_start_1=log(sd(dataset$random_variable[dataset$time==0]-dataset$sex*x1+dataset$age*x2))
+  sd_start_2=log(sd(dataset$random_variable[dataset$time==1]-dataset$sex*x1+dataset$age*x2))
 
   if(bt_mode==TRUE) {
-    mu_1_eta_start= mu_1_eta
-    mu_2_eta_start= mu_2_eta-mu_1_eta
-  } else {
-    mu_1_eta_start= mu_1_eta
-    mu_2_eta_start= mu_2_eta
+    sd_start_2=sd_start_1+sd_start_2
   }
 
+  if(dist=="GA") {sd_start_2=sd_start_1}
+
+  mu1_start=mean(dataset$random_variable[dataset$time==0])
+  mu2_start=mean(dataset$random_variable[dataset$time==1])
+
+  mu_1_eta_start=linkFunction(mu1_start,dist=dist)-1
+  mu_2_eta_start=linkFunction(mu2_start,dist=dist)-1
+  
+  #if(dist=="PO") {
+  #  var1=var(dataset$random_variable[dataset$time==1]-dataset$sex*x1+dataset$age*x2)
+  #  var2=var(dataset$random_variable[dataset$time==1]-dataset$sex*x1+dataset$age*x2)
+
+  #  sd_start_1=log((var1-mu_1_eta_start)/(mu_1_eta_start^2))
+  #  sd_start_2=log((var2-mu_2_eta_start)/(mu_2_eta_start^2))
+  #}
+
+  if(bt_mode==TRUE) {
+    mu_1_eta_start= mu_1_eta_start
+    mu_2_eta_start= mu_2_eta_start-mu_1_eta_start
+  }
+
+  #Write an optimisation that chooses optim_par such that getLogLik is maximised
   optim_par=optim(par=c(mu_1_eta_start,mu_2_eta_start,x1,x2,sd_start_1,sd_start_2)
-                  , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction,linkInvFunction=linkInvFunction, input_dist=dist
-                  , control=list(maxit=100000, reltol=1e-8, trace=0))
+                  , method="SANN"#, lower=c(-10,-10,0,0,-10,-10), upper=c(10,10,100,100,10,10)
+                  , fn=getLogLik, dataset=dataset, pdf=pdf, linkFunction=linkFunction
+                  ,linkInvFunction=linkInvFunction, input_dist=dist
+                  , bt_mode=bt_mode)
 
   return(optim_par)
 
@@ -1933,7 +1962,8 @@ simCovariateMLEs_parallel = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, t
   # Calculate return values
   return_list <- list(
     coefficients = colMeans(optim_cov_outputs),
-    ses = diag(cov(optim_cov_outputs))
+    ses = diag(cov(optim_cov_outputs)),
+    all_sims=optim_cov_outputs
   )
   names(return_list) <- c("coefficients", "ses")
 
@@ -1959,31 +1989,46 @@ simCovariateMLEs_auto = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace
   }
 }
 
-get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=1000) {
+get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=500,debug_mode=FALSE) {
+  
   # Create a unique cache key from all parameters
   cache_key <- paste(n, a, b, c, mu1, mu2, dist, x1, x2, sep="_")
-  cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
 
-  # Create cache directory if it doesn't exist
-  if (!dir.exists("Cache")) {
-    dir.create("Cache", recursive = TRUE)
-  }
+  if(debug_mode==FALSE) {
+      
+    cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
 
-  # Check if cached result exists
-  if (file.exists(cache_file)) {
-    cat("Loading cached true SEs for parameters:", cache_key, "\n")
-    return(readRDS(cache_file))
+    # Create cache directory if it doesn't exist
+    if (!dir.exists("Cache")) {
+      dir.create("Cache", recursive = TRUE)
+    }
+
+    # Check if cached result exists
+    if (file.exists(cache_file)) {
+      cat("Loading cached true SEs for parameters:", cache_key, "\n")
+      return(readRDS(cache_file))
+    }
   }
 
   # If not cached, compute and save
   cat("Computing true SEs for parameters:", cache_key, "(this may take a while...)\n")
-  sim_out <- simCovariateMLEs_parallel(sims = sims, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2, trace = FALSE)
+  sim_out <- simCovariateMLEs_parallel(sims = sims, n = n, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2, dist = dist, x1 = x1, x2 = x2
+  , if(debug_mode==FALSE) {trace = FALSE} else {trace=TRUE})
   ses <- sim_out$ses[1:4]
   names(ses) <- c("t1", "t2", "x1", "x2")
 
   # Save to cache
-  saveRDS(ses, cache_file)
-  cat("Cached true SEs to:", cache_file, "\n")
+  if(debug_mode==FALSE) {
+    saveRDS(ses, cache_file)
+    cat("Cached true SEs to:", cache_file, "\n")
+  }
+  
 
-  return(ses)
+  if(debug_mode==FALSE) {
+    out_file=ses
+  } else {
+    out_file=sim_out
+  }
+
+  return(out_file)
 }
