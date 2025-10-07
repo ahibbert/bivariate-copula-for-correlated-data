@@ -16,7 +16,7 @@ models_to_plot <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", 
 cat("\n=== APPLYING OUTLIER REMOVAL FOR MU1/MU2 PLOTS ===\n")
 
 # Function to remove outliers using conservative 3*IQR method
-remove_outliers <- function(matrix_data, matrix_name = "matrix", iqr_multiplier = 3, 
+remove_outliers <- function(matrix_data, matrix_name = "matrix", iqr_multiplier   = 3, 
                            remove_global_outliers = TRUE, verbose = TRUE) {
   
   if(verbose) cat("Processing", matrix_name, "for outlier removal...\n")
@@ -29,7 +29,7 @@ remove_outliers <- function(matrix_data, matrix_name = "matrix", iqr_multiplier 
   if(remove_global_outliers) {
     # Find infinite, NaN, or extremely large values
     global_outliers <- is.infinite(cleaned_matrix) | is.nan(cleaned_matrix) | 
-                      abs(cleaned_matrix) > 1000 * median(abs(cleaned_matrix), na.rm = TRUE)
+                      abs(cleaned_matrix) > 100 * median(abs(cleaned_matrix), na.rm = TRUE)
     
     global_count <- sum(global_outliers, na.rm = TRUE)
     if(global_count > 0) {
@@ -494,7 +494,7 @@ create_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE)
                                             estimated_models)),
                           breaks = all_models_in_data,
                           limits = all_models_in_data) +
-    coord_cartesian(ylim = c(0, 0.4),xlim=c(.2,.7)) +
+    coord_cartesian(xlim=c(.2,.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
@@ -677,7 +677,7 @@ create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend =
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
-    coord_cartesian(ylim = c(-.25,.25),xlim=c(.2,.7)) +
+    coord_cartesian(ylim = c(-1,1),xlim=c(.2,.7)) +
     labs(
       title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
       x = "Kendall's τ",
@@ -853,7 +853,7 @@ create_mu2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = T
                                             estimated_models)),
                           breaks = all_models_in_data,
                           limits = all_models_in_data) +
-    coord_cartesian(ylim = c(0, 0.4),xlim=c(.2,.7)) +
+    coord_cartesian(xlim=c(.2,.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
@@ -1678,7 +1678,7 @@ if(length(bias_plots) > 0 && length(se_plots) > 0) {
   # Save the combined plot to Charts directory
   chart_filename <- paste0("Charts/Mu1_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
   
-  ggsave(chart_filename, plot = combined_plot, width = 15, height = 14, dpi = 600)
+  ggsave(chart_filename, plot = combined_plot, width = 14, height = 14, dpi = 600)
   cat("Combined bias and SE plot saved to:", chart_filename, "\n")
   
   cat("Mu1 bias and SE vs correlation plots created successfully!\n")
@@ -1863,7 +1863,7 @@ if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
   # Save the combined plot to Charts directory
   chart_filename_mu2 <- paste0("Charts/Mu2_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
   
-  ggsave(chart_filename_mu2, plot = combined_plot_mu2, width = 15, height = 14, dpi = 600)
+  ggsave(chart_filename_mu2, plot = combined_plot_mu2, width = 14, height = 14, dpi = 600)
   cat("Combined mu2 bias and SE plot saved to:", chart_filename_mu2, "\n")
   
   cat("Mu2 bias and SE vs correlation plots created successfully!\n")
@@ -1959,7 +1959,7 @@ if(length(bias_plots_skew) > 0 && length(se_plots_skew) > 0) {
     # Save the combined plot to Charts directory
     chart_filename_skew <- paste0("Charts/Mu1_Bias_and_SE_vs_Skewness_Combined_", Sys.Date(), ".png")
     
-    ggsave(chart_filename_skew, plot = combined_plot_skew, width = 15, height = 14, dpi = 600)
+    ggsave(chart_filename_skew, plot = combined_plot_skew, width = 14, height = 14, dpi = 600)
     cat("Combined mu1 bias and SE vs skewness plot saved to:", chart_filename_skew, "\n")
     
     cat("Mu1 bias and SE vs skewness plots created successfully!\n")
@@ -2054,7 +2054,7 @@ if(length(bias_plots_mu2_skew) > 0 && length(se_plots_mu2_skew) > 0) {
     # Save the combined plot to Charts directory
     chart_filename_mu2_skew <- paste0("Charts/Mu2_Bias_and_SE_vs_Skewness_Combined_", Sys.Date(), ".png")
     
-    ggsave(chart_filename_mu2_skew, plot = combined_plot_mu2_skew, width = 15, height = 14, dpi = 600)
+    ggsave(chart_filename_mu2_skew, plot = combined_plot_mu2_skew, width = 14, height = 14, dpi = 600)
     cat("Combined mu2 bias and SE vs skewness plot saved to:", chart_filename_mu2_skew, "\n")
     
     cat("Mu2 bias and SE vs skewness plots created successfully!\n")
