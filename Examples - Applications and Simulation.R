@@ -78,7 +78,6 @@ results <- r(function(data_input, dist, a, b, c, mu1, mu2) {
   fitBivModels_Bt_withCov(data=data_input, dist=dist, include="ALL", a, b, c, mu1, mu2)
 }, args = list(data_input = dataset, dist = dist, a = a, b = b, c = c, mu1 = mu1, mu2 = mu2))
 
-
 coef=cbind(results$coefficients,results$ses,results$logliks)
 colnames(coef)=c("mu1","mu2","x1","x2","mu1_se","mu2_se","x1_se","x2_se","loglik","edf")
 coef
@@ -89,11 +88,15 @@ eval_out
 ####### 5) Manual fitting of ZIS #############
 
 library(gamlss)
+#GAMLSS MODEL
+model_re_nosig <- gamlss(formula=random_variable~ -1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=ZISICHEL(),method=RS(6))
 
+#GJRM MODEL
+library(gamlss)
 #Test we are working on the same data and model as other fits
 #model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=NBI(),method=RS(1000))
 #model_re_nosig <- gamlss(formula=random_variable~ as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=ZISICHEL(),method=CG(1000))
-model_re_nosig <- gamlss(formula=random_variable~ -1+as.factor(time==1)+as.factor(sex)+age+re(random=~1|patient), data=dataset, family=ZISICHEL(),method=RS(6))
+
 
 links<-ZISICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
                 tau.link = "logit")
@@ -104,12 +107,6 @@ fit2<-gamlss(gamma_c_mu2~gender+age,family=ZISICHEL(),method=RS(100))
 
 dMargin1<-pZISICHEL(gamma_c_mu1,links$mu.linkinv(fit1$mu.coefficients[1]+fit1$mu.coefficients[2]*gender+fit1$mu.coefficients[3]*age),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
 dMargin2<-pZISICHEL(gamma_c_mu2,links$mu.linkinv(fit2$mu.coefficients[1]+fit2$mu.coefficients[2]*gender+fit2$mu.coefficients[3]*age),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
-
-par(mfrow=c(1,2))
-hist(dMargin1)
-hist(dMargin2)
-
-plot(dMargin1,dMargin2)
 
 # Choose and fit best copula
 library(VineCopula)
@@ -127,68 +124,50 @@ df_fit<-fit1$df.fit+fit2$df.fit+2
 
 c(ll_combined,-2*ll_combined+2*df_fit,-2*ll_combined+4*df_fit,-2*ll_combined+(log(nrow(dataset))*df_fit))
 
-summary(fit1)
+optim_cop_like <- function(fit1,fit2,copula_model) {
+  # Simulate from the fitted copula and margins to get new data
+  bicop_sim<-BiCopSim(length(gamma_c_mu1),copula_model)
 
-
-optim_cop_like <- function(par) {
+  qMargin1<-qZISICHEL(bicop_sim[,1],links$mu.linkinv(fit1$mu.coefficients[1]+fit1$mu.coefficients[2]*gender+fit1$mu.coefficients[3]*(age))
+  ,links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
+  qMargin2<-qZISICHEL(bicop_sim[,2],links$mu.linkinv(fit2$mu.coefficients[1]+fit2$mu.coefficients[2]*gender+fit2$mu.coefficients[3]*(age))
+  ,links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
   
-  # Check for valid parameters
-  if(any(is.na(par)) || any(!is.finite(par))) {
-    return(-Inf)
-  }
+  fit1<-gamlss(qMargin1~gender+age,family=ZISICHEL(),method=RS(100))
+  fit2<-gamlss(qMargin2~gender+age,family=ZISICHEL(),method=RS(100))
 
-  a=par[1]; b=par[2]; c=par[3]; d=par[4];
-
-  tryCatch({
-    bicop_sim<-BiCopSim(length(gamma_c_mu1),copula_model)
-    qMargin1<-qZISICHEL(bicop_sim[,1],links$mu.linkinv(a+b*gender+c*age),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
-    qMargin2<-qZISICHEL(bicop_sim[,2],links$mu.linkinv(d+b*gender+c*age),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
-
-    dMargin1<-dZISICHEL(qMargin1,links$mu.linkinv(a+b*gender+c*age),links$sigma.linkinv(fit1$sigma.coefficients),links$nu.linkinv(fit1$nu.coefficients),links$tau.linkinv(fit1$tau.coefficients))
-    dMargin2<-dZISICHEL(qMargin2,links$mu.linkinv(d+b*gender+c*age),links$sigma.linkinv(fit2$sigma.coefficients),links$nu.linkinv(fit2$nu.coefficients),links$tau.linkinv(fit2$tau.coefficients))
-
-    # Check for valid density values
-    if(any(is.na(dMargin1)) || any(is.na(dMargin2)) || any(dMargin1 <= 0) || any(dMargin2 <= 0)) {
-      return(-Inf)
-    }
-    
-    loglik <- sum(log(dMargin1)) + sum(log(dMargin2))
-    
-    # Return negative log-likelihood for minimization
-    return(-loglik)
-  }, error = function(e) {
-    return(-Inf)
-  })
+  # Return negative log-likelihood for minimization
+  return(list(coef(fit1),coef(fit2),
+    -(logLik(fit1)[1]+logLik(fit2)[1])))
 }
 
 # Estimate standard error for beta_t via simulation of fitted model
 
-mean_margins=matrix(NA,ncol=4,nrow=0)
+mean_margins=matrix(NA,ncol=6,nrow=0)
 set.seed(100)
-a=fit1$mu.coefficients[1]
-b=(fit1$mu.coefficients[2]+fit2$mu.coefficients[2])/2
-c=(fit1$mu.coefficients[3]+fit2$mu.coefficients[3])/2
-d=fit2$mu.coefficients[1]
 
 for (i in 1:100) {
+  #i=1
   print(i)
-  # Fix: Use c(a,b,c,d) instead of c(par=a,b,c,d)
-  # Also add control parameters for SANN and error handling
-  optim_fit <- tryCatch({
-    optim(par = c(a,b,c,d), 
-          fn = optim_cop_like, 
-          method = "SANN",
-          control = list(maxit = 1000, temp = 10, tmax = 10))
-  }, error = function(e) {
-    cat("Error in iteration", i, ":", e$message, "\n")
-    list(par = c(a,b,c,d), value = NA)
-  })
-  
-  # Store results if optimization succeeded
-  if(!is.na(optim_fit$value)) {
-    mean_margins <- rbind(mean_margins, optim_fit$par)
-  }
+  optim_fit <- optim_cop_like(fit1,fit2,copula_model)
+  mean_margins <- rbind(mean_margins, c(optim_fit[[1]],optim_fit[[2]]))
 }
+
+par(mfrow=c(2,3))
+for (i in 1:ncol(mean_margins)) {
+  hist(mean_margins[,i],main=colnames(mean_margins)[i])
+}
+
+colMeans(mean_margins)
+cov_sims=cov(mean_margins)
+
+sqrt(diag(cov_sims))
+
+
+sqrt(cov_sims[2,2]+cov_sims[5,5]+2*cov_sims[2,5])
+sqrt(cov_sims[3,3]+cov_sims[6,6]+2*cov_sims[3,6])*10
+
+
 
 summary(fit2)[1]-summary(fit1)[1]
 sqrt(var(mean_margins[,1])+var(mean_margins[,2])-2*cov(mean_margins)[1,2])
