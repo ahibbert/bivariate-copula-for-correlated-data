@@ -1989,18 +1989,18 @@ simCovariateMLEs_auto = function(sims, n, a, b, c, mu1, mu2, dist, x1, x2, trace
   }
 }
 
-get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=500,debug_mode=FALSE) {
+get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=500,debug_mode=FALSE,cache_location="Cache") {
   
   # Create a unique cache key from all parameters
   cache_key <- paste(n, a, b, c, mu1, mu2, dist, x1, x2, sep="_")
 
   if(debug_mode==FALSE) {
       
-    cache_file <- paste0("Cache/true_ses_", cache_key, ".rds")
+    cache_file <- paste0(cache_location,"/true_ses_", cache_key, ".rds")
 
     # Create cache directory if it doesn't exist
-    if (!dir.exists("Cache")) {
-      dir.create("Cache", recursive = TRUE)
+    if (!dir.exists(cache_location)) {
+      dir.create(cache_location, recursive = TRUE)
     }
 
     # Check if cached result exists
