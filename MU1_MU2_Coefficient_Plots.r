@@ -299,17 +299,23 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
   unique_models <- unique(plot_data$model_label)
   cat("Unique models in", dist_name, "data:", paste(unique_models, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
     # Use consistent color mapping, only showing models
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
+    # Add line type scale
+    scale_linetype_identity() +
     coord_cartesian(ylim = c(-1,1),xlim=c(.2,.7)) +
     labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Kendall's τ",
       y = TeX("$(\\hat{\\mu_1}/\\mu_1)-1$"),
       color = "Model"
@@ -481,19 +487,20 @@ create_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE)
   estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
   cat("Models in", dist_name, "SE data:", paste(all_models_in_data, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
+  # Add line type mapping for different models based on evaluation metrics approach
+  se_data$line_type <- ifelse(se_data$type == "Theoretical", "dashed",
+                       ifelse(se_data$model_label %in% c("GEE", "GLM"), "dotted",
+                       ifelse(se_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     # Manual color scale - only include models present in this plot
     scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
                        breaks = all_models_in_data,
                        limits = all_models_in_data) +
-    # Manual linetype scale - set theoretical to dashed, others to solid
-    scale_linetype_manual(values = c("Theoretical" = "dashed",
-                                    setNames(rep("solid", length(estimated_models)),
-                                            estimated_models)),
-                          breaks = all_models_in_data,
-                          limits = all_models_in_data) +
+    # Add line type scale
+    scale_linetype_identity() +
     coord_cartesian(xlim=c(.2,.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
@@ -669,17 +676,23 @@ create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend =
   unique_models <- unique(plot_data$model_label)
   cat("Unique models in", dist_name, "mu2 data:", paste(unique_models, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
     # Use consistent color mapping, only showing models present in this plot
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
+    # Add line type scale
+    scale_linetype_identity() +
     coord_cartesian(ylim = c(-1,1),xlim=c(.2,.7)) +
     labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Kendall's τ",
       y = TeX("$(\\hat{\\mu_2}/\\mu_2)-1$"),
       color = "Model"
@@ -840,19 +853,20 @@ create_mu2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = T
   estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
   cat("Models in", dist_name, "mu2 SE data:", paste(all_models_in_data, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
+  # Add line type mapping for different models based on evaluation metrics approach
+  se_data$line_type <- ifelse(se_data$type == "Theoretical", "dashed",
+                       ifelse(se_data$model_label %in% c("GEE", "GLM"), "dotted",
+                       ifelse(se_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     # Manual color scale - only include models present in this plot
     scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
                        breaks = all_models_in_data,
                        limits = all_models_in_data) +
-    # Manual linetype scale - set theoretical to dashed, others to solid
-    scale_linetype_manual(values = c("Theoretical" = "dashed",
-                                    setNames(rep("solid", length(estimated_models)),
-                                            estimated_models)),
-                          breaks = all_models_in_data,
-                          limits = all_models_in_data) +
+    # Add line type scale
+    scale_linetype_identity() +
     coord_cartesian(xlim=c(.2,.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
@@ -996,14 +1010,20 @@ create_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend 
   # Create the plot with consistent color mapping
   unique_models <- unique(plot_data$model_label)
   
-  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
+    # Add line type scale
+    scale_linetype_identity() +
     labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Skewness",
       y = TeX("Bias in $\\hat{\\mu_1}$ (Relative)"),
       color = "Model"
@@ -1164,19 +1184,20 @@ create_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend = 
   estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
   cat("Models in", dist_name, "SE data (skewness):", paste(all_models_in_data, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(se_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = model_label)) +
+  # Add line type mapping for different models based on evaluation metrics approach
+  se_data$line_type <- ifelse(se_data$type == "Theoretical", "dashed",
+                       ifelse(se_data$model_label %in% c("GEE", "GLM"), "dotted",
+                       ifelse(se_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(se_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
     # Manual color scale - only include models present in this plot
     scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
                        breaks = all_models_in_data,
                        limits = all_models_in_data) +
-    # Manual linetype scale - set theoretical to dashed, others to solid
-    scale_linetype_manual(values = c("Theoretical" = "dashed",
-                                    setNames(rep("solid", length(estimated_models)),
-                                            estimated_models)),
-                          breaks = all_models_in_data,
-                          limits = all_models_in_data) +
+    # Add line type scale
+    scale_linetype_identity() +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Skewness",
@@ -1325,14 +1346,20 @@ create_mu2_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_leg
   # Create the plot with consistent color mapping
   unique_models <- unique(plot_data$model_label)
   
-  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label)) +
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  p <- ggplot(plot_data, aes(x = skew_vals, y = bias, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1.2) +    
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
+    # Add line type scale
+    scale_linetype_identity() +
     labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      title = paste0(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name," - Bias"),
       x = "Skewness",
       y = TeX("Bias in $\\hat{\\mu_2}$ (Relative)"),
       color = "Model"
@@ -1490,25 +1517,21 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
   # Get unique estimated models in the proper order
   estimated_models <- unique(plot_data$model_label[plot_data$type == "Estimated"])
   
+  # Add line type mapping for different models based on evaluation metrics approach  
+  plot_data$line_type <- ifelse(plot_data$type == "Theoretical", "dashed",
+                         ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
   if(has_theoretical) {
-    # Create plot with both estimated and theoretical data
-    p <- ggplot(plot_data, aes(x = skew_vals)) +
-      geom_smooth(data = subset(plot_data, type == "Estimated"),
-                  aes(y = se_value, color = model_label), 
-                  method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
-      geom_smooth(data = subset(plot_data, type == "Theoretical"),
-                  aes(y = se_value), 
-                  method = "loess", se = FALSE, span = 0.75, linewidth = 1.2,
-                  color = "black", linetype = "dashed") +
-      scale_color_manual(values = model_colors[estimated_models], 
-                         breaks = estimated_models,
-                         limits = estimated_models,
+    # Create plot with both estimated and theoretical data using line types
+    p <- ggplot(plot_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = line_type)) +
+      geom_smooth(method = "loess", se = TRUE, span = 0.75, linewidth = 1.2) +
+      scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
+                         breaks = c(estimated_models, "Theoretical"),
+                         limits = c(estimated_models, "Theoretical"),
                          name = "Model") +
-      scale_linetype_manual(values = c("Estimated" = "solid", "Theoretical" = "dashed"), 
-                           name = "Data Type") +
-      guides(color = guide_legend(title = "Model", override.aes = list(linetype = "solid")),
-             linetype = guide_legend(title = "Data Type", 
-                                   override.aes = list(color = c("Estimated" = "darkgray", "Theoretical" = "black")))) +
+      # Add line type scale
+      scale_linetype_identity() +
       labs(
         title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
         x = "Skewness",
@@ -1524,14 +1547,16 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
         legend.position = if(show_legend) "bottom" else "none"
       )
   } else {
-    # Create plot with only estimated data (fallback)
+    # Create plot with only estimated data (fallback) with line types
     unique_models <- unique(plot_data$model_label)
     
-    p <- ggplot(plot_data, aes(x = skew_vals, y = se_value, color = model_label)) +
+    p <- ggplot(plot_data, aes(x = skew_vals, y = se_value, color = model_label, linetype = line_type)) +
       geom_smooth(method = "loess", se = FALSE, span = 0.75, linewidth = 1.2) +
       scale_color_manual(values = model_colors[unique_models], 
                          breaks = unique_models,
                          limits = unique_models) +
+      # Add line type scale
+      scale_linetype_identity() +
       labs(
         title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
         x = "Skewness",
@@ -1879,7 +1904,7 @@ if(length(bias_plots_mu2) > 0 && length(se_plots_mu2) > 0) {
 # Create plots for each distribution
 cat("Creating mu1 bias vs skewness plots for each distribution...\n")
 
-distributions <- c("NO","PO", "GA", "LO")
+distributions <- c("PO", "GA", "LO")  # Excluding NO distribution
 
 # Create mu1 bias plots without individual legends (we'll add a shared legend)
 bias_plots_skew <- lapply(distributions, function(dist) {

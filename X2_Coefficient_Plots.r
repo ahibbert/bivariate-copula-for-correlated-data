@@ -237,19 +237,25 @@ create_x2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = 
   unique_models <- unique(plot_data$model_label)
   cat("Unique models in x2", dist_name, "data:", paste(unique_models, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label)) +
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
     # Use consistent color mapping, only showing models present in this plot
     scale_color_manual(values = model_colors[unique_models], 
                        breaks = unique_models,
                        limits = unique_models) +
-    coord_cartesian( xlim = c(0.2, 0.7)) +
+    # Add line type scale
+    scale_linetype_identity() +
+    coord_cartesian( xlim = c(0.2, 0.7),ylim=if(dist_name=="LO"){c(-0.2,1.2)}else{c(-0.2,.2)}) +
     labs(
-      title = if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name,
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Kendall's τ",
-      y = TeX("$(\\hat{x_2}/x_2)-1$"),
+      y = TeX("$(\\hat{\\beta_{x_2}}/\\beta_{x_2})-1$"),
       color = "Model"
     ) +
     theme_minimal() +
@@ -383,24 +389,25 @@ create_x2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TR
   estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
   cat("Models in x2", dist_name, "SE data:", paste(all_models_in_data, collapse = ", "), "\n")
   
-  # Create the plot with consistent color mapping
-  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = model_label)) +
+  # Add line type mapping for different models based on evaluation metrics approach
+  se_data$line_type <- ifelse(se_data$type == "Theoretical", "dashed",
+                       ifelse(se_data$model_label %in% c("GEE", "GLM"), "dotted",
+                       ifelse(se_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = line_type)) +
     geom_smooth(method = "loess", se = TRUE, size = 1.2) +
     # Manual color scale - only include models present in this plot
     scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
                        breaks = all_models_in_data,
                        limits = all_models_in_data) +
-    # Manual linetype scale - set theoretical to dashed, others to solid
-    scale_linetype_manual(values = c("Theoretical" = "dashed",
-                                    setNames(rep("solid", length(estimated_models)),
-                                            estimated_models)),
-                          breaks = all_models_in_data,
-                          limits = all_models_in_data) +
+    # Add line type scale
+    scale_linetype_identity() +
     coord_cartesian(xlim = c(0.2, 0.7)) +
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
       x = "Kendall's τ",
-      y = TeX("SE$(\\hat{x_2})$"),
+      y = TeX("SE$(\\hat{\\beta_{x_2}})$"),
       color = "Model"
     ) +
     theme_minimal() +
