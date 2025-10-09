@@ -1,4 +1,7 @@
 bt_mode <- TRUE  # Set to TRUE for BT files, FALSE for non-BT files
+cache_location="Cache"  # Set to a path string to override cache location, or NULL to use default
+#cache_location="Cache/CORRECT BT (with Gamma Update) (100 sims)"
+#cache_location="Cache/CORRECT nonBT 31025 (100 sims)"
 
 # EXTRACT ALL THE DATA FROM SAVED SIMULATIONS ----
 
@@ -663,56 +666,30 @@ parameters=input_params_df
 # Compute true values (new simulations) - or load cached from file if available ----
 
 # Check if we already have a valid true_ses_matrix from the previous loading section
-if(exists("true_ses_matrix") && !is.null(true_ses_matrix) && 
-   is.matrix(true_ses_matrix) && sum(!is.na(true_ses_matrix)) > 0) {
-  cat("\n=== Using Previously Loaded True Standard Errors ===\n")
-  cat("Found valid true_ses_matrix with dimensions:", dim(true_ses_matrix), "\n")
-  cat("Non-missing values:", sum(!is.na(true_ses_matrix)), "/", length(true_ses_matrix), "\n")
-  cat("Skipping computation as valid data already exists.\n")
+if(exists("true_ses_matrix")) { rm(true_ses_matrix) }
+
+# Initialize matrix to store true standard errors
+# get_true_ses returns SEs for: t1, t2, x1, x2
+true_ses_matrix <- matrix(NA, nrow = nrow(true_params_matrix), ncol = 4)
+colnames(true_ses_matrix) <- c("t1_se", "t2_se", "x1_se", "x2_se")
+rownames(true_ses_matrix) <- rownames(true_params_matrix)
+completed_rows <- integer(0)
+start_row <- 1
+
+cat("\n=== Computing True Standard Errors for All Parameter Combinations ===\n")
   
-  # Apply the transformations that would normally be done at the end
-  cat("Applying transformations to loaded true_ses_matrix...\n")
-  true_ses_matrix <- sqrt(true_ses_matrix)
-  #true_ses_matrix[true_params_matrix[,"dist"]=="GA",] <- true_ses_matrix[true_params_matrix[,"dist"]=="GA",]/sqrt(1000)
-  cat("Transformations applied successfully.\n")
-  
-} else {
-  cat("\n=== Computing True Standard Errors for All Parameter Combinations ===\n")
-  cat("No valid true_ses_matrix found, starting computation...\n")
-  
-  # Load the get_true_ses function
-  source("common_functions.R")
-  
-  # Create a filename for saving progress
-  progress_filename <- paste0("Cache/true_ses_progress_", Sys.Date(), ".rds")
-  final_filename <- paste0("Cache/true_ses_complete_", Sys.Date(), ".rds")
-  
-  # Check if we have previous progress to restore
-  if(file.exists(progress_filename)) {
-    cat("Found previous progress file, loading...\n")
-    progress_data <- readRDS(progress_filename)
-    true_ses_matrix <- progress_data$true_ses_matrix
-    completed_rows <- progress_data$completed_rows
-    start_row <- max(completed_rows) + 1
-    cat("Resuming from row", start_row, "of", nrow(true_params_matrix), "\n")
-  } else {
-    cat("Starting fresh computation...\n")
-    # Initialize matrix to store true standard errors
-    # get_true_ses returns SEs for: t1, t2, x1, x2
-    true_ses_matrix <- matrix(NA, nrow = nrow(true_params_matrix), ncol = 4)
-    colnames(true_ses_matrix) <- c("t1_se", "t2_se", "x1_se", "x2_se")
-    rownames(true_ses_matrix) <- rownames(true_params_matrix)
-    completed_rows <- integer(0)
-    start_row <- 1
-  }
+# Load the get_true_ses function
+source("common_functions.R")
+
+# Create a filename for saving progress
+#progress_filename <- paste0(cache_location,"/true_ses_progress_", Sys.Date(), ".rds")
+#final_filename <- paste0(cache_location,"/true_ses_complete_", Sys.Date(), ".rds")
 
 cat("Total parameter combinations to process:", nrow(true_params_matrix), "\n")
-cat("Starting from row:", start_row, "\n")
 
 # Initialize timing variables for time estimation
 computation_start_time <- Sys.time()
 row_times <- numeric()
-
 # Process each row
 for(i in start_row:nrow(true_params_matrix)) {
   
@@ -744,7 +721,8 @@ for(i in start_row:nrow(true_params_matrix)) {
       mu2 = as.numeric(params$mu2),
       dist = params$dist,
       x1 = as.numeric(params$x1),
-      x2 = as.numeric(params$x2)
+      x2 = as.numeric(params$x2),
+      cache_location = cache_location
     )  # Scale down SEs accordingly
     
     # Store results in matrix
@@ -812,18 +790,6 @@ for(i in start_row:nrow(true_params_matrix)) {
         if(estimated_time_remaining < 60) paste(round(estimated_time_remaining, 1), "sec") 
         else if(estimated_time_remaining < 3600) paste(round(estimated_time_remaining/60, 1), "min")
         else paste(round(estimated_time_remaining/3600, 1), "hr"), "\n")
-  }
-  
-  # Save progress every 50 rows
-  if(i %% 50 == 0 || i == nrow(true_params_matrix)) {
-    cat("  Saving progress at row", i, "...\n")
-    progress_data <- list(
-      true_ses_matrix = true_ses_matrix,
-      completed_rows = completed_rows,
-      last_completed_row = i,
-      timestamp = Sys.time()
-    )
-    saveRDS(progress_data, progress_filename)
   }
   
   # Print progress every 100 rows
@@ -895,10 +861,10 @@ cat("Available in variable: true_ses_matrix\n")
 
 # Apply transformations only if we computed the matrix
 cat("Applying transformations to computed true_ses_matrix...\n")
-true_ses_matrix <- sqrt(true_ses_matrix)
+true_ses_matrix <- sqrt(true_ses_matrix/2)
 cat("Transformations applied successfully.\n")
 
-} # End of computation block
+ # End of computation block
 
 # PLOTTING SECTION ######
 
@@ -973,7 +939,7 @@ if(exists("loglik_matrix")) {
 
 #Run the plotting files
 #source("Evaluation_plots.R")
-source("Evaluation_Metric_Plots.r")
+if(bt_mode==FALSE) {source("Evaluation_Metric_Plots.r")}
 source("MU1_MU2_Coefficient_Plots.R")
 source("X1_Coefficient_Plots.R")
 source("X2_Coefficient_Plots.R")
