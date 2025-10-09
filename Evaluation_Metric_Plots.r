@@ -282,8 +282,8 @@ create_eval_dist_plot <- function(dist_name, metric_matrix, metric_name, y_label
   cat("Unique models in", dist_name, metric_name, "data:", paste(unique_models, collapse = ", "), "\n")
   
   # Add line type mapping for different models
-  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "solid",
-                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "dotted"))
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
   
   # Create the plot with consistent color mapping and line types for GJRM models
   p <- ggplot(plot_data, aes(x = corr_vals, y = metric_value, color = model_label, linetype = line_type)) +
