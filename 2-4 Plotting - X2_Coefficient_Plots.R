@@ -1,0 +1,597 @@
+# X2 Coefficient Plots - Bias and SE Analysis
+# This script creates bias and standard error plots for x2 coefficients
+# following the same structure as the mu1 plots in "Plotting for Broad Models.r"
+
+cat("=== X2 Coefficient Plotting Script ===\n")
+cat("Loading required data from main plotting script...\n")
+
+# Check if required data objects exist (from main plotting script)
+required_objects <- c("x2_coef_matrix", "x2_se_matrix", "true_params_matrix", 
+                      "skew_matrix", "model_colors", "models_to_plot", "true_ses_matrix")
+
+missing_objects <- c()
+for(obj in required_objects) {
+  if(!exists(obj)) {
+    missing_objects <- c(missing_objects, obj)
+  }
+}
+
+if(length(missing_objects) > 0) {
+  cat("ERROR: Missing required data objects:", paste(missing_objects, collapse = ", "), "\n")
+  cat("Please run 'Plotting for Broad Models.r' first to generate the required data.\n")
+  stop("Required data objects not found")
+} else {
+  cat("All required data objects found. Proceeding with x2 plotting...\n")
+}
+
+# OUTLIER REMOVAL FOR X2 PLOTS ----
+cat("\n=== APPLYING OUTLIER REMOVAL FOR X2 PLOTS ===\n")
+
+# Function to remove outliers using conservative 3*IQR method
+remove_outliers_x2 <- function(matrix_data, matrix_name = "matrix", iqr_multiplier = 3, 
+                           remove_global_outliers = TRUE, verbose = TRUE) {
+  
+  if(verbose) cat("Processing", matrix_name, "for outlier removal...\n")
+  
+  # Make a copy to work with
+  cleaned_matrix <- matrix_data
+  total_removed <- 0
+  
+  # Step 1: Remove global outliers (computational failures)
+  if(remove_global_outliers) {
+    # Find infinite, NaN, or extremely large values
+    global_outliers <- is.infinite(cleaned_matrix) | is.nan(cleaned_matrix) | 
+                      abs(cleaned_matrix) > 20 * median(abs(cleaned_matrix), na.rm = TRUE)
+    
+    global_count <- sum(global_outliers, na.rm = TRUE)
+    if(global_count > 0) {
+      cleaned_matrix[global_outliers] <- NA
+      total_removed <- total_removed + global_count
+      if(verbose) cat("  Removed", global_count, "global outliers (inf/nan/extreme values)\n")
+    }
+  }
+  
+  # Step 2: Distribution-specific outlier removal using 3*IQR
+  # Get unique distributions
+  distributions <- unique(true_params_matrix[, "dist"])
+  distributions <- distributions[!is.na(distributions)]
+  
+  for(dist in distributions) {
+    if(verbose) cat("  Processing distribution:", dist, "\n")
+    
+    # Get rows for this distribution
+    dist_rows <- which(true_params_matrix[, "dist"] == dist)
+    
+    if(length(dist_rows) == 0) next
+    
+    # Process each model column separately
+    for(j in 1:ncol(cleaned_matrix)) {
+      model_name <- colnames(cleaned_matrix)[j]
+      
+      # Get data for this distribution and model
+      dist_model_data <- cleaned_matrix[dist_rows, j]
+      
+      # Skip if all missing
+      if(all(is.na(dist_model_data))) next
+      
+      # Calculate IQR-based bounds
+      q1 <- quantile(dist_model_data, 0.25, na.rm = TRUE)
+      q3 <- quantile(dist_model_data, 0.75, na.rm = TRUE)
+      iqr <- q3 - q1
+      
+      # Skip if IQR is 0 (no variation)
+      if(iqr == 0 || is.na(iqr)) next
+      
+      # Define outlier bounds using 3*IQR (conservative)
+      lower_bound <- q1 - iqr_multiplier * iqr
+      upper_bound <- q3 + iqr_multiplier * iqr
+      
+      # Identify outliers
+      outliers <- !is.na(dist_model_data) & 
+                 (dist_model_data < lower_bound | dist_model_data > upper_bound)
+      
+      outlier_count <- sum(outliers)
+      
+      if(outlier_count > 0) {
+        # Remove outliers
+        cleaned_matrix[dist_rows[outliers], j] <- NA
+        total_removed <- total_removed + outlier_count
+        
+        if(verbose) {
+          cat("    ", model_name, "- removed", outlier_count, "outliers",
+              "(bounds: [", round(lower_bound, 3), ",", round(upper_bound, 3), "])\n")
+        }
+      }
+    }
+  }
+  
+  if(verbose) {
+    cat("  Total outliers removed from", matrix_name, ":", total_removed, "\n")
+    cat("  Percentage removed:", round(100 * total_removed / length(matrix_data), 2), "%\n")
+  }
+  
+  return(cleaned_matrix)
+}
+
+# Apply outlier removal to X2 coefficient and SE matrices
+cat("\nApplying outlier removal to X2 coefficient and SE matrices...\n")
+x2_coef_matrix_clean <- remove_outliers_x2(x2_coef_matrix, "x2_coef_matrix")
+x2_se_matrix_clean <- remove_outliers_x2(x2_se_matrix, "x2_se_matrix")
+
+# Summary of outlier removal for X2
+cat("\n=== X2 OUTLIER REMOVAL SUMMARY ===\n")
+
+matrices_info_x2 <- list(
+  "x2_coef" = list(original = x2_coef_matrix, cleaned = x2_coef_matrix_clean),
+  "x2_se" = list(original = x2_se_matrix, cleaned = x2_se_matrix_clean)
+)
+
+for(matrix_name in names(matrices_info_x2)) {
+  orig <- matrices_info_x2[[matrix_name]]$original
+  clean <- matrices_info_x2[[matrix_name]]$cleaned
+  
+  orig_missing <- sum(is.na(orig))
+  clean_missing <- sum(is.na(clean))
+  additional_missing <- clean_missing - orig_missing
+  
+  cat(matrix_name, ": originally", orig_missing, "missing,", 
+      additional_missing, "additional removed,", 
+      clean_missing, "total missing\n")
+}
+
+cat("\nX2 outlier removal complete! Using cleaned matrices for plotting.\n")
+
+# Load required libraries
+library(ggplot2)
+library(latex2exp)  # For TeX labels
+library(gridExtra)
+library(grid)
+library(gtable)     # For legend creation
+library(cowplot)    # For get_legend
+
+# Source common functions for model renaming
+if(file.exists("common_functions.R")) {
+  source("common_functions.R")
+} else {
+  cat("Warning: common_functions.R not found. Using basic model renaming.\n")
+  # Basic model renaming function
+  rename_model <- function(model_name) {
+    switch(model_name,
+           "glm" = "GLM",
+           "gee" = "GEE",
+           "re_nosig" = "GAMLSS (Sig)",
+           "re_np" = "GAMLSS (NP)",
+           "lme4" = "LME4",
+           "gamm" = "GAMM",
+           "cop_n" = "Copula (N)",
+           "cop" = "Copula",
+           model_name)  # Return original if no match
+  }
+}
+
+# Use the legend handling functions from main plotting file
+# (get_legend and validate_legend are defined in the main plotting script)
+
+# Function to prepare x2 bias plot data for a specific distribution
+prepare_x2_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    non_missing_counts <- colSums(!is.na(x2_coef_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No x2 bias data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get true x2 values for this distribution
+  true_x2 <- as.numeric(true_params_matrix$x2[dist_rows])
+  
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated x2 values for this distribution and selected models
+  # Note: x2 coefficients should not need link function transformations like mu1
+  est_x2_matrix <- x2_coef_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  
+  # Calculate relative bias using (estimated - true) / true
+  bias_matrix <- est_x2_matrix / rep(true_x2, each = 1) - 1
+  
+  # Convert to long format for ggplot
+  plot_data <- data.frame(
+    corr_vals = rep(corr_vals, length(models_to_plot)),
+    bias = as.vector(bias_matrix),
+    model = rep(models_to_plot, each = length(true_x2)),
+    model_label = rep(sapply(models_to_plot, rename_model), each = length(true_x2)),
+    dist = dist_name
+  )
+  
+  # Remove rows with missing values
+  plot_data <- plot_data[complete.cases(plot_data), ]
+  
+  return(plot_data)
+}
+
+# Create individual x2 bias plots for each distribution
+create_x2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  plot_data <- prepare_x2_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(plot_data) || nrow(plot_data) == 0) {
+    cat("No data available for x2 bias plot:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  unique_models <- unique(plot_data$model_label)
+  cat("Unique models in x2", dist_name, "data:", paste(unique_models, collapse = ", "), "\n")
+  
+  # Add line type mapping for different models
+  plot_data$line_type <- ifelse(plot_data$model_label %in% c("GEE", "GLM"), "dotted",
+                         ifelse(plot_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid"))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(plot_data, aes(x = corr_vals, y = bias, color = model_label, linetype = line_type)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +
+    # Use consistent color mapping, only showing models present in this plot
+    scale_color_manual(values = model_colors[unique_models], 
+                       breaks = unique_models,
+                       limits = unique_models) +
+    # Add line type scale
+    scale_linetype_identity() +
+    coord_cartesian( xlim = c(0.2, 0.7),ylim=if(dist_name=="LO"){c(-0.2,1.2)}else{c(-0.2,.2)}) +
+    labs(
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
+      x = "Kendall's τ",
+      y = TeX("$(\\hat{\\beta_{x_2}}/\\beta_{x_2})-1$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  if(DEBUG_LEGENDS && show_legend) {
+    cat("DEBUG: create_x2_dist_plot for", dist_name, "- plot created with legend position:", if(show_legend) "bottom" else "none", "\n")
+    cat("DEBUG: create_x2_dist_plot for", dist_name, "- unique models in plot:", paste(unique_models, collapse = ", "), "\n")
+    if(exists("model_colors") && length(model_colors) > 0) {
+      available_colors <- intersect(unique_models, names(model_colors))
+      cat("DEBUG: create_x2_dist_plot for", dist_name, "- available colors:", length(available_colors), "of", length(unique_models), "\n")
+    } else {
+      cat("DEBUG: create_x2_dist_plot for", dist_name, "- model_colors not available!\n")
+    }
+  }
+  
+  return(p)
+}
+
+# Function to prepare x2 SE plot data for a specific distribution
+prepare_x2_se_plot_data <- function(dist_name, models_to_plot = NULL) {
+  
+  # If no models specified, use all available models with non-missing data
+  if(is.null(models_to_plot)) {
+    non_missing_counts <- colSums(!is.na(x2_se_matrix_clean))
+    models_to_plot <- names(non_missing_counts[non_missing_counts > 0])
+  }
+  
+  # Define the desired order for models
+  desired_order <- c("glm", "gee", "re_nosig", "re_np", "lme4", "gamm", "cop_n", "cop")
+  
+  # Reorder models_to_plot according to desired order
+  models_to_plot <- intersect(desired_order, models_to_plot)
+  
+  # Filter true parameters for this distribution
+  dist_rows <- which(true_params_matrix$dist == dist_name)
+  
+  if(length(dist_rows) == 0) {
+    cat("No x2 SE data found for distribution:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get correlation values for this distribution (from skew_matrix column 2)
+  corr_vals <- skew_matrix[dist_rows, 2]
+  
+  # Get estimated SE values for this distribution and selected models
+  est_se_matrix <- x2_se_matrix_clean[dist_rows, models_to_plot, drop = FALSE]
+  
+  # Get theoretical SE values from true_ses_matrix if available
+  true_se_vals <- rep(NA, length(dist_rows))
+  
+  if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+    # Handle different structures of true_ses_matrix
+    if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+      # If it's a list containing the matrix
+      actual_ses_matrix <- true_ses_matrix$true_ses_matrix
+    } else if(is.matrix(true_ses_matrix)) {
+      # If it's already a matrix
+      actual_ses_matrix <- true_ses_matrix
+    } else {
+      actual_ses_matrix <- NULL
+    }
+    
+    if(!is.null(actual_ses_matrix) && is.matrix(actual_ses_matrix) && "x2_se" %in% colnames(actual_ses_matrix)) {
+      true_se_vals <- actual_ses_matrix[dist_rows, "x2_se"]
+      cat("Found theoretical x2 SEs for", dist_name, ":", sum(!is.na(true_se_vals)), "non-missing values\n")
+    } else {
+      cat("Warning: x2_se column not found in true_ses_matrix for", dist_name, "\n")
+    }
+  } else {
+    cat("Warning: true_ses_matrix not available, using estimated SEs only for x2", dist_name, "\n")
+  }
+  
+  # Create long format data combining estimated and theoretical SEs
+  n_models <- length(models_to_plot)
+  n_obs <- length(dist_rows)
+  
+  # Estimated SEs
+  estimated_data <- data.frame(
+    corr_vals = rep(corr_vals, n_models),
+    se_value = as.vector(est_se_matrix),
+    model = rep(models_to_plot, each = n_obs),
+    model_label = rep(sapply(models_to_plot, rename_model), each = n_obs),
+    type = "Estimated",
+    dist = dist_name
+  )
+  
+  # Theoretical SEs - only add if we have non-NA values
+  if(any(!is.na(true_se_vals))) {
+    theoretical_data <- data.frame(
+      corr_vals = corr_vals,
+      se_value = true_se_vals,
+      model = "theoretical",
+      model_label = "Theoretical",
+      type = "Theoretical",
+      dist = dist_name
+    )
+    
+    # Combine estimated and theoretical data
+    combined_se_data <- rbind(estimated_data, theoretical_data)
+  } else {
+    # Only use estimated data if no theoretical SEs available
+    combined_se_data <- estimated_data
+    cat("No theoretical SEs available for x2", dist_name, ", using only estimated SEs\n")
+  }
+  
+  # Remove rows with missing se_value
+  combined_se_data <- combined_se_data[complete.cases(combined_se_data$se_value), ]
+  
+  return(combined_se_data)
+}
+
+# Function to create x2 SE plot for a specific distribution
+create_x2_se_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRUE) {
+  
+  se_data <- prepare_x2_se_plot_data(dist_name, models_to_plot)
+  
+  if(is.null(se_data) || nrow(se_data) == 0) {
+    cat("No data available for x2 SE plot:", dist_name, "\n")
+    return(NULL)
+  }
+  
+  # Get unique model labels from the data
+  all_models_in_data <- unique(se_data$model_label)
+  estimated_models <- unique(se_data$model_label[se_data$type == "Estimated"])
+  cat("Models in x2", dist_name, "SE data:", paste(all_models_in_data, collapse = ", "), "\n")
+  
+  # Add line type mapping for different models based on evaluation metrics approach
+  se_data$line_type <- ifelse(se_data$type == "Theoretical", "dashed",
+                       ifelse(se_data$model_label %in% c("GEE", "GLM"), "dotted",
+                       ifelse(se_data$model_label %in% c("GAMLSS", "GAMLSS NP", "LME4", "GAMM"), "dashed", "solid")))
+  
+  # Create the plot with consistent color mapping and line types for GJRM models
+  p <- ggplot(se_data, aes(x = corr_vals, y = se_value, color = model_label, linetype = line_type)) +
+    geom_smooth(method = "loess", se = TRUE, size = 1.2) +
+    # Manual color scale - only include models present in this plot
+    scale_color_manual(values = c("Theoretical" = "black", model_colors[estimated_models]), 
+                       breaks = all_models_in_data,
+                       limits = all_models_in_data) +
+    # Add line type scale
+    scale_linetype_identity() +
+    coord_cartesian(xlim = c(0.2, 0.7)) +
+    labs(
+      title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
+      x = "Kendall's τ",
+      y = TeX("SE$(\\hat{\\beta_{x_2}})$"),
+      color = "Model"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 10),
+      legend.position = if(show_legend) "bottom" else "none"
+    )
+  
+  return(p)
+}
+
+# MAIN PLOTTING SECTION ----
+
+cat("\n=== Creating X2 Bias and SE Plots ===\n")
+
+# Create x2 bias plots without individual legends (we'll add a shared legend)
+plot_NO_x2_bias <- create_x2_dist_plot("NO", models_to_plot, show_legend = FALSE)
+plot_PO_x2_bias <- create_x2_dist_plot("PO", models_to_plot, show_legend = FALSE) 
+plot_GA_x2_bias <- create_x2_dist_plot("GA", models_to_plot, show_legend = FALSE)
+plot_LO_x2_bias <- create_x2_dist_plot("LO", models_to_plot, show_legend = FALSE)
+
+# Create x2 SE plots without individual legends
+plot_NO_x2_se <- tryCatch(create_x2_se_plot("NO", models_to_plot, show_legend = FALSE), 
+                          error = function(e) { cat("Error creating NO x2 SE plot:", e$message, "\n"); NULL })
+plot_PO_x2_se <- tryCatch(create_x2_se_plot("PO", models_to_plot, show_legend = FALSE), 
+                          error = function(e) { cat("Error creating PO x2 SE plot:", e$message, "\n"); NULL })
+plot_GA_x2_se <- tryCatch(create_x2_se_plot("GA", models_to_plot, show_legend = FALSE), 
+                          error = function(e) { cat("Error creating GA x2 SE plot:", e$message, "\n"); NULL })
+plot_LO_x2_se <- tryCatch(create_x2_se_plot("LO", models_to_plot, show_legend = FALSE), 
+                          error = function(e) { cat("Error creating LO x2 SE plot:", e$message, "\n"); NULL })
+
+# Remove NULL plots and organize in pairs
+bias_plots_x2 <- list(plot_NO_x2_bias, plot_PO_x2_bias, plot_GA_x2_bias, plot_LO_x2_bias)
+se_plots_x2 <- list(plot_NO_x2_se, plot_PO_x2_se, plot_GA_x2_se, plot_LO_x2_se)
+
+# Filter out NULL plots but keep the pairing
+valid_indices_x2 <- which(!sapply(bias_plots_x2, is.null) & !sapply(se_plots_x2, is.null))
+bias_plots_x2 <- bias_plots_x2[valid_indices_x2]
+se_plots_x2 <- se_plots_x2[valid_indices_x2]
+
+if(length(bias_plots_x2) > 0 && length(se_plots_x2) > 0) {
+  # Use gridExtra for plot arrangement with shared legend (same as MU1/MU2 plots)
+  library(gridExtra)
+  library(grid)
+  
+  # Check what distributions are available for x2
+  available_dists_x2 <- unique(true_params_matrix$dist)
+  cat("Available distributions for x2:", paste(available_dists_x2, collapse = ", "), "\n")
+  
+  # Find the first distribution that has data for legend extraction (same approach as MU1/MU2)
+  legend_dist_x2 <- NULL
+  for(dist in c("GA", "NO", "PO", "LO")) {
+    if(dist %in% available_dists_x2) {
+      test_plot_x2 <- create_x2_dist_plot(dist, models_to_plot, show_legend = TRUE)
+      
+      if(!is.null(test_plot_x2)) {
+        legend_dist_x2 <- dist
+        break
+      }
+    }
+  }
+  
+  if(is.null(legend_dist_x2)) {
+    cat("Error: No valid distribution found for x2 legend extraction\n")
+    # Force manual legend creation (same as MU1/MU2 approach)
+    shared_legend_x2 <- validate_legend(NULL, "Chart X2", force_manual = TRUE)
+  } else {
+    cat("Using", legend_dist_x2, "distribution for x2 legend extraction\n")
+    
+    # Extract legend from the working distribution with improved error handling (same as MU1/MU2)
+    tryCatch({
+      legend_plot_temp_x2 <- create_x2_dist_plot(legend_dist_x2, models_to_plot, show_legend = TRUE) + 
+        theme(
+          legend.position = "bottom", 
+          legend.text = element_text(size = 10), 
+          legend.title = element_text(size = 11),
+          legend.box = "horizontal",
+          legend.margin = margin(t = 10, b = 10)
+        )
+      
+      # Extract the legend with improved method (same as MU1/MU2)
+      shared_legend_x2 <- get_legend(legend_plot_temp_x2, force_manual = FALSE)
+      
+      # Validate and potentially replace with manual legend (same as MU1/MU2)
+      shared_legend_x2 <- validate_legend(shared_legend_x2, "Chart X2", force_manual = FALSE)
+      
+      cat("Legend extraction completed for X2 plots\n")
+      
+    }, error = function(e) {
+      cat("Error extracting x2 legend:", e$message, "\n")
+      shared_legend_x2 <- validate_legend(NULL, "Chart X2", force_manual = TRUE)
+    })
+  }
+  
+  # Interleave bias and SE plots for each distribution
+  all_plots_x2 <- vector("list", length(bias_plots_x2) * 2)
+  for(i in 1:length(bias_plots_x2)) {
+    all_plots_x2[2*i-1] <- bias_plots_x2[i]  # Bias plot (left column)
+    all_plots_x2[2*i] <- se_plots_x2[i]      # SE plot (right column)
+  }
+  
+  # Arrange plots in a grid (rows, 2 columns)
+  plots_grid_x2 <- do.call(arrangeGrob, c(all_plots_x2, ncol = 2))
+  
+  # Combine the plots grid with the shared legend at the bottom
+  combined_plot_x2 <- arrangeGrob(plots_grid_x2, shared_legend_x2, 
+                                  ncol = 1, 
+                                  heights = c(10, 1))
+  
+  # Display the combined plot
+  grid.draw(combined_plot_x2)
+  
+  # Save the combined plot to Charts directory
+  chart_filename_x2 <- paste0("Charts/X2_Bias_and_SE_vs_Correlation_Combined_", Sys.Date(), ".png")
+  
+  # Create Charts directory if it doesn't exist
+  if(!dir.exists("Charts")) {
+    dir.create("Charts")
+  }
+  
+  ggsave(chart_filename_x2, plot = combined_plot_x2, width = 15, height = 14, dpi = 600)
+  cat("Combined x2 bias and SE plot saved to:", chart_filename_x2, "\n")
+  
+  cat("X2 bias and SE vs correlation plots created successfully!\n")
+  cat("Number of x2 bias plots created:", length(bias_plots_x2), "\n")
+  cat("Number of x2 SE plots created:", length(se_plots_x2), "\n")
+  
+} else {
+  cat("No x2 plots could be created - check data availability\n")
+}
+
+# Print diagnostic information for x2
+cat("\n=== X2 DIAGNOSTIC INFORMATION ===\n")
+cat("Distribution counts in true_params_matrix:\n")
+print(table(true_params_matrix$dist))
+cat("\nSkew matrix dimensions:", dim(skew_matrix), "\n")
+cat("Available models in x2_coef_matrix:\n")
+print(colnames(x2_coef_matrix))
+cat("\nNon-missing values in x2_coef_matrix by model:\n")
+for(model in models_to_plot) {
+  if(model %in% colnames(x2_coef_matrix_clean)) {
+    non_missing <- sum(!is.na(x2_coef_matrix_clean[, model]))
+    model_label <- rename_model(model)
+    cat(model_label, "(", model, "):", non_missing, "non-missing values\n")
+  } else {
+    cat(model, ": not found in x2 data\n")
+  }
+}
+
+cat("\nNon-missing values in x2_se_matrix by model:\n")
+for(model in models_to_plot) {
+  if(model %in% colnames(x2_se_matrix_clean)) {
+    non_missing <- sum(!is.na(x2_se_matrix_clean[, model]))
+    model_label <- rename_model(model)
+    cat(model_label, "(", model, "):", non_missing, "non-missing SE values\n")
+  } else {
+    cat(model, ": not found in x2 SE data\n")
+  }
+}
+
+# Check true x2 parameter values
+cat("\nTrue x2 parameter values:\n")
+x2_values <- unique(true_params_matrix$x2)
+cat("Unique true x2 values:", paste(sort(x2_values), collapse = ", "), "\n")
+
+# Check if theoretical SEs are available
+if(exists("true_ses_matrix") && !is.null(true_ses_matrix)) {
+  if(is.list(true_ses_matrix) && "true_ses_matrix" %in% names(true_ses_matrix)) {
+    actual_matrix <- true_ses_matrix$true_ses_matrix
+  } else {
+    actual_matrix <- true_ses_matrix
+  }
+  
+  if(is.matrix(actual_matrix) && "x2_se" %in% colnames(actual_matrix)) {
+    x2_se_availability <- sum(!is.na(actual_matrix[, "x2_se"]))
+    cat("Theoretical x2 SEs available:", x2_se_availability, "out of", nrow(actual_matrix), "parameter combinations\n")
+  } else {
+    cat("No x2_se column found in theoretical SE matrix\n")
+  }
+} else {
+  cat("No theoretical SE matrix available\n")
+}
+
+cat("\n=== X2 PLOTTING COMPLETED ===\n")
