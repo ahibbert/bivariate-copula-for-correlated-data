@@ -687,7 +687,7 @@ source("common_functions.R")
 
 # Create a filename for saving progress
 #progress_filename <- paste0(cache_location,"/true_ses_progress_", Sys.Date(), ".rds")
-final_filename <- paste0(cache_location,"/true_ses_complete_", Sys.Date(), ".rds")
+#final_filename <- paste0(cache_location,"/true_ses_complete_", Sys.Date(), ".rds")
 
 cat("Total parameter combinations to process:", nrow(true_params_matrix), "\n")
 
@@ -834,7 +834,7 @@ final_data <- list(
   total_rows = nrow(true_params_matrix),
   total_computation_minutes = total_computation_time
 )
-saveRDS(final_data, final_filename)
+#saveRDS(final_data, final_filename)
 
 # Print final summary
 successful_computations <- sum(!is.na(true_ses_matrix[, "t1_se"]))
@@ -842,7 +842,7 @@ cat("\n=== FINAL SUMMARY ===\n")
 cat("Total parameter combinations:", nrow(true_params_matrix), "\n")
 cat("Successful computations:", successful_computations, "\n")
 cat("Success rate:", round(successful_computations/nrow(true_params_matrix)*100, 1), "%\n")
-cat("Results saved to:", final_filename, "\n")
+#cat("Results saved to:", final_filename, "\n")
 
 # Show breakdown by distribution
 cat("\nSuccess breakdown by distribution:\n")
@@ -851,12 +851,6 @@ for(dist in unique(true_params_matrix$dist)) {
   dist_successes <- sum(!is.na(true_ses_matrix[dist_rows, "t1_se"]))
   cat("  ", dist, ":", dist_successes, "/", length(dist_rows), 
       "(", round(dist_successes/length(dist_rows)*100, 1), "%)\n")
-}
-
-# Clean up progress file if computation completed successfully
-if(file.exists(progress_filename) && successful_computations > 0) {
-  cat("Removing progress file as computation completed successfully.\n")
-  file.remove(progress_filename)
 }
 
 cat("\nTrue standard errors matrix computation complete!\n")
@@ -942,11 +936,10 @@ if(exists("loglik_matrix")) {
 }
 
 #Run the plotting files
-#source("Evaluation_plots.R")
 if(bt_mode==FALSE) {
   source("2-1 Plotting - Evaluation_Metric_Plots.R")
   source("2-3 Plotting - X1_Coefficient_Plots.R")
   source("2-4 Plotting - X2_Coefficient_Plots.R")
 }
-source("2-2 Plotting - MU1_MU2_Coefficient_Plots")
+source("2-2 Plotting - MU1_MU2_Coefficient_Plots.R")
 
