@@ -27,7 +27,9 @@ TEMP CHARTS - DONT SYNC
 .vscode/r.code-snippets
 .vscode/settings.json
 .vscode/tasks.json
-Cache/
-Data/broad_sims/
+
 Data/broad_sims_bt/
 Data/Archive/
+PhD Admin/
+input_params_list.RData
+Archive/
