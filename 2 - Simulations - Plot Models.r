@@ -687,7 +687,7 @@ source("common_functions.R")
 
 # Create a filename for saving progress
 #progress_filename <- paste0(cache_location,"/true_ses_progress_", Sys.Date(), ".rds")
-#final_filename <- paste0(cache_location,"/true_ses_complete_", Sys.Date(), ".rds")
+final_filename <- paste0(cache_location,"/true_ses_complete_", Sys.Date(), ".rds")
 
 cat("Total parameter combinations to process:", nrow(true_params_matrix), "\n")
 
