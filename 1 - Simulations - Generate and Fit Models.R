@@ -25,7 +25,7 @@ options(future.rng.onMisuse = "ignore")
 load("input_params_list.RData")
 outer_sims <- 1  # Number of simulations per input set
 mode="broad_mean"
-bt_mode=TRUE
+bt_mode=FALSE
 
 # Testing for a single run
 #params <- input_params_list[[1]]
