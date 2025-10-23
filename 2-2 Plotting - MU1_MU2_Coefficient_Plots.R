@@ -317,7 +317,7 @@ create_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend = TRU
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Kendall's τ",
-      y = TeX("$(\\hat{\\mu_1}/\\mu_1)-1$"),
+      y = TeX("$Bias(\\hat{\\beta_1})$"),
       color = "Model"
     ) +
     theme_minimal() +
@@ -724,7 +724,7 @@ create_mu2_dist_plot <- function(dist_name, models_to_plot = NULL, show_legend =
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Kendall's τ",
-      y = TeX("$(\\hat{\\mu_2}/\\mu_2)-1$"),
+      y = TeX("$Bias(\\hat{\\beta_2})$"),
       color = "Model"
     ) +
     theme_minimal() +
@@ -1055,7 +1055,7 @@ create_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_legend 
     labs(
       title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- Bias"),
       x = "Skewness",
-      y = TeX("Bias in $\\hat{\\mu_1}$ (Relative)"),
+      y = TeX("$Bias(\\hat{\\beta_1})$"),
       color = "Model"
     ) +
     theme_minimal() +
@@ -1391,7 +1391,7 @@ create_mu2_dist_plot_skew <- function(dist_name, models_to_plot = NULL, show_leg
     labs(
       title = paste0(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name," - Bias"),
       x = "Skewness",
-      y = TeX("Bias in $\\hat{\\beta_2}$ (Relative)"),
+      y = TeX("Bias(\\hat{\\beta_1})"),
       color = "Model"
     ) +
     coord_cartesian(ylim = c(-1, 1)) +
@@ -1565,7 +1565,7 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
       labs(
         title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
         x = "Skewness",
-        y = TeX("SE$(\\hat{\\mu_2})$"),
+        y = TeX("SE$(\\hat{\\beta_2})$"),
         color = "Model"
       ) +
       theme_minimal() +
@@ -1590,7 +1590,7 @@ create_mu2_se_plot_skew <- function(dist_name, models_to_plot = NULL, show_legen
       labs(
         title = paste(if(dist_name == "NO") "Normal" else if(dist_name == "PO") "Negative Binomial" else if(dist_name == "GA") "Gamma" else if(dist_name == "LO") "Bernoulli" else dist_name, "- SE"),
         x = "Skewness",
-        y = TeX("SE$(\\hat{\\mu_2})$"),
+        y = TeX("SE$(\\hat{\\beta_2})$"),
         color = "Model"
       ) +
       theme_minimal() +
