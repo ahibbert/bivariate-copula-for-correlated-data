@@ -120,7 +120,7 @@ ll_m2<--1*fit2$G.deviance/2
 ll_cop<-copula_model$logLik
 
 ll_combined<-ll_m1+ll_m2+ll_cop
-df_fit<-fit1$df.fit+fit2$df.fit+2
+df_fit<-fit1$df.fit+fit2$df.fit+1
 
 c(ll_combined,-2*ll_combined+2*df_fit,-2*ll_combined+4*df_fit,-2*ll_combined+(log(nrow(dataset))*df_fit))
 
