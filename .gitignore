@@ -27,11 +27,13 @@ TEMP CHARTS - DONT SYNC
 .vscode/r.code-snippets
 .vscode/settings.json
 .vscode/tasks.json
-
+Submission/
 Data/broad_sims_bt/
 Data/Archive/
 PhD Admin/
 input_params_list.RData
 Archive/
 Response to review.docx
+Data/rand_mvt.rds
+Data/random effects papers.xlsx
 Data/rand_mvt.rds
