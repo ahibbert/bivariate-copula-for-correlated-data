@@ -83,6 +83,7 @@ simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in
 
 
 #Estimate true values
+print("Estimating true parameter values...")
 x1=runif(n); x2=as.numeric(runif(n)>0.5)
 true_sim=simFit(n=1000,rho=rho,sims=100,mean_in=sim_mean,sigma_in=sim_sigma,x1_in=x1,x2_in=x2,coef_in=c(1,1))[[1]]
 
@@ -90,6 +91,8 @@ sims=list()
 coef_sum = ses_sum = coef_count = ses_count =loglik_count=loglik_sum= NULL
 
 for (j in 1:num_outer_sims) {
+
+  print(paste("Simulation run:", j, "of", num_outer_sims))
 
   set.seed(100)
   library(glmtoolbox)
@@ -113,11 +116,13 @@ for (j in 1:num_outer_sims) {
 
   data_long=data_long[order(data_long$patient),]
 
-  model_glm=           glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())
-  model_gee=        glmgee(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian(), id=patient, corstr="Unstructured")
-  model_re_nosig <- gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NO())
-  model_lme4 <-       lmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj))
-  model_gamm =        gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=gaussian)
+  print("Fitting models...")
+
+  invisible(capture.output(model_glm<-           glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())))
+  invisible(capture.output(model_gee<-        glmgee(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian(), id=patient, corstr="Unstructured")))
+  invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NO())))
+  invisible(capture.output(model_lme4 <-       lmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj))))
+  invisible(capture.output(model_gamm <-        gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=gaussian)))
 
   residuals_matrix <- cbind(
     model_glm$residuals[as.character(1:1000)],
@@ -127,18 +132,18 @@ for (j in 1:num_outer_sims) {
     model_glm$residuals[as.character(4001:5000)]
   )
 
-  coef_in=summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients)-2),1:2]
-
-  simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=coef_in[1,1],sigma_in=sigma(model_glm),x1_in=x1,x2_in=x2,coef_in=c(coef_in[2,1],coef_in[3,1]))
+  coef_in=model_glm$coefficients
+  simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=coef_in[1],sigma_in=sigma(model_glm),x1_in=x1,x2_in=x2,coef_in=coef_in[2:3])
  
   results_table=list()
 
-  results_table[[1]]=summary(model_glm)$coeff[,1:2]
-  results_table[[2]]=summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients)-2),1:2]
-  results_table[[3]]=cbind(summary(model_re_nosig)[1:3],summary(model_re_nosig)[5:7])
+  print("Extracting results...")
+  invisible(capture.output(results_table[[1]]<-summary(model_glm)$coeff[,1:2]))
+  invisible(capture.output(results_table[[2]]<-summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients)-2),1:2]))
+  invisible(capture.output(results_table[[3]]<-cbind(summary(model_re_nosig)[1:3],summary(model_re_nosig)[5:7])))
   #esults_table[[4]]=cbind(summary(model_re_np)[1:4],summary(model_re_np)[8:11])
-  results_table[[5]]=summary(model_lme4)$coefficients[,c(1,2)]
-  results_table[[6]]=cbind(summary(model_gamm$lme)$coefficients[[1]],sqrt(diag(model_gamm$lme$varFix)))
+  invisible(capture.output(results_table[[5]]<-summary(model_lme4)$coefficients[,c(1,2)]))
+  invisible(capture.output(results_table[[6]]<-cbind(summary(model_gamm$lme)$coefficients[[1]],sqrt(diag(model_gamm$lme$varFix)))))
 
   rownames(results_table[[1]])=rownames(results_table[[2]])=rownames(results_table[[3]])=rownames(results_table[[5]])=rownames(results_table[[6]])=c("(Intercept)","x1_long","as.factor(x2_long)1")
   colnames(results_table[[1]])=colnames(results_table[[2]])=colnames(results_table[[3]])=colnames(results_table[[5]])=colnames(results_table[[6]])=c("Estimate","Std. Error")
@@ -202,7 +207,7 @@ for (j in 1:num_outer_sims) {
   rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
   colnames(loglik_table)=c("LogLik","DF","AIC","BIC")
 
-    if (is.null(coef_sum)) {
+  if (is.null(coef_sum)) {
     coef_sum <- ifelse(is.na(coefficients_table), 0, coefficients_table)
     ses_sum <- ifelse(is.na(ses_table), 0, ses_table)
     coef_count <- !is.na(coefficients_table)
