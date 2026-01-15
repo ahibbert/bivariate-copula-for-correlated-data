@@ -52,12 +52,17 @@ simRVine=function(n,rho=0,data_in=NULL){
     return_list=list()
     return_list[[1]]=out
     return_list[[2]]=loglik_vine
+    return_list[[3]]=par
     return(return_list)
 
 }
 
 simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in=0,coef_in,dist_name=NA){
     coef_out=matrix(0,nrow=sims,ncol=3)
+    dispersion_out=rep(0,sims)
+    x1=x1_in
+    x2=x2_in
+
     for(i in 1:sims) {
         simvine=simRVine(n=n,rho=rho,data_in=data_in)
         out=simvine[[1]]  
@@ -86,16 +91,19 @@ simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in
 
         data_long=data_long[order(data_long$patient),]
 
-        coef_out[i,]= if(dist_name=="GA") {glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"))$coefficients}
-        else if (dist_name =="NB") {glm.nb(random_variable~1+x1_long+as.factor(x2_long), data=data_long,maxit=1000)$coefficients}
-        else if (dist_name =="LO") {glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit"))$coefficients}
+        glm_fit= if(dist_name=="GA") {glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"))}
+        else if (dist_name =="NB") {glm.nb(random_variable~1+x1_long+as.factor(x2_long), data=data_long,maxit=1000)}
+        else if (dist_name =="LO") {glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit"))}
         else {stop("Distribution not recognized")}
+
+        coef_out[i,]=glm_fit$coefficients
+        dispersion_out[i]=summary(glm_fit)$dispersion
         #capture GLM outputs into a matrix
     }
     result=cbind(colMeans(coef_out),apply(coef_out,2,sd))
     colnames(result)=c("Mean","SD")
     rownames(result)=c("Intercept","X1","X2")
-    return(list(result,loglik_vine))
+    return(list(result,loglik_vine,par=simvine[[3]],glm_dispersion=mean(dispersion_out)))
 }
 
 set.seed(1000)
@@ -135,6 +143,23 @@ sims=list()
 
 coef_count=NULL; ses_count=NULL; coef_sum=NULL; ses_sum=NULL; loglik_sum=NULL; loglik_count=NULL
 
+# Initialize timing tracking
+model_times <- list(
+  GLM = numeric(num_outer_sims),
+  GEE = numeric(num_outer_sims),
+  RENOSIG = numeric(num_outer_sims),
+  LME4 = numeric(num_outer_sims),
+  GAMM = numeric(num_outer_sims),
+  VineCopula = numeric(num_outer_sims)
+)
+conv_rates <- list(
+  GLM = numeric(num_outer_sims),
+  GEE = numeric(num_outer_sims),
+  RENOSIG = numeric(num_outer_sims),
+  LME4 = numeric(num_outer_sims),
+  GAMM = numeric(num_outer_sims)
+)
+
 for (j in 1:num_outer_sims) {
   print(paste("Outer Simulation ",j," of ",num_outer_sims,sep=""))
   out=pnorm(mvtnorm::rmvnorm(n=n,sigma=matrix(c(1,rho,rho^2,rho^3,rho^4,
@@ -169,28 +194,81 @@ for (j in 1:num_outer_sims) {
 
   print("Fitting models...")
 
+  # Helper to time and fit models safely
+  safe_fit_timed <- function(model_name, sim_id, fit_fn) {
+    time_taken <- system.time({
+      result <- safe_fit(model_name, sim_id, fit_fn)
+    })[3]
+    return(list(result = result, time = time_taken))
+  }
+
   if(dist_name=="GA") {
-    invisible(capture.output(fit_glm <- safe_fit("GLM", j, function() suppressMessages(glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"))))))
+    fit_result_glm <- safe_fit_timed("GLM", j, function() suppressMessages(glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"))))
+    fit_glm <- fit_result_glm$result
+    model_times$GLM[j] <- fit_result_glm$time
+    
+    invisible(capture.output(fit_result_gee <- safe_fit_timed("GEE", j, function() suppressMessages(glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"), id=patient, corstr="Unstructured")))))
+    fit_gee <- fit_result_gee$result
+    model_times$GEE[j] <- fit_result_gee$time
+    
+    invisible(capture.output(fit_result_renosig <- safe_fit_timed("RE-NOSIG", j, function() suppressMessages(gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=GA(),method=RS(1000))))))
+    fit_re_nosig <- fit_result_renosig$result
+    model_times$RENOSIG[j] <- fit_result_renosig$time
+    
+    invisible(capture.output(fit_result_lme4 <- safe_fit_timed("LME4", j, function() suppressMessages(glmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),family = Gamma(link="log"),control=glmerControl(optCtrl = list(maxfun=200000)))))))
+    fit_lme4 <- fit_result_lme4$result
+    model_times$LME4[j] <- fit_result_lme4$time
+    
+    invisible(capture.output(fit_result_gamm <- safe_fit_timed("GAMM", j, function() suppressMessages(gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=Gamma(link="log"))))))
+    fit_gamm <- fit_result_gamm$result
+    model_times$GAMM[j] <- fit_result_gamm$time
+    
     invisible(capture.output(fit_glm_gamlss <- safe_fit("GAMLSS-GLM", j, function() suppressMessages(gamlss(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=GA)))))
-    invisible(capture.output(fit_gee <- safe_fit("GEE", j, function() suppressMessages(glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=Gamma(link="log"), id=patient, corstr="Unstructured")))))
-    invisible(capture.output(fit_re_nosig <- safe_fit("RE-NOSIG", j, function() suppressMessages(gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=GA(),method=RS(1000))))))
-    invisible(capture.output(fit_lme4 <- safe_fit("LME4", j, function() suppressMessages(glmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),family = Gamma(link="log"),control=glmerControl(optCtrl = list(maxfun=200000)))))))
-    invisible(capture.output(fit_gamm <- safe_fit("GAMM", j, function() suppressMessages(gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=Gamma(link="log"))))))
   } else if (dist_name=="NB") {
-    invisible(capture.output(fit_glm <- safe_fit("GLM", j, function()                glm.nb(random_variable~1+x1_long+as.factor(x2_long), data=data_long,maxit=1000))));model_glm <- fit_glm$model
-    invisible(capture.output(fit_glm_gamlss <- safe_fit("GAMLSS-GLM", j, function()  gamlss(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=NBI(),method=RS(1000)))))
-    invisible(capture.output(fit_gee <- safe_fit("GEE", j, function()                glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, init.beta=model_glm$coefficients,
-                                                          family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable"))))
-    invisible(capture.output(fit_re_nosig <- safe_fit("RE-NOSIG", j, function()      gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NBI(),method=RS(1000)))))
-    invisible(capture.output(fit_lme4 <- safe_fit("LME4", j, function()              glmer.nb(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),control=glmerControl(optCtrl = list(maxfun=200000))))))
-    invisible(capture.output(fit_gamm <- safe_fit("GAMM", j, function()              gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=nb(link="log"),control=list(niterEM=1000)))))
+    fit_result_glm <- safe_fit_timed("GLM", j, function() glm.nb(random_variable~1+x1_long+as.factor(x2_long), data=data_long,maxit=1000))
+    fit_glm <- fit_result_glm$result
+    model_times$GLM[j] <- fit_result_glm$time
+    model_glm <- fit_glm$model
+    
+    invisible(capture.output(fit_result_gee <- safe_fit_timed("GEE", j, function() glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, init.beta=model_glm$coefficients, family=neg.bin(theta=summary(model_glm)$theta),corstr = "exchangeable"))))
+    fit_gee <- fit_result_gee$result
+    model_times$GEE[j] <- fit_result_gee$time
+    
+    invisible(capture.output(fit_result_renosig <- safe_fit_timed("RE-NOSIG", j, function() gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NBI(),method=RS(1000)))))
+    fit_re_nosig <- fit_result_renosig$result
+    model_times$RENOSIG[j] <- fit_result_renosig$time
+    
+    invisible(capture.output(fit_result_lme4 <- safe_fit_timed("LME4", j, function() glmer.nb(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),control=glmerControl(optCtrl = list(maxfun=200000))))))
+    fit_lme4 <- fit_result_lme4$result
+    model_times$LME4[j] <- fit_result_lme4$time
+    
+    invisible(capture.output(fit_result_gamm <- safe_fit_timed("GAMM", j, function() gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=nb(link="log"),control=list(niterEM=1000)))))
+    fit_gamm <- fit_result_gamm$result
+    model_times$GAMM[j] <- fit_result_gamm$time
+    
+    invisible(capture.output(fit_glm_gamlss <- safe_fit("GAMLSS-GLM", j, function() gamlss(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=NBI(),method=RS(1000)))))
   } else if (dist_name=="LO") {
-    invisible(capture.output(fit_glm <- safe_fit("GLM", j, function()                glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit")))))
-    invisible(capture.output(fit_glm_gamlss <- safe_fit("GAMLSS-GLM", j, function()  gamlss(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=BI()))))
-    invisible(capture.output(fit_gee <- safe_fit("GEE", j, function()                glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit"), id=patient, corstr="Unstructured"))))
-    invisible(capture.output(fit_re_nosig <- safe_fit("RE-NOSIG", j, function()      gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=BI(),method=RS(1000)))))
-    invisible(capture.output(fit_lme4 <- safe_fit("LME4", j, function()              glmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),family = binomial(link="logit"),control=glmerControl(optCtrl = list(maxfun=200000))))))
-    invisible(capture.output(fit_gamm <- safe_fit("GAMM", j, function()              gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=binomial(link="logit")))))
+    fit_result_glm <- safe_fit_timed("GLM", j, function() glm(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit")))
+    fit_glm <- fit_result_glm$result
+    model_times$GLM[j] <- fit_result_glm$time
+    
+    invisible(capture.output(fit_result_gee <- safe_fit_timed("GEE", j, function() glmgee(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=binomial(link="logit"), id=patient, corstr="Unstructured"))))
+    fit_gee <- fit_result_gee$result
+    model_times$GEE[j] <- fit_result_gee$time
+    
+    invisible(capture.output(fit_result_renosig <- safe_fit_timed("RE-NOSIG", j, function() gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=BI(),method=RS(1000)))))
+    fit_re_nosig <- fit_result_renosig$result
+    model_times$RENOSIG[j] <- fit_result_renosig$time
+    
+    invisible(capture.output(fit_result_lme4 <- safe_fit_timed("LME4", j, function() glmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj),family = binomial(link="logit"),control=glmerControl(optCtrl = list(maxfun=200000))))))
+    fit_lme4 <- fit_result_lme4$result
+    model_times$LME4[j] <- fit_result_lme4$time
+    
+    invisible(capture.output(fit_result_gamm <- safe_fit_timed("GAMM", j, function() gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=binomial(link="logit")))))
+    fit_gamm <- fit_result_gamm$result
+    model_times$GAMM[j] <- fit_result_gamm$time
+    
+    invisible(capture.output(fit_glm_gamlss <- safe_fit("GAMLSS-GLM", j, function() gamlss(random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=BI()))))
   } else {
     stop("Distribution not recognized")
   }
@@ -218,25 +296,29 @@ for (j in 1:num_outer_sims) {
   if (!is.null(model_glm_gamlss)) {
     coef_in=model_glm_gamlss$mu.coefficients[2:3]
     if (dist_name=="LO") {
-      simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=(model_glm_gamlss$mu.coefficients[1])
-      ,sigma_in=NA,x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name= dist_name)
+      time_vine <- system.time(simvinefit<-simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=(model_glm_gamlss$mu.coefficients[1])
+      ,sigma_in=NA,x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name= dist_name))[3]
+      model_times$VineCopula[j] <- time_vine
     } else if (dist_name=="NB") {
       
       #Using method from Mitskopoulos1 et al (2022) to convert NBI residuals to uniform
 
       #hist(residuals_matrix, breaks=50, main=paste("Histogram of NBI residuals - Simulation ",j,sep=""), xlab="Residuals")
       pnorm_residuals_in=pnorm(residuals_matrix)
-      simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm_residuals_in,mean_in=model_glm_gamlss$mu.coefficients[1]
-      ,sigma_in=exp(model_glm_gamlss$sigma.coefficients),x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name = dist_name)
+      time_vine <- system.time(simvinefit<-simFit(n=1000,rho=0,sims=100,data_in=pnorm_residuals_in,mean_in=model_glm_gamlss$mu.coefficients[1]
+      ,sigma_in=exp(model_glm_gamlss$sigma.coefficients),x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name = dist_name))[3]
+      model_times$VineCopula[j] <- time_vine
     
     } else {
-      simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=model_glm_gamlss$mu.coefficients[1]
-      ,sigma_in=exp(model_glm_gamlss$sigma.coefficients),x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name = dist_name)
+      time_vine <- system.time(simvinefit<-simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=model_glm_gamlss$mu.coefficients[1]
+      ,sigma_in=exp(model_glm_gamlss$sigma.coefficients),x1_in=x1,x2_in=x2,coef_in=coef_in,dist_name = dist_name))[3]
+      model_times$VineCopula[j] <- time_vine
     }
 
     
   } else {
     simvinefit <- empty_coef_se()
+    model_times$VineCopula[j] <- 0
   }
 
     results_table=list()
@@ -311,18 +393,47 @@ for (j in 1:num_outer_sims) {
         logLiks,
         dfs,-2*logLiks+2*dfs,-2*logLiks+log(n*d)*dfs
       )
-      conv_check = c(
+
+      conv_check=c(
         model_glm$converged,
         model_gee$converged,
         model_re_nosig$converged,
-        model_re_np$converged,
-        !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ),
-        !any( grepl("converge", warnings(model_gamm)))
+        if (!is.null(model_lme4)) !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ) else NA,
+        if (!is.null(model_gamm)) !any( grepl("converge", warnings(model_gamm))) else NA,
+        NA_real_        
+
       )
 
+      sigmas=rbind(
+        rep(summary(model_glm)$dispersion,d)
+        , rep(model_gee$phi,d)
+        , if(dist_name=="LO") { rep(1,d) } else {rep((model_re_nosig$sigma.coefficients),d)}
+        , rep(summary(model_lme4)$sigma,d)
+        , rep(model_gamm$lme$sigma,d)
+        , rep(simvinefit$glm_dispersion,d)
+      )
+
+      #Extract correlations - for random effect models this is the random effect sd
+      correlations=list(
+        0
+        ,(model_gee$corr)
+        ,getSmo(model_re_nosig)$sigb
+        ,summary(model_lme4)$varcor$patient[1,1]
+        ,var(ranef(model_gamm$lme)[[1]])
+        , simvinefit$par
+      )
+      
+      # Store convergence rates
+      conv_rates$GLM[j] <- as.numeric(if (!is.null(model_glm)) model_glm$converged else NA)
+      conv_rates$GEE[j] <- as.numeric(if (!is.null(model_gee)) model_gee$converged else NA)
+      conv_rates$RENOSIG[j] <- as.numeric(if (!is.null(model_re_nosig)) model_re_nosig$converged else NA)
+      conv_rates$LME4[j] <- as.numeric(if (!is.null(model_lme4)) !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ) else NA)
+      conv_rates$GAMM[j] <- as.numeric(if (!is.null(model_gamm)) !any( grepl("converge", warnings(model_gamm))) else NA)
+
     sims[[j]]=coefficients_table
-    rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
+    rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
     colnames(loglik_table)=c("LogLik","DF","AIC","BIC")
+    names(correlations)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
 
     if (is.null(coef_sum)) {
       coef_sum <- ifelse(is.na(coefficients_table), 0, coefficients_table)
@@ -354,6 +465,31 @@ loglik_count_table_extended[loglik_count == 0] <- NA_real_
 conv_check_final <- conv_check_sum / num_outer_sims
 
 loglik_count_table_extended
+
+# Print timing summary
+cat("\n========== MODEL TIMING SUMMARY ==========\n")
+cat("Average execution time (in seconds) and convergence rates across", num_outer_sims, "simulations:\n\n")
+
+timing_summary <- data.frame(
+  Model = c("GLM", "GEE", "RE-NOSIG", "LME4", "GAMM", "VineCopula"),
+  Avg_Time_Sec = c(
+    mean(model_times$GLM, na.rm=TRUE),
+    mean(model_times$GEE, na.rm=TRUE),
+    mean(model_times$RENOSIG, na.rm=TRUE),
+    mean(model_times$LME4, na.rm=TRUE),
+    mean(model_times$GAMM, na.rm=TRUE),
+    mean(model_times$VineCopula, na.rm=TRUE)
+  ),
+  Convergence_Rate = c(
+    mean(conv_rates$GLM, na.rm=TRUE),
+    mean(conv_rates$GEE, na.rm=TRUE),
+    mean(conv_rates$RENOSIG, na.rm=TRUE),
+    mean(conv_rates$LME4, na.rm=TRUE),
+    mean(conv_rates$GAMM, na.rm=TRUE),
+    NA_real_
+  )
+)
+
 
 if (nrow(failure_log) > 0) {
   print("Model fit failures captured during simulations:")
@@ -429,4 +565,6 @@ write.csv(loglik_count_table_extended, file = paste("Charts/ChartData/Multivaria
 write.csv(coefficients_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Coef.csv",sep=""))
 write.csv(ses_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_SE.csv",sep=""))
 write.csv(true_sim, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_TrueSim.csv",sep=""))
+write.csv(timing_summary, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Timing.csv",sep=""), row.names=FALSE)
+
 print("Simulation complete.")

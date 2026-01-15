@@ -52,12 +52,17 @@ simRVine=function(n,rho=0,data_in=NULL){
     return_list=list()
     return_list[[1]]=out
     return_list[[2]]=loglik_vine
+    return_list[[3]]=par
     return(return_list)
 
 }
 
 simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in=0,coef_in){
     coef_out=matrix(0,nrow=sims,ncol=3)
+    dispersion_out=rep(0,sims)
+    x1=x1_in
+    x2=x2_in
+
     for(i in 1:sims) {
         simvine=simRVine(n=n,rho=rho,data_in=data_in)
         out=simvine[[1]]
@@ -72,13 +77,15 @@ simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in
 
         data_long=data_long[order(data_long$patient),]
 
-        coef_out[i,]= glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())$coefficients
+        glm_fit=glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())
+        coef_out[i,]= glm_fit$coefficients
+        dispersion_out[i]=summary(model_glm)$dispersion
         #capture GLM outputs into a matrix
     }
     result=cbind(colMeans(coef_out),apply(coef_out,2,sd))
     colnames(result)=c("Mean","SD")
     rownames(result)=c("Intercept","X1","X2")
-    return(list(result,loglik_vine))
+    return(list(result,loglik_vine,par=simvine[[3]],glm_dispersion=mean(dispersion_out)))
 }
 
 
@@ -89,6 +96,23 @@ true_sim=simFit(n=1000,rho=rho,sims=100,mean_in=sim_mean,sigma_in=sim_sigma,x1_i
 
 sims=list()
 coef_sum = ses_sum = coef_count = ses_count =loglik_count=loglik_sum= NULL
+
+# Initialize timing tracking
+model_times <- list(
+  GLM = numeric(num_outer_sims),
+  GEE = numeric(num_outer_sims),
+  RENOSIG = numeric(num_outer_sims),
+  LME4 = numeric(num_outer_sims),
+  GAMM = numeric(num_outer_sims),
+  VineCopula = numeric(num_outer_sims)
+)
+conv_rates <- list(
+  GLM = numeric(num_outer_sims),
+  GEE = numeric(num_outer_sims),
+  RENOSIG = numeric(num_outer_sims),
+  LME4 = numeric(num_outer_sims),
+  GAMM = numeric(num_outer_sims)
+)
 
 for (j in 1:num_outer_sims) {
 
@@ -118,11 +142,25 @@ for (j in 1:num_outer_sims) {
 
   print("Fitting models...")
 
-  invisible(capture.output(model_glm<-           glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())))
-  invisible(capture.output(model_gee<-        glmgee(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian(), id=patient, corstr="Unstructured")))
-  invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NO())))
-  invisible(capture.output(model_lme4 <-       lmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj))))
-  invisible(capture.output(model_gamm <-        gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=gaussian)))
+  # GLM
+  time_glm <- system.time(invisible(capture.output(model_glm<-           glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian()))))[3]
+  model_times$GLM[j] <- time_glm
+  
+  # GEE
+  time_gee <- system.time(invisible(capture.output(model_gee<-        glmgee(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian(), id=patient, corstr="Unstructured"))))[3]
+  model_times$GEE[j] <- time_gee
+  
+  # RE-NOSIG
+  time_renosig <- system.time(invisible(capture.output(model_re_nosig <- gamlss(formula=random_variable~1+x1_long+as.factor(x2_long)+random(as.factor(patient)), data=as.data.frame(out_adj), family=NO()))))[3]
+  model_times$RENOSIG[j] <- time_renosig
+  
+  # LME4
+  time_lme4 <- system.time(invisible(capture.output(model_lme4 <-       lmer(formula=random_variable~1+x1_long+as.factor(x2_long)+ (1|patient), data=as.data.frame(out_adj)))))[3]
+  model_times$LME4[j] <- time_lme4
+  
+  # GAMM
+  time_gamm <- system.time(invisible(capture.output(model_gamm <-        gamm(formula=random_variable~1+x1_long+as.factor(x2_long), random=list(patient=~1), data=as.data.frame(out_adj), family=gaussian))))[3]
+  model_times$GAMM[j] <- time_gamm
 
   residuals_matrix <- cbind(
     model_glm$residuals[as.character(1:1000)],
@@ -133,7 +171,8 @@ for (j in 1:num_outer_sims) {
   )
 
   coef_in=model_glm$coefficients
-  simvinefit=simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=coef_in[1],sigma_in=sigma(model_glm),x1_in=x1,x2_in=x2,coef_in=coef_in[2:3])
+  time_vine <- system.time(simvinefit<-simFit(n=1000,rho=0,sims=100,data_in=pnorm(residuals_matrix),mean_in=coef_in[1],sigma_in=sigma(model_glm),x1_in=x1,x2_in=x2,coef_in=coef_in[2:3]))[3]
+  model_times$VineCopula[j] <- time_vine
  
   results_table=list()
 
@@ -202,18 +241,47 @@ for (j in 1:num_outer_sims) {
         dfs,-2*logLiks+2*dfs,-2*logLiks+log(n*d)*dfs
       )
 
-      conv_check = c(
+      sigmas=rbind(
+        rep(summary(model_glm)$dispersion,d)
+        , rep(model_gee$phi,d)
+        , if(dist_name=="LO") { rep(1,d) } else {rep((model_re_nosig$sigma.coefficients),d)}
+        , rep(summary(model_lme4)$sigma,d)
+        , rep(model_gamm$lme$sigma,d)
+        , rep(simvinefit$glm_dispersion,d)
+      )
+
+      #Extract correlations - for random effect models this is the random effect sd
+      correlations=list(
+        0
+        ,(model_gee$corr)
+        ,getSmo(model_re_nosig)$sigb
+        ,summary(model_lme4)$varcor$patient[1,1]
+        ,var(ranef(model_gamm$lme)[[1]])
+        , simvinefit$par
+      )
+
+       conv_check=c(
         model_glm$converged,
         model_gee$converged,
         model_re_nosig$converged,
-        model_re_np$converged,
-        !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ),
-        !any( grepl("converge", warnings(model_gamm)))
+        if (!is.null(model_lme4)) !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ) else NA,
+        if (!is.null(model_gamm)) !any( grepl("converge", warnings(model_gamm))) else NA,
+        NA_real_        
+
       )
+
+
+      
+      # Store convergence rates
+      conv_rates$GLM[j] <- as.numeric(model_glm$converged)
+      conv_rates$GEE[j] <- as.numeric(model_gee$converged)
+      conv_rates$RENOSIG[j] <- as.numeric(model_re_nosig$converged)
+      conv_rates$LME4[j] <- as.numeric(!any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ))
+      conv_rates$GAMM[j] <- as.numeric(!any( grepl("converge", warnings(model_gamm))))
 
   sims[[j]]=coefficients_table
 
-  rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
+  rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=names(correlations)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
   colnames(loglik_table)=c("LogLik","DF","AIC","BIC")
 
   if (is.null(coef_sum)) {
@@ -246,6 +314,32 @@ loglik_count_table_extended[loglik_count == 0] <- NA_real_
 conv_check_final <- conv_check_sum / num_outer_sims #Correct convergence rate for each model
 
 loglik_count_table_extended
+
+# Print timing summary
+cat("\n========== MODEL TIMING SUMMARY ==========\n")
+cat("Average execution time (in seconds) and convergence rates across", num_outer_sims, "simulations:\n\n")
+
+timing_summary <- data.frame(
+  Model = c("GLM", "GEE", "RE-NOSIG", "LME4", "GAMM", "VineCopula"),
+  Avg_Time_Sec = c(
+    mean(model_times$GLM),
+    mean(model_times$GEE),
+    mean(model_times$RENOSIG),
+    mean(model_times$LME4),
+    mean(model_times$GAMM),
+    mean(model_times$VineCopula)
+  ),
+  Convergence_Rate = c(
+    mean(conv_rates$GLM),
+    mean(conv_rates$GEE),
+    mean(conv_rates$RENOSIG),
+    mean(conv_rates$LME4),
+    mean(conv_rates$GAMM),
+    NA_real_
+  )
+)
+
+
 
 ######PLOTTING
 
@@ -310,4 +404,6 @@ write.csv(loglik_count_table_extended, file = paste("Charts/ChartData/Multivaria
 write.csv(coefficients_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Coef.csv",sep=""))
 write.csv(ses_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_SE.csv",sep=""))
 write.csv(true_sim, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_TrueSim.csv",sep=""))
+write.csv(timing_summary, file = paste("Charts/ChartData/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Timing.csv",sep=""), row.names=FALSE)
+
 print("Simulation complete.")
