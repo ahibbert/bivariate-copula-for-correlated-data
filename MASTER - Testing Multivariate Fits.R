@@ -4,7 +4,7 @@
 set.seed(12345)
 n=1000;d=5;
 num_outer_sims=50; true_sims=10000;
-# num_outer_sims=1; true_sims=100;
+# num_outer_sims=1; true_sims=5;
 
 
 # ============================================================================

@@ -202,6 +202,15 @@ for (j in 1:num_outer_sims) {
         dfs,-2*logLiks+2*dfs,-2*logLiks+log(n*d)*dfs
       )
 
+      conv_check = c(
+        model_glm$converged,
+        model_gee$converged,
+        model_re_nosig$converged,
+        model_re_np$converged,
+        !any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ),
+        !any( grepl("converge", warnings(model_gamm)))
+      )
+
   sims[[j]]=coefficients_table
 
   rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
@@ -215,6 +224,7 @@ for (j in 1:num_outer_sims) {
     #now do the same thing for columns of the loglik table
     loglik_sum <- ifelse(is.na(loglik_table), 0, loglik_table)
     loglik_count <- !is.na(loglik_table)
+    conv_check_sum <- conv_check
   } else {
     coef_sum <- coef_sum + ifelse(is.na(coefficients_table), 0, coefficients_table)
     ses_sum <- ses_sum + ifelse(is.na(ses_table), 0, ses_table)
@@ -222,6 +232,7 @@ for (j in 1:num_outer_sims) {
     ses_count <- ses_count + !is.na(ses_table)
     loglik_sum <- loglik_sum + ifelse(is.na(loglik_table), 0, loglik_table)
     loglik_count <- loglik_count + !is.na(loglik_table)
+    conv_check_sum <- conv_check_sum + conv_check
   }
 
 }
@@ -232,6 +243,7 @@ coefficients_table_extended[coef_count == 0] <- NA_real_
 ses_table_extended[ses_count == 0] <- NA_real_
 loglik_count_table_extended <- loglik_sum / loglik_count
 loglik_count_table_extended[loglik_count == 0] <- NA_real_
+conv_check_final <- conv_check_sum / num_outer_sims #Correct convergence rate for each model
 
 loglik_count_table_extended
 
@@ -259,8 +271,8 @@ plot_data_list <- lapply(1:ncol(coefficients_table_extended), function(i) {
 # Create plots for each coefficient
 plots <- lapply(1:ncol(coefficients_table_extended), function(i) {
   # Calculate y-axis limits with small margin
-  y_min <- min(plot_data_list[[i]]$Lower,true_sim[i,1]-1.96*true_sim[i,2])
-  y_max <- max(plot_data_list[[i]]$Upper,true_sim[i,1]+1.96*true_sim[i,2])
+  y_min <- max( min(plot_data_list[[i]]$Lower,true_sim[i,1]-1.96*true_sim[i,2]),true_sim[i,1]-5*true_sim[i,2])
+  y_max <- min(max(plot_data_list[[i]]$Upper,true_sim[i,1]+1.96*true_sim[i,2]),true_sim[i,1]+5*true_sim[i,2])
   y_range <- y_max - y_min
   y_margin <- y_range * 0.05  # 5% margin
   
@@ -286,7 +298,7 @@ plots <- lapply(1:ncol(coefficients_table_extended), function(i) {
     ylim(y_min - y_margin, y_max + y_margin)
 })
 
-skew_out=0
+skew_out=0; dist_name_out="Normal"
 # Display all three plots together
 p=grid.arrange(plots[[1]], plots[[2]], plots[[3]], ncol = 3
   , top = paste("Multivariate Normal (T=5) Coefficient Estimates with 95% CI | rho=",rho," | sims=",num_outer_sims,sep=""))
@@ -294,4 +306,8 @@ p=grid.arrange(plots[[1]], plots[[2]], plots[[3]], ncol = 3
 ggsave(p, filename = paste("Charts/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,".png",sep=""), width = 9, height = 4)
 rownames(loglik_count_table_extended)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
 colnames(loglik_count_table_extended)=c("LogLik","DF","AIC","BIC")
-write.csv(loglik_count_table_extended, file = paste("Charts/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_LogLik.csv",sep=""))
+write.csv(loglik_count_table_extended, file = paste("Charts/ChartData/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_LogLik.csv",sep=""))
+write.csv(coefficients_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Coef.csv",sep=""))
+write.csv(ses_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_SE.csv",sep=""))
+write.csv(true_sim, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_TrueSim.csv",sep=""))
+print("Simulation complete.")
