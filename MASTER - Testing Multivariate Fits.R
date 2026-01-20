@@ -1,17 +1,16 @@
 # Master file for testing multivariate fits with different parameter values
 # This file runs the testing scripts for different families (NO, GA, NB, LO)
 
-set.seed(12345)
+set.seed(12345); source("common_functions.R")
 n=1000;d=5;
-num_outer_sims=50; true_sims=10000;
-# num_outer_sims=1; true_sims=5;
-
+# num_outer_sims=50; true_sims=10000;
+num_outer_sims=2; true_sims=5;
 
 # ============================================================================
 # NORMAL COPULA (NO) - Testing Multivariate Fits
 # ============================================================================
 
-sim_mean=1; sim_sigma=1; 
+sim_mean=1; sim_sigma=1; dist_name="NO"
 
 cat("\n=== Running Testing Multivariate Fits (NO) with rho=0.5 ===\n")
 rho <- 0.5

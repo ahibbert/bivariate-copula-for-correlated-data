@@ -1,61 +1,4 @@
-library(VineCopula)
-
-simRVine=function(n,rho=0,data_in=NULL){
-
-    # define 5-dimensional R-vine tree structure matrix
-    Matrix <- c(5, 2, 3, 1, 4,
-                0, 2, 3, 4, 1,
-                0, 0, 3, 4, 1,
-                0, 0, 0, 4, 1,
-                0, 0, 0, 0, 1)
-    Matrix <- matrix(Matrix, 5, 5)
-    # define R-vine pair-copula family matrix
-    family <- c(0, 1, 1, 1, 1,
-                0, 0, 1, 1, 1,
-                0, 0, 0, 1, 1,
-                0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0)
-    family <- matrix(family, 5, 5)
-    # define R-vine pair-copula parameter matrix
-    
-    if(rho==0){
-        #automatically select parameters for normal copula
-         par=RVineCopSelect(data_in, familyset=1,Matrix)$par
-    }   else {
-        par <- c(0, rho^4, rho^3, rho^2, rho,
-            0, 0, rho^3, rho^2, rho,
-            0, 0, 0, rho^2, rho,
-            0, 0, 0, 0, rho,
-            0, 0, 0, 0, 0)
-    }
-
-    par <- matrix(par, 5, 5)
-    # define second R-vine pair-copula parameter matrix
-    par2 <- matrix(0, 5, 5)
-
-    ## define RVineMatrix object
-    RVM <- RVineMatrix(Matrix = Matrix, family = family,
-                    par = par, par2 = par2,
-                    names = c("V1", "V2", "V3", "V4", "V5"))
-
-    ## see the object's content or a summary
-    #str(RVM)
-    #summary(RVM)
-
-    ### inspect the model using plots
-    #if (FALSE) plot(RVM)  # tree structure
-    #contour(RVM)  # contour plots of all pair-copulas
-
-    ## simulate from the vine copula model
-    out=RVineSim(n, RVM)
-    loglik_vine=RVineLogLik(out, RVM)$loglik
-    return_list=list()
-    return_list[[1]]=out
-    return_list[[2]]=loglik_vine
-    return_list[[3]]=par
-    return(return_list)
-
-}
+library(VineCopula); source("common_functions.R")
 
 simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in=0,coef_in){
     coef_out=matrix(0,nrow=sims,ncol=3)
@@ -79,7 +22,7 @@ simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in
 
         glm_fit=glm(        random_variable~1+x1_long+as.factor(x2_long), data=data_long, family=gaussian())
         coef_out[i,]= glm_fit$coefficients
-        dispersion_out[i]=summary(model_glm)$dispersion
+        dispersion_out[i]=summary(glm_fit)$dispersion
         #capture GLM outputs into a matrix
     }
     result=cbind(colMeans(coef_out),apply(coef_out,2,sd))
@@ -88,11 +31,10 @@ simFit=function(n,rho=0,sims=100,data_in=NULL,mean_in=0,sigma_in=1,x1_in=0,x2_in
     return(list(result,loglik_vine,par=simvine[[3]],glm_dispersion=mean(dispersion_out)))
 }
 
-
 #Estimate true values
 print("Estimating true parameter values...")
 x1=runif(n); x2=as.numeric(runif(n)>0.5)
-true_sim=simFit(n=1000,rho=rho,sims=100,mean_in=sim_mean,sigma_in=sim_sigma,x1_in=x1,x2_in=x2,coef_in=c(1,1))[[1]]
+true_sim=simFit(n=1000,rho=rho,sims=true_sims,mean_in=sim_mean,sigma_in=sim_sigma,x1_in=x1,x2_in=x2,coef_in=c(1,1))[[1]]
 
 sims=list()
 coef_sum = ses_sum = coef_count = ses_count =loglik_count=loglik_sum= NULL
@@ -113,6 +55,9 @@ conv_rates <- list(
   LME4 = numeric(num_outer_sims),
   GAMM = numeric(num_outer_sims)
 )
+
+vs2_all=matrix(0,nrow=num_outer_sims,ncol=6)
+vs2_wt_all=matrix(0,nrow=num_outer_sims,ncol=6)
 
 for (j in 1:num_outer_sims) {
 
@@ -270,8 +215,6 @@ for (j in 1:num_outer_sims) {
 
       )
 
-
-      
       # Store convergence rates
       conv_rates$GLM[j] <- as.numeric(model_glm$converged)
       conv_rates$GEE[j] <- as.numeric(model_gee$converged)
@@ -279,10 +222,58 @@ for (j in 1:num_outer_sims) {
       conv_rates$LME4[j] <- as.numeric(!any( grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages) ))
       conv_rates$GAMM[j] <- as.numeric(!any( grepl("converge", warnings(model_gamm))))
 
+
+
   sims[[j]]=coefficients_table
 
   rownames(coefficients_table)=rownames(ses_table)=rownames(loglik_table)=rownames(sigmas)=names(correlations)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
   colnames(loglik_table)=c("LogLik","DF","AIC","BIC")
+
+  ########## VARIOGRAM SCORES
+  library(scoringRules)
+
+  # Simulate from each fitted model
+  sim_model_out=list()
+  vs2=vs2_wt=rep(NA,length(rownames(sigmas)))
+  names(vs2)=names(vs2_wt)=rownames(sigmas)
+
+  print("Calculating variogram scores...")
+
+  vg_sims=100
+
+  w_vs=matrix(1,ncol=n*d,nrow=n*d)
+  w_vs_0=matrix(0,ncol=n*d,nrow=n*d)
+  # Set values where row = col + n or col = row + n to 10
+  # For every pair of adjacent observations
+  for (i in 1:nrow(w_vs)) {
+    if (i + 1 <= nrow(w_vs)) {
+      w_vs[i, i + 1] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+      w_vs[i + 1, i] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+      w_vs_0[i, i + 1] <- 1
+      w_vs_0[i + 1, i] <- 1
+    }
+  }
+
+  for(model_name in rownames(sigmas)) {
+    sim_model_out[[model_name]]=matrix(nrow=n*d,ncol=vg_sims)
+    for(i in 1:vg_sims) {
+      set.seed(100+i+j*vg_sims)
+      sim_model_out[[model_name]][,i] <- as.vector(sim_model_mvt(model=model_name, dist=dist_name, n=n
+      , coefficients=coefficients_table, sigma=sigmas, correlations=correlations, x1=x1, x2=x2))
+     }
+    vs2[model_name] = vs_sample(y=as.vector(out_adj),dat=sim_model_out[[model_name]],p=2)
+    vs2_wt[model_name] = vs_sample(y=as.vector(out_adj),dat=sim_model_out[[model_name]],p=2,w_vs=w_vs)
+  }
+  vs2_all[j,]=vs2
+  vs2_wt_all[j,]=vs2_wt
+    
+      
+      #Calculate variogram scores
+      #vs2[model]    = vs_sample(y=y,dat=sim_model_out[[model]],p=2)
+      #vs2_wt[model] = vs_sample(y=y,dat=sim_model_out[[model]],p=2,w_vs=w_vs)
+
+
+      #########################################
 
   if (is.null(coef_sum)) {
     coef_sum <- ifelse(is.na(coefficients_table), 0, coefficients_table)
@@ -313,7 +304,16 @@ loglik_count_table_extended <- loglik_sum / loglik_count
 loglik_count_table_extended[loglik_count == 0] <- NA_real_
 conv_check_final <- conv_check_sum / num_outer_sims #Correct convergence rate for each model
 
-loglik_count_table_extended
+# Data cleaning for variogram scores
+for (i in 1:nrow(vs2_all)) {
+  row_mean <- mean(vs2_all[i, ], na.rm = TRUE)
+  vs2_all[i, vs2_all[i, ] > 100 * row_mean] <- NA
+}
+
+for (i in 1:nrow(vs2_wt_all)) {
+  row_mean <- mean(vs2_wt_all[i, ], na.rm = TRUE)
+  vs2_wt_all[i, vs2_wt_all[i, ] > 100 * row_mean] <- NA
+}
 
 # Print timing summary
 cat("\n========== MODEL TIMING SUMMARY ==========\n")
@@ -338,7 +338,6 @@ timing_summary <- data.frame(
     NA_real_
   )
 )
-
 
 
 ######PLOTTING
@@ -398,6 +397,41 @@ p=grid.arrange(plots[[1]], plots[[2]], plots[[3]], ncol = 3
   , top = paste("Multivariate Normal (T=5) Coefficient Estimates with 95% CI | rho=",rho," | sims=",num_outer_sims,sep=""))
 
 ggsave(p, filename = paste("Charts/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,".png",sep=""), width = 9, height = 4)
+
+# Prepare data for ggplot
+vs2_data <- data.frame(
+  Score = c(vs2_all),
+  Model = rep(rownames(sigmas), each = nrow(vs2_all)),
+  Type = "Unweighted"
+)
+
+vs2_wt_data <- data.frame(
+  Score = c(vs2_wt_all),
+  Model = rep(rownames(sigmas), each = nrow(vs2_wt_all)),
+  Type = "Weighted"
+)
+
+# Create ggplot boxplots with separate facets
+p_vs2 <- ggplot(rbind(vs2_data, vs2_wt_data), aes(x = factor(Model, levels = rownames(sigmas)), y = Score, fill = Model)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ Type, scales = "free_y") +
+  labs(
+    title = paste("Variogram Scores across Models | rho=", rho, " | sims=", num_outer_sims, sep=""),
+    x = "Model",
+    y = "Variogram Score"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "none"
+  )
+
+print(p_vs2)
+
+ggsave(p_vs2, filename = paste("Charts/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_VariogramScores.png",sep=""), width = 10, height = 6)
+
+
 rownames(loglik_count_table_extended)=c("GLM","GEE","GAMLSS","LME4","GAMM","VineCopula")
 colnames(loglik_count_table_extended)=c("LogLik","DF","AIC","BIC")
 write.csv(loglik_count_table_extended, file = paste("Charts/ChartData/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_LogLik.csv",sep=""))
@@ -405,5 +439,6 @@ write.csv(coefficients_table_extended, file = paste("Charts/ChartData/Multivaria
 write.csv(ses_table_extended, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_SE.csv",sep=""))
 write.csv(true_sim, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_TrueSim.csv",sep=""))
 write.csv(timing_summary, file = paste("Charts/ChartData/Multivariate_Normal_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_Timing.csv",sep=""), row.names=FALSE)
+write.csv(vs2_all, file = paste("Charts/ChartData/Multivariate_",dist_name_out,"_T5_rho",rho,"_sims",num_outer_sims,"_skew",skew_out,"_VariogramScores.csv",sep=""), row.names=FALSE)
 
 print("Simulation complete.")

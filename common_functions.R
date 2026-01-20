@@ -1566,6 +1566,200 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALS
   return(as.vector(rbind(t1, t2)))
 }
 
+
+simRVine=function(n,rho=0,data_in=NULL){
+
+
+    #Generate data from a 5-dimensional R-vine copula with normal pair-copulas and AR1 dependence 
+      d = 5
+      dd = d*(d-1)/2
+      order = 1:d
+      family = rep(1,dd)
+     
+    # define R-vine pair-copula parameter matrix
+
+    Matrix=matrix(c(5, 0, 0, 0, 0,
+         1, 4, 0, 0, 0,
+         2, 1, 3, 0, 0,
+         3, 2, 1, 2, 0,
+         4, 3, 2, 1, 1), nrow = 5, ncol = 5, byrow = TRUE)
+    
+    if(all(rho==0)){
+        #automatically select parameters for normal copula
+         f=RVineCopSelect(data_in, familyset=1,Matrix)$par
+         par=t(f)[upper.tri(t(f))]
+         par=par[rev(order(par))]
+    }   else {
+
+        #If rho is a single number use the below else use the matrix directly
+
+        if(length(rho)==1) {
+          par <- c(rho, rho, rho, rho, #first order
+                   rho^2, rho^2, rho^2, 
+                   rho^3, rho^3, 
+                   rho^4)
+        } else {
+          par <- rho
+        }
+
+    }
+
+     #par = c(0.5,0.5,0.5,0.5,
+     #         0.5,0.5,0.5,
+     #         0.5,0.5,
+     #         0.5
+     #       )
+
+      #[1,] 0.0000 0.000 0.00  0.0    0
+      #[2,] 0.4096 0.000 0.00  0.0    0
+      #[3,] 0.5120 0.512 0.00  0.0    0
+      #[4,] 0.6400 0.640 0.64  0.0    0
+      #[5,] 0.8000 0.800 0.80  0.8    0
+
+      par2 = rep(0,length(par))
+
+      RVM = D2RVine(order,family,par,par2)
+      #contour(RVM)
+
+      #RVM$par
+
+    ## define RVineMatrix object
+    #RVM <- RVineMatrix(Matrix = Matrix, family = family,
+    #                par = par, par2 = par2,
+    #                names = c("V1", "V2", "V3", "V4", "V5"))
+
+    ## see the object's content or a summary
+    #str(RVM)
+    #summary(RVM)
+
+    ### inspect the model using plots
+    #if (FALSE) plot(RVM)  # tree structure
+    #contour(RVM)  # contour plots of all pair-copulas
+
+    ## simulate from the vine copula model
+    out=RVineSim(n, RVM)
+    loglik_vine=RVineLogLik(out, RVM)$loglik
+    return_list=list()
+    return_list[[1]]=out
+    return_list[[2]]=loglik_vine
+    return_list[[3]]=par
+    return(return_list)
+
+}
+
+
+sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
+
+  #Calculate linear predictor
+  #coefficients=coefficients_table
+  lp_1=coefficients[model,1]+coefficients[model,2]*x1 + coefficients[model,3]*x2
+
+  if (model == "GLM") {
+    #model="glm"
+    #Get linear predictor
+
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1), sigma=sqrt(sigmas[model,1]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1))
+    } else if (dist=="PO") {
+      t1=rNBI(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+    }
+
+    t1=cbind(t1,t1,t1,t1,t1) #For compatibility with other functions
+
+  } else if (model == "GEE") {
+    library(VineCopula)
+    #model="GEE"
+    #Generate basic correlation structure based on correlation parameter
+    m=correlations[[model]]
+    correlations_final=matrix(
+            c( 0, m[5,1], m[4,1], m[3,1], m[2,1],
+               0, 0,      m[5,2], m[4,2], m[3,2],
+               0, 0,      0,      m[5,3], m[4,3],
+               0, 0,      0,      0,      m[5,4],
+               0, 0,      0,      0,      0 
+            )
+      ,nrow=5,ncol=5,byrow = TRUE)
+    
+    mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
+    rho_in=t(mf)[lower.tri(t(mf))]
+
+    c0=simRVine(n, rho=rho_in)[[1]]
+
+    if(dist=="NO") {
+      t1=qNO(c0, mu=(lp_1), sigma=sqrt(sigmas[model,1]))
+    } else if (dist=="GA") {
+      t1=qGA(c0, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+    } else if (dist=="LO") {
+      t1=qBI(c0, mu=logit_inv(lp_1))
+    } else if (dist=="PO") {
+      t1=qNBI(c0, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
+    }
+
+  } else if (model == "GAMLSS") {
+    #model="re_nosig"
+
+    #Generate random effects
+    b_var=correlations[[model]]
+    re_val=rnorm(n,mean=0,sd=(((b_var))))
+
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1+re_val), sigma=exp(sigmas[model,1]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
+    } else if (dist=="PO") {
+      t1=rNBI(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
+    }
+
+    t1=cbind(t1,t1,t1,t1,t1)
+  } else if (model == "LME4" | model == "GAMM") {
+    #model="lme4"; model="gamm"
+
+    #Generate random effects
+    b_var=correlations[[model]]
+    re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
+
+    if(dist=="NO") {
+      t1=rNO(n, mu=(lp_1+re_val), sigma=(sigmas[model,1]))
+    } else if (dist=="GA") {
+      t1=rGA(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
+    } else if (dist=="LO") {
+      t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
+    } else if (dist=="PO") {
+      t1=rNBI(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
+    }
+    t1=cbind(t1,t1,t1,t1,t1)
+
+  } else if (model == "re_np") {
+    t1=rep(NA,n)
+  } else if (startsWith(model, "VineCopula")) {
+    #model="VineCopula"
+
+    m=(correlations[[model]])
+    #m=m[ncol(m):1,ncol(m):1][lower.tri(m)]
+    
+    c0=simRVine(n, rho=m)[[1]]
+
+        if(dist=="NO") {
+          t1=qNO(c0, mu=(lp_1), sigma=(sigmas[model,1]))
+        } else if (dist=="GA") {
+          t1=qGA(c0, mu=exp(lp_1), sigma=(sigmas[model,1]))
+        } else if (dist=="LO") {
+          t1=qBI(c0, mu=logit_inv(lp_1))
+        } else if (dist=="PO") {
+          t1=qNBI(c0, mu=exp(lp_1), sigma=(sigmas[model,1]))
+        }
+    
+  }
+  return((t1))
+}
+
+
 evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
 
   #Extract model info
