@@ -1569,12 +1569,11 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALS
 
 simRVine=function(n,rho=0,data_in=NULL){
 
-
     #Generate data from a 5-dimensional R-vine copula with normal pair-copulas and AR1 dependence 
       d = 5
       dd = d*(d-1)/2
       order = 1:d
-      family = rep(1,dd)
+      family = rep(3,dd)
      
     # define R-vine pair-copula parameter matrix
 
@@ -1584,9 +1583,9 @@ simRVine=function(n,rho=0,data_in=NULL){
          3, 2, 1, 2, 0,
          4, 3, 2, 1, 1), nrow = 5, ncol = 5, byrow = TRUE)
     
-    if(all(rho==0)){
+    if(all(rho==0)&&length(rho)==1) {
         #automatically select parameters for normal copula
-         f=RVineCopSelect(data_in, familyset=1,Matrix)$par
+         f=RVineCopSelect(data_in, familyset=3,Matrix)$par
          par=t(f)[upper.tri(t(f))]
          par=par[rev(order(par))]
     }   else {
@@ -1594,10 +1593,18 @@ simRVine=function(n,rho=0,data_in=NULL){
         #If rho is a single number use the below else use the matrix directly
 
         if(length(rho)==1) {
-          par <- c(rho, rho, rho, rho, #first order
+         par <- c(rho, rho, rho, rho, #first order ############ TEMPORARY DELETE LATER ITS FOR CLAYTON
                    rho^2, rho^2, rho^2, 
                    rho^3, rho^3, 
                    rho^4)
+         par <- c(rho, rho, rho, rho, #first order
+                   rho/2, rho/2, rho/2, 
+                   rho/3, rho/3, 
+                   rho/4)
+
+
+
+                   
         } else {
           par <- rho
         }
@@ -1655,7 +1662,7 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
   lp_1=coefficients[model,1]+coefficients[model,2]*x1 + coefficients[model,3]*x2
 
   if (model == "GLM") {
-    #model="glm"
+    #model="GLM"
     #Get linear predictor
 
     if(dist=="NO") {
@@ -1664,7 +1671,7 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
       t1=rGA(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
     } else if (dist=="LO") {
       t1=rBI(n, mu=logit_inv(lp_1))
-    } else if (dist=="PO") {
+    } else if (dist=="PO"|dist=="NB") {
       t1=rNBI(n, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
     }
 
@@ -1674,18 +1681,23 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
     library(VineCopula)
     #model="GEE"
     #Generate basic correlation structure based on correlation parameter
-    m=correlations[[model]]
-    correlations_final=matrix(
-            c( 0, m[5,1], m[4,1], m[3,1], m[2,1],
-               0, 0,      m[5,2], m[4,2], m[3,2],
-               0, 0,      0,      m[5,3], m[4,3],
-               0, 0,      0,      0,      m[5,4],
-               0, 0,      0,      0,      0 
-            )
-      ,nrow=5,ncol=5,byrow = TRUE)
-    
-    mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
-    rho_in=t(mf)[lower.tri(t(mf))]
+
+    if(all(correlations[[model]]==1)) {rho_in=rep(0,10)} else {
+      m=correlations[[model]]
+      correlations_final=matrix(
+              c( 0, m[5,1], m[4,1], m[3,1], m[2,1],
+                0, 0,      m[5,2], m[4,2], m[3,2],
+                0, 0,      0,      m[5,3], m[4,3],
+                0, 0,      0,      0,      m[5,4],
+                0, 0,      0,      0,      0 
+              )
+        ,nrow=5,ncol=5,byrow = TRUE)
+      
+      mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
+      rho_in=t(mf)[lower.tri(t(mf))]
+
+    }
+
 
     c0=simRVine(n, rho=rho_in)[[1]]
 
@@ -1695,7 +1707,7 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
       t1=qGA(c0, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
     } else if (dist=="LO") {
       t1=qBI(c0, mu=logit_inv(lp_1))
-    } else if (dist=="PO") {
+    } else if (dist=="PO"|dist=="NB") {
       t1=qNBI(c0, mu=exp(lp_1), sigma=sqrt(sigmas[model,1]))
     }
 
@@ -1712,7 +1724,7 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
       t1=rGA(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
     } else if (dist=="LO") {
       t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
-    } else if (dist=="PO") {
+    } else if (dist=="PO"|dist=="NB") {
       t1=rNBI(n, mu=exp(lp_1+re_val), sigma=exp(sigmas[model,1]))
     }
 
@@ -1730,7 +1742,7 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
       t1=rGA(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
     } else if (dist=="LO") {
       t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
-    } else if (dist=="PO") {
+    } else if (dist=="PO"|dist=="NB") {
       t1=rNBI(n, mu=exp(lp_1+re_val), sigma=(sigmas[model,1]))
     }
     t1=cbind(t1,t1,t1,t1,t1)
@@ -1751,14 +1763,13 @@ sim_model_mvt <- function(model,dist,n,coefficients,sigmas,correlations,x1,x2) {
           t1=qGA(c0, mu=exp(lp_1), sigma=(sigmas[model,1]))
         } else if (dist=="LO") {
           t1=qBI(c0, mu=logit_inv(lp_1))
-        } else if (dist=="PO") {
+        } else if (dist=="PO"|dist=="NB") {
           t1=qNBI(c0, mu=exp(lp_1), sigma=(sigmas[model,1]))
         }
     
   }
   return((t1))
 }
-
 
 evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=100) {
 
@@ -2225,4 +2236,776 @@ get_true_ses <- function(n, a, b, c, mu1, mu2, dist, x1, x2,sims=500,debug_mode=
   }
 
   return(out_file)
+}
+
+
+
+#################### TRIVARIATE MODELS #####################
+
+
+simulate_trivariate <- function(
+    n=1000, 
+    mu_intercept=c(-1,0,1), 
+    cutoff=0.5,
+    mu_coefficients=c(1,0.01),
+    theta_intercept=c(0.25,0.5,0.5),  #[2,3],[1,2],[1,3]|2
+    copula_family=1,
+    x1=NULL,
+    x2=NULL,
+    seed = NULL,
+    plot_copula = FALSE
+) {
+    if (!is.null(seed)) set.seed(seed)
+
+    if (length(mu_intercept) != 3) stop("mu_intercept must be length 3")
+    if (length(mu_coefficients) != 2) stop("mu_coefficients must be length 2")
+    if (length(theta_intercept) != 3) stop("theta_intercept must be length 3")
+
+    # VineCopula provides RVineMatrix/RVineSim/contour methods
+    if (!requireNamespace("VineCopula", quietly = TRUE)) {
+        stop("Package 'VineCopula' is required for RVineMatrix/RVineSim. Install it via install.packages('VineCopula')")
+    }
+
+    Matrix <- matrix(
+        c(3, 0, 0,
+            1, 2, 0,
+            2, 1, 1),
+        nrow = 3, ncol = 3, byrow = TRUE
+    )
+
+    par <- matrix(
+        c(0, 0, 0,
+            theta_intercept[1], 0, 0,
+            theta_intercept[3], theta_intercept[2], 0),
+        nrow = 3, ncol = 3, byrow = TRUE
+    )
+    par2 <- 0 * par
+
+    family <- matrix(
+        c(0, 0, 0,
+            copula_family, 0, 0,
+            copula_family, copula_family, 0),
+        nrow = 3, ncol = 3, byrow = TRUE
+    )
+
+    RVM <- VineCopula::RVineMatrix(Matrix = Matrix, family = family, par = par, par2 = par2)
+    gaussian_copula_samples <- qnorm(VineCopula::RVineSim(n, RVM))
+
+    if (is.null(x1)) x1 <- as.numeric(stats::runif(n, 0, 1) > 0.5)
+    if (is.null(x2)) x2 <- sample(1:100, n, replace = TRUE)
+
+    if (length(x1) != n) stop("x1 must be length n")
+    if (length(x2) != n) stop("x2 must be length n")
+
+    sim_true <- gaussian_copula_samples +
+        matrix(rep(mu_intercept, n), ncol = 3, byrow = TRUE) +
+        matrix(rep(x1, 3), byrow = FALSE, ncol = 3) * mu_coefficients[1] +
+        matrix(rep(x2, 3), byrow = FALSE, ncol = 3) * mu_coefficients[2]
+
+    y <- matrix(as.numeric(logit_inv(sim_true) >= cutoff), ncol = 3)
+
+    if (isTRUE(plot_copula)) {
+        contour(RVM)
+    }
+
+    list(
+        y = y,
+        sim_true = sim_true,
+        gaussian_copula_samples = gaussian_copula_samples,
+        x1 = x1,
+        x2 = x2,
+        RVM = RVM,
+        params = list(
+            n = n,
+            mu_intercept = mu_intercept,
+            cutoff = cutoff,
+            mu_coefficients = mu_coefficients,
+            theta_intercept = theta_intercept,
+            copula_family = copula_family
+        )
+    )
+}
+
+empty_coef_se <- function() {
+  out <- matrix(NA_real_, nrow = 5, ncol = 2)
+  colnames(out) <- c("Estimate", "Std. Error")
+  out
+}
+
+fit_trivariate_models <- function(
+  sim,
+  data_long,
+  n = nrow(sim$y),
+  d = ncol(sim$y),
+  verbose = TRUE
+) {
+
+  library(gamlss)
+  library(glmtoolbox)
+  library(lme4)
+  library(mgcv)
+
+  model_glm <- glm(y ~ -1 + t + x1 + x2,
+    data = data_long,
+    family = binomial(link = "logit")
+  )
+
+  model_gee <- tryCatch({
+    glmgee(y ~ -1 + t + x1 + x2,
+      data = data_long,
+      family = binomial(link = "logit"),
+      id = id,
+      corstr = "Unstructured"
+    )
+  }, error = function(e) {
+    warning(paste("glmgee failed:", conditionMessage(e)))
+    NULL
+  })
+
+  model_re_nosig <- gamlss::gamlss(
+    formula = y ~ -1 + t + x1 + x2 + random(as.factor(id)),
+    data = data_long,
+    family = gamlss.dist::BI()
+  )
+
+  model_lme4 <- glmer(
+    formula = y ~ -1 + t + x1 + x2 + (1 | id),
+    data = data_long,
+    family = binomial(link = "logit"),
+    control = glmerControl(optCtrl = list(maxfun = 200000))
+  )
+
+  model_gamm <- tryCatch({
+    gamm(
+      formula = y ~ -1 + t + x1 + x2,
+      random = list(id = ~1),
+      data = data_long,
+      family = binomial(link = "logit")
+    )
+  }, error = function(e) {
+    warning(paste("gamm failed:", conditionMessage(e)))
+    NULL
+  })
+
+  if (isTRUE(verbose)) print("Calculating effective degrees of freedom for LME4...")
+
+  lme_EDF <- tryCatch({
+    X <- getME(model_lme4, name = "X")[, 1:2]
+    Z <- getME(model_lme4, name = "Z")
+    U <- cbind(X, Z)
+    W <- model_lme4@resp$sqrtrwt
+    UWU <- (t(as.matrix(U)) %*% (diag(as.vector(W))) %*% as.matrix(U))
+    D <- getME(model_lme4, name = "Lambda")
+
+    if (sum(D) == 0) {
+      NA_real_
+    } else {
+      D_inv <- solve(D)
+      dinv_plus_00 <- c(0, 0, diag(D_inv))
+      sum(diag(UWU %*% solve(UWU + diag(dinv_plus_00))))
+    }
+  }, error = function(e) {
+    warning(paste("Failed to calculate LME4 EDF:", conditionMessage(e)))
+    NA_real_
+  })
+
+  results_table <- list()
+  invisible(capture.output(results_table[[1]] <- if (!is.null(model_glm)) summary(model_glm)$coeff[, 1:2] else empty_coef_se()))
+  invisible(capture.output(results_table[[2]] <- if (!is.null(model_gee)) summary(model_gee)$coefficients[1:(nrow(summary(model_gee)$coefficients) - 2), 1:2] else empty_coef_se()))
+  invisible(capture.output(results_table[[3]] <- if (!is.null(model_re_nosig)) cbind(summary(model_re_nosig)[1:5], summary(model_re_nosig)[6:10]) else empty_coef_se()))
+  invisible(capture.output(results_table[[4]] <- if (!is.null(model_lme4)) summary(model_lme4)$coefficients[, c(1, 2)] else empty_coef_se()))
+  invisible(capture.output(results_table[[5]] <- if (!is.null(model_gamm)) cbind(summary(model_gamm$lme)$coefficients[[1]], sqrt(diag(model_gamm$lme$varFix))) else empty_coef_se()))
+
+    dfs <- c(
+    (n * d) - df.residual(model_glm),
+    if (is.null(model_gee)) NA else (n * d) - model_gee$df.residual,
+    model_re_nosig$df.fit,
+    lme_EDF,
+    lme_EDF,
+    NA  # GJRM — filled below from subprocess
+  )
+
+  logLiks <- c(
+    logLik(model_glm),
+    if (is.null(model_gee)) NA else model_gee$logLik,
+    logLik(model_re_nosig),
+    logLik(model_lme4),
+    if (!is.null(model_gamm)) logLik(model_gamm$lme) else NA,
+    NA  # GJRM — filled below from subprocess
+  )
+
+  # --- Fit GJRM in an isolated R subprocess to avoid conflicts with gamlss ---
+  if (isTRUE(verbose)) print("Fitting GJRM in a separate R session...")
+
+  gjrm_data <- data.frame(
+    V1 = sim$y[, 1],
+    V2 = sim$y[, 2],
+    V3 = sim$y[, 3],
+    x1 = sim$x1,
+    x2 = sim$x2
+  )
+
+  gjrm_result <- tryCatch({
+    callr::r(function(gjrm_data) {
+      library(GJRM)
+      model_gjrm <- gjrm(
+        formula = list(
+          V1 ~ x1 + x2,
+          V2 ~ x1 + x2,
+          V3 ~ x1 + x2
+        ),
+        data = gjrm_data,
+        margins = c("logit", "logit", "logit"),
+        model = "T"
+      )
+
+      model_gjrm_vcov <- solve(model_gjrm$fit$hessian)
+      model_gjrm_vcov_x1 <- model_gjrm_vcov[grep("x1", rownames(model_gjrm_vcov)), grep("x1", colnames(model_gjrm_vcov))]
+      model_gjrm_vcov_x2 <- model_gjrm_vcov[grep("x2", rownames(model_gjrm_vcov)), grep("x2", colnames(model_gjrm_vcov))]
+      model_gjrm_vcov_intercept <- model_gjrm_vcov[grep("(Intercept)", rownames(model_gjrm_vcov)), grep("(Intercept)", colnames(model_gjrm_vcov))]
+
+      x1_var <- (sum(diag(model_gjrm_vcov_x1)) + 2 * (model_gjrm_vcov_x1[1, 2] + model_gjrm_vcov_x1[1, 3] + model_gjrm_vcov_x1[2, 3])) / (3^2)
+      x2_var <- (sum(diag(model_gjrm_vcov_x2)) + 2 * (model_gjrm_vcov_x2[1, 2] + model_gjrm_vcov_x2[1, 3] + model_gjrm_vcov_x2[2, 3])) / (3^2)
+
+      list(
+        coef_se = cbind(
+          c(model_gjrm$coefficients[c(1, 4, 7)], mean(model_gjrm$coefficients[c(2, 5, 8)]), mean(model_gjrm$coefficients[c(3, 6, 9)])),
+          sqrt(c(diag(model_gjrm_vcov_intercept)/3, x1_var, x2_var))
+        ),
+        edf = model_gjrm$t.edf,
+        loglik = as.numeric(logLik(model_gjrm)),
+        converged = model_gjrm$fit$converged,
+        thetas = c(model_gjrm$fit$theta12, model_gjrm$fit$theta23, model_gjrm$fit$theta13)
+      )
+    }, args = list(gjrm_data = gjrm_data))
+  }, error = function(e) {
+    warning(paste("GJRM subprocess failed:", conditionMessage(e)))
+    NULL
+  })
+
+  if (isTRUE(verbose)) print("Compiling results...")
+
+  if (!is.null(gjrm_result)) {
+    dfs[6] <- gjrm_result$edf
+    logLiks[6] <- gjrm_result$loglik
+    results_table[[6]] <- gjrm_result$coef_se
+  } else {
+    results_table[[6]] <- empty_coef_se()
+  }
+
+  names(results_table) <- c("GLM", "GEE", "GAMLSS", "LME4", "GAMM", "GJRM")
+
+  coefficients_table <- rbind(
+    results_table[[1]][, 1],
+    results_table[[2]][, 1],
+    results_table[[3]][, 1],
+    results_table[[4]][, 1],
+    results_table[[5]][, 1],
+    results_table[[6]][, 1]
+  )
+  ses_table <- rbind(
+    results_table[[1]][, 2],
+    results_table[[2]][, 2],
+    results_table[[3]][, 2],
+    results_table[[4]][, 2],
+    results_table[[5]][, 2],
+    results_table[[6]][, 2]
+  )
+
+  loglik_table <- cbind(
+    logLiks,
+    dfs,
+    -2 * logLiks + 2 * dfs,
+    -2 * logLiks + log(n * d) * dfs
+  )
+
+  conv_check <- c(
+    model_glm$converged,
+    if (is.null(model_gee)) NA else model_gee$converged,
+    model_re_nosig$converged,
+    if (!is.null(model_lme4)) !any(grepl("failed to converge", model_lme4@optinfo$conv$lme4$messages)) else NA,
+    if (!is.null(model_gamm)) !any(grepl("converge", warnings(model_gamm))) else NA,
+    if (!is.null(gjrm_result)) gjrm_result$converged else NA
+  )
+
+  correlations <- list(
+    0,
+    if (is.null(model_gee)) NA else (model_gee$corr),
+    getSmo(model_re_nosig)$sigb,
+    summary(model_lme4)$varcor$id[1, 1],
+    if (!is.null(model_gamm)) var(ranef(model_gamm$lme)[[1]]) else 0,
+    if (!is.null(gjrm_result)) gjrm_result$thetas else rep(NA, 3)
+  )
+
+  names(correlations)=rownames(loglik_table)=rownames(coefficients_table)=rownames(ses_table)=c("GLM","GEE","GAMLSS","LME4","GAMM","GJRM")
+
+  list(
+    coefficients = coefficients_table,
+    ses = ses_table,
+    logliks = loglik_table,
+    convergences = conv_check,
+    correlations = correlations
+    #models = list(
+    #  glm = model_glm,
+    #  gee = model_gee,
+    #  gamlss = model_re_nosig,
+    #  lme4 = model_lme4,
+    #  gamm = model_gamm,
+    #  gjrm = model_gjrm
+    #),
+    #edf = list(lme4 = lme_EDF),
+    #tables = results_table
+  )
+}
+
+
+simRVine <- function(n,rho){
+
+    #Generate data from a 5-dimensional R-vine copula with normal pair-copulas and AR1 dependence 
+      d = 3
+      dd = d*(d-1)/2
+      order = 1:d
+      family = rep(1,dd)
+     
+    # define R-vine pair-copula parameter matrix
+
+    #Matrix=matrix(c(3, 0, 0,
+    #     1, 2, 0,
+    #     2, 1, 1), nrow = 3, ncol = 3, byrow = TRUE)
+    
+    par=rho
+
+    par2 = rep(0,length(par))
+
+    RVM = D2RVine(order,family,par,par2)
+
+    ## simulate from the vine copula model
+    out=RVineSim(n, RVM)
+    loglik_vine=RVineLogLik(out, RVM)$loglik
+    return_list=list()
+    return_list[[1]]=out
+    return_list[[2]]=loglik_vine
+    return_list[[3]]=par
+    return(return_list)
+
+    }
+
+calc_variogram_score <- function(fits, sim, vg_sims=100,input_seed=123) {
+
+      ############## VARIOGRAM SCORE CALCULATION
+      library(scoringRules)
+
+      # Simulate from each fitted model
+      correlations=fits$correlations
+      conv_check=fits$convergences
+
+      sim_model_out=list()
+      vs2=vs2_wt=rep(NA,length(names(correlations)))
+      names(conv_check)=names(vs2)=names(vs2_wt)=names(correlations)
+
+      print("Calculating variogram scores...")
+
+      n=nrow(sim$y)
+      d=ncol(sim$y)
+      w_vs=matrix(1,ncol=n*d,nrow=n*d)
+      w_vs_0=matrix(0,ncol=n*d,nrow=n*d)
+
+      # Set values where row = col + n or col = row + n to 10
+      # For every pair of adjacent observations
+      for (i in 1:nrow(w_vs)) {
+        if (i + 1 <= nrow(w_vs)) {
+          w_vs[i, i + 1] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+          w_vs[i + 1, i] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+          w_vs_0[i, i + 1] <- 1
+          w_vs_0[i + 1, i] <- 1
+        }
+      }
+
+      for(model_name in names(correlations)) {
+        
+        if(is.na(conv_check[match(model_name, names(conv_check))]) || 
+          !conv_check[match(model_name, names(conv_check))]) {
+          vs2[model_name] <- NA
+          vs2_wt[model_name] <- NA
+          next
+        }
+
+        sim_model_out[[model_name]]=matrix(nrow=n*d,ncol=vg_sims)
+        for(i in 1:vg_sims) {
+          set.seed(i*100000+input_seed)
+          sim_model_out[[model_name]][,i] <- as.vector(sim_model_tri(model=model_name, n=n
+          , coefficients=fits$coefficients, correlations=correlations, x1=sim$x1, x2=sim$x2))
+        }
+        vs2[model_name] = vs_sample(y=as.vector(sim$y),dat=sim_model_out[[model_name]],p=2)
+        vs2_wt[model_name] = vs_sample(y=as.vector(sim$y),dat=sim_model_out[[model_name]],p=2,w_vs=w_vs)
+      }
+
+      return(list(vs2=vs2, vs2_wt=vs2_wt))
+
+    }
+
+run_trivariate_outer_sims <- function(
+  num_outer_sims,
+  simulate_args = list(),
+  fit_args = list(),
+  seed_start = 1,
+  verbose = TRUE,
+  n_cores = NULL
+) {
+  if (length(num_outer_sims) != 1 || is.na(num_outer_sims) || num_outer_sims < 1) {
+    stop("num_outer_sims must be a single integer >= 1")
+  }
+  num_outer_sims <- as.integer(num_outer_sims)
+
+  require(foreach)
+  require(doParallel)
+
+  if (is.null(n_cores)) {
+    n_cores <- max(1, parallel::detectCores() - 1)
+  }
+
+  seeds <- seed_start + (0:(num_outer_sims - 1))
+
+  if (isTRUE(verbose)) message(sprintf("Running %d outer sims in parallel on %d cores", num_outer_sims, n_cores))
+
+  cl <- parallel::makeCluster(n_cores)
+  doParallel::registerDoParallel(cl)
+  on.exit({ parallel::stopCluster(cl); foreach::registerDoSEQ() }, add = TRUE)
+
+  # Run all simulations in parallel via foreach
+  results <- foreach(
+    s = seq_len(num_outer_sims),
+    .packages = c("gamlss", "gamlss.dist", "glmtoolbox", "lme4", "mgcv", "VineCopula", "callr"),
+    .export = c("simulate_trivariate", "simRVine", "sim_model_tri", "calc_variogram_score", "fit_trivariate_models", "logit", "logit_inv", "empty_coef_se"),
+    .errorhandling = "pass",
+    .verbose = isTRUE(verbose)
+  ) %dopar% {
+    sim_call_args <- simulate_args
+    sim_call_args$seed <- seeds[s]
+    if (is.null(sim_call_args$plot_copula)) sim_call_args$plot_copula <- FALSE
+
+    sim <- do.call(simulate_trivariate, sim_call_args)
+
+    data_long <- data.frame(
+      y = as.vector(sim$y),
+      x1 = rep(sim$x1, times = 3),
+      x2 = rep(sim$x2, times = 3),
+      t = factor(rep(c("1", "2", "3"), each = nrow(sim$y))),
+      id = rep(1:nrow(sim$y), times = 3)
+    )
+
+    fit_call_args <- fit_args
+    fit_call_args$sim <- sim
+    fit_call_args$data_long <- data_long
+    if (is.null(fit_call_args$verbose)) fit_call_args$verbose <- FALSE
+
+    res <- tryCatch({
+      do.call(fit_trivariate_models, fit_call_args)
+    }, error = function(e) {
+      warning(sprintf("fit_trivariate_models failed in outer sim %d: %s", s, conditionMessage(e)))
+      NULL
+    })
+
+    variogram_call_args=list(
+      fits=res,
+      sim=sim,
+      input_seed=seeds[s]
+    )
+
+    var= do.call(calc_variogram_score, variogram_call_args)
+
+    list(s = s, res = res, var = var)
+  }
+
+  if (isTRUE(verbose)) message("All parallel workers finished. Assembling results...")
+
+  # Post-process: collect results and assemble into arrays
+  coeffs_arr <- NULL
+  ses_arr <- NULL
+  logliks_arr <- NULL
+  vs2_arr <- NULL
+  vs2_wt_arr <- NULL
+  convergences_mat <- NULL
+  model_names <- NULL
+  coef_names <- NULL
+  loglik_colnames <- NULL
+  failures <- integer(0)
+
+  for (r in results) {
+    # .errorhandling = "pass" returns error objects on failure
+    if (inherits(r, "error")) {
+      warning(sprintf("Parallel worker error: %s", conditionMessage(r)))
+      next
+    }
+
+    s <- r$s
+    res <- r$res
+    var <- r$var
+
+    if (is.null(res)) {
+      failures <- c(failures, s)
+      next
+    }
+
+    # Lazy-allocate output arrays based on first successful result
+    if (is.null(coeffs_arr)) {
+      model_names <- rownames(res$coefficients)
+      if (is.null(model_names)) model_names <- paste0("model", seq_len(nrow(res$coefficients)))
+      family = gamlss.dist::BI
+      coef_names <- colnames(res$coefficients)
+      if (is.null(coef_names)) coef_names <- paste0("beta", seq_len(ncol(res$coefficients)))
+
+      loglik_colnames <- colnames(res$logliks)
+      if (is.null(loglik_colnames)) loglik_colnames <- paste0("stat", seq_len(ncol(res$logliks)))
+
+      coeffs_arr <- array(NA_real_, dim = c(num_outer_sims, length(model_names), length(coef_names)))
+      ses_arr <- array(NA_real_, dim = c(num_outer_sims, length(model_names), length(coef_names)))
+      logliks_arr <- array(NA_real_, dim = c(num_outer_sims, length(model_names), ncol(res$logliks)))
+      convergences_mat <- matrix(NA, nrow = num_outer_sims, ncol = length(model_names))
+
+      dimnames(coeffs_arr) <- list(sim = seq_len(num_outer_sims), model = model_names, coef = coef_names)
+      dimnames(ses_arr) <- list(sim = seq_len(num_outer_sims), model = model_names, coef = coef_names)
+      dimnames(logliks_arr) <- list(sim = seq_len(num_outer_sims), model = model_names, stat = loglik_colnames)
+      colnames(convergences_mat) <- model_names
+      rownames(convergences_mat) <- seq_len(num_outer_sims)
+    }
+
+    # Store results
+    coeffs_arr[s, , ] <- as.matrix(res$coefficients)
+    ses_arr[s, , ] <- as.matrix(res$ses)
+    logliks_arr[s, , ] <- as.matrix(res$logliks)
+    convergences_mat[s, ] <- as.vector(res$convergences)
+    if (!is.null(var)) {  
+      if (is.null(vs2_arr)) {
+        vs2_names <- names(var$vs2)
+        vs2_arr <- matrix(NA_real_, nrow = num_outer_sims, ncol = length(var$vs2))
+        vs2_wt_arr <- matrix(NA_real_, nrow = num_outer_sims, ncol = length(var$vs2_wt))
+        dimnames(vs2_arr) <- list(sim = seq_len(num_outer_sims), model = vs2_names)
+        dimnames(vs2_wt_arr) <- list(sim = seq_len(num_outer_sims), model = vs2_names)
+      }
+      vs2_arr[s, ] <- as.vector(var$vs2)
+      vs2_wt_arr[s, ] <- as.vector(var$vs2_wt)
+    }
+  }
+
+  list(
+    coefficients = coeffs_arr,
+    ses = ses_arr,
+    logliks = logliks_arr,
+    convergences = convergences_mat,
+    seeds = seeds,
+    failures = failures,
+    vs2 = vs2_arr,
+    vs2_wt = vs2_wt_arr
+  )
+}
+
+calculate_trivariate_true_values <- function(
+  true_sims,
+  simulate_args = list(),
+  seed_start = 1,
+  verbose = TRUE,
+  n_cores = NULL
+) {
+
+require(foreach)
+require(doParallel)
+
+  if (length(true_sims) != 1 || is.na(true_sims) || true_sims < 1) {
+    stop("true_sims must be a single integer >= 1")
+  }
+  true_sims <- as.integer(true_sims)
+
+  if (is.null(n_cores)) {
+    n_cores <- max(1, parallel::detectCores() - 1)
+  }
+
+  seeds <- seed_start + (0:(true_sims - 1))
+
+  if (isTRUE(verbose)) message(sprintf("Running %d true-value sims in parallel on %d cores", true_sims, n_cores))
+
+  cl <- parallel::makeCluster(n_cores)
+  doParallel::registerDoParallel(cl)
+  on.exit({ parallel::stopCluster(cl); foreach::registerDoSEQ() }, add = TRUE)
+
+  all_coefs_list <- foreach(
+    i = seq_len(true_sims),
+    .packages = c("VineCopula", "gamlss", "gamlss.dist"),
+    .export = c("simulate_trivariate", "logit", "logit_inv"),
+    .errorhandling = "pass",
+    .verbose = isTRUE(verbose)
+  ) %dopar% {
+    sim_call_args <- simulate_args
+    sim_call_args$seed <- seeds[i]
+    if (is.null(sim_call_args$plot_copula)) sim_call_args$plot_copula <- FALSE
+
+    sim <- do.call(simulate_trivariate, sim_call_args)
+
+    calc_log_lik <- function(par=c(a1,a2,a3, b, c, theta), sim) {
+      a1=par[1]; a2=par[2]; a3=par[3]; b=par[4]; c=par[5]; theta=logit_inv(par[c(6,7,8)])
+
+      m1=dLO(sim$y[, 1], mu = logit_inv(a1 + b * sim$x1 + c * sim$x2))
+      m2=dLO(sim$y[, 2], mu = logit_inv(a2 + b * sim$x1 + c * sim$x2))
+      m3=dLO(sim$y[, 3], mu = logit_inv(a3 + b * sim$x1 + c * sim$x2))
+
+      use_vine_lik=FALSE
+      if(use_vine_lik==TRUE) {
+        
+        new_RVM=sim$RVM
+        new_RVM$par[1,2]=theta[1]
+        new_RVM$par[2,3]=theta[2]
+        new_RVM$par[1,3]=theta[3]
+
+        q1=pLO(sim$y[, 1], mu = logit_inv(a1 + b * sim$x1 + c * sim$x2))
+        q2=pLO(sim$y[, 2], mu = logit_inv(a2 + b * sim$x1 + c * sim$x2))
+        q3=pLO(sim$y[, 3], mu = logit_inv(a3 + b * sim$x1 + c * sim$x2))
+
+        -(sum(log(m1)) + sum(log(m2)) + sum(log(m3))+(VineCopula::RVineLogLik(cbind(q1,q2,q3), new_RVM))$loglik)
+      } else {
+        -(sum(log(m1)) + sum(log(m2)) + sum(log(m3)))
+      }
+
+      
+    }
+
+    optim_res <- tryCatch({
+      optim(
+        par = c(logit(mean(sim$y[, 1]))-1,logit(mean(sim$y[, 2]))-1,logit(mean(sim$y[, 3]))-1,1,.01,0,0,0),
+        fn = calc_log_lik,
+        sim = sim,
+        control = list(maxit = 10000),
+        method = "SANN"
+      )
+    }, error = function(e) {
+      warning(paste("Optimization failed in true value sim:", conditionMessage(e)))
+      NULL
+    })
+
+    if (!is.null(optim_res)) c(optim_res$par) else rep(NA_real_, 8)
+  }
+
+  if (isTRUE(verbose)) message("All parallel workers finished. Assembling results...")
+
+  # Assemble results
+  all_coefs <- matrix(NA_real_, ncol = 8, nrow = true_sims)
+  for (i in seq_along(all_coefs_list)) {
+    r <- all_coefs_list[[i]]
+    if (inherits(r, "error")) {
+      warning(sprintf("True value sim %d failed: %s", i, conditionMessage(r)))
+    } else {
+      all_coefs[i, ] <- r
+    }
+  }
+
+  if(verbose==TRUE) {
+    par(mfrow=c(3,3))
+    hist(all_coefs[,1],main="t1")
+    hist(all_coefs[,2],main="t2")
+    hist(all_coefs[,3],main="t3")
+    hist(all_coefs[,4],main="x1")
+    hist(all_coefs[,5],main="x2")
+    hist(all_coefs[,6],main="theta12")
+    hist(all_coefs[,7],main="theta23")
+    hist(all_coefs[,8],main="theta13")
+  }
+
+  true_coef <- colMeans(all_coefs, na.rm = TRUE)
+  true_covariance_matrix <- stats::cov(all_coefs, use = "complete.obs")
+
+  true_coef_se=sqrt(diag(true_covariance_matrix)/3)
+
+  list(
+    all_coefs = all_coefs,
+    true_coef = true_coef,
+    true_covariance_matrix = true_covariance_matrix,
+    true_coef_se = true_coef_se,
+    seeds = seeds
+  )
+}
+
+
+
+sim_model_tri <- function(model,dist="LO",n,coefficients,correlations,x1,x2) {
+
+  #Calculate linear predictor
+  #coefficients=coefficients_table
+  lp_1=coefficients[model,1]+coefficients[model,4]*x1 + coefficients[model,5]*x2
+  lp_2=coefficients[model,2]+coefficients[model,4]*x1 + coefficients[model,5]*x2
+  lp_3=coefficients[model,3]+coefficients[model,4]*x1 + coefficients[model,5]*x2
+
+  if (model == "GLM") {
+    #model="GLM"
+    #Get linear predictor
+
+    t1=rBI(n, mu=logit_inv(lp_1))
+    t2=rBI(n, mu=logit_inv(lp_2))
+    t3=rBI(n, mu=logit_inv(lp_3))
+   
+    mean_out=cbind(t1,t2,t3) #For compatibility with other functions
+
+  } else if (model == "GEE") {
+
+    library(VineCopula)
+    #model="GEE"
+    #Generate basic correlation structure based on correlation parameter
+
+      m=correlations[[model]]
+      correlations_final=matrix(
+              c( 0, m[3,1], m[2,1],
+                0, 0,   m[3,2],
+                0, 0,      0
+              )
+        ,nrow=3,ncol=3,byrow = TRUE)
+      
+      mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
+      rho_in=t(mf)[lower.tri(t(mf))]
+    
+    c0=simRVine(n, rho=sqrt(rho_in))[[1]]
+
+    t1=qBI(c0[,1], mu=logit_inv(lp_1))
+    t2=qBI(c0[,2], mu=logit_inv(lp_2))
+    t3=qBI(c0[,3], mu=logit_inv(lp_3))
+    mean_out=cbind(t1,t2,t3)
+
+  } else if (model == "GAMLSS") {
+    #model="GAMLSS"
+
+    #Generate random effects
+    b_var=correlations[[model]]
+    re_val=rnorm(n,mean=0,sd=(((b_var))))
+
+    t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
+    t2=rBI(n, mu=logit_inv(lp_2+re_val))#*exp(re_val)####COME BACK FOR THIS
+    t3=rBI(n, mu=logit_inv(lp_3+re_val))#*exp(re_val)####COME BACK FOR THIS
+    
+    mean_out=cbind(t1,t2,t3)
+        
+    
+  } else if (model == "LME4" | model == "GAMM") {
+    #model="LME4"; model="GAMM"
+
+    #Generate random effects
+    b_var=correlations[[model]]
+    re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
+
+    t1=rBI(n, mu=logit_inv(lp_1+re_val))#*exp(re_val)####COME BACK FOR THIS
+    t2=rBI(n, mu=logit_inv(lp_2+re_val))#*exp(re_val)####COME BACK FOR THIS
+    t3=rBI(n, mu=logit_inv(lp_3+re_val))#*exp(re_val)####COME BACK FOR THIS
+    
+    mean_out=cbind(t1,t2,t3)
+
+  } else if (startsWith(model, "GJRM")) {
+    #model="GJRM"
+
+    m=(correlations[[model]])
+    #m=m[ncol(m):1,ncol(m):1][lower.tri(m)]
+    
+    c0=simRVine(n, rho=m)[[1]]
+    t1=qBI(c0[,1], mu=logit_inv(lp_1))
+    t2=qBI(c0[,2], mu=logit_inv(lp_2))
+    t3=qBI(c0[,3], mu=logit_inv(lp_3))
+    mean_out=cbind(t1,t2,t3)
+    
+  }
+  return(mean_out)
 }
