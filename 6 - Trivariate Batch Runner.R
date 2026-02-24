@@ -10,8 +10,8 @@ library(ggplot2)
 library(ggpubr)
 
 ##################### SHARED PARAMETERS ####################
-true_sims   <- 100
-num_outer_sims <- 100
+true_sims   <- 10000
+num_outer_sims <- 1000
 n           <- 1000
 copula_family <- 1
 
@@ -19,19 +19,12 @@ copula_family <- 1
 # Each row is one scenario: list(mu_intercept, mu_coefficients, cutoff, theta_intercept)
 
 param_grid <- list(
-  #list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.5^2, .5, .5)),
-  #list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.75^2, .75, .75)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.75, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.75, theta_intercept = c(.75^2, .75, .75)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.25, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.25, theta_intercept = c(.75^2, .75, .75)),
-
-  list(mu_intercept = c(logit(0.1),logit(0.1),logit(0.1)), mu_coefficients = c(1,0.01), cutoff = 0.5, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(logit(0.9),logit(0.9),logit(0.9)), mu_coefficients = c(1,0.01), cutoff = 0.5, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(logit(0.9),logit(0.1),logit(0.1)), mu_coefficients = c(1,0.01), cutoff = 0.5, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(logit(0.1),logit(0.9),logit(0.9)), mu_coefficients = c(1,0.01), cutoff = 0.5, theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(logit(0.1),logit(0.9),logit(0.1)), mu_coefficients = c(1,0.01), cutoff = 0.5, theta_intercept = c(.5^2, .5, .5))
-
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.1^2, .1, .1)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.25^2, .25, .25)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.5^2, .5, .5)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.667^2, .667, .667)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.75^2, .75, .75)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.9^2, .9, .9))
 )
 
 ##################### MAIN LOOP ####################
@@ -123,6 +116,15 @@ for (idx in seq_along(param_grid)) {
   true_coef_vec <- true_vals$true_coef
   names(true_coef_vec) <- c("t1", "t2", "t3", "x1", "x2", "theta12", "theta23", "theta13")
 
+  # Mathematical notation labels for coefficients
+  coef_labels <- list(
+    t1 = expression(beta[1]),
+    t2 = expression(beta[2]),
+    t3 = expression(beta[3]),
+    x1 = expression(beta[x[1]]),
+    x2 = expression(beta[x[2]])
+  )
+
   coef_draws_long <- as.data.frame.table(outer$coefficients, responseName = "estimate")
   names(coef_draws_long) <- c("sim", "model", "coef", "estimate")
   coef_draws_long$sim <- as.integer(as.character(coef_draws_long$sim))
@@ -133,9 +135,9 @@ for (idx in seq_along(param_grid)) {
     ggplot(df, aes(x = model, y = estimate)) +
       geom_boxplot(outlier.alpha = 0.4) +
       geom_hline(yintercept = true_coef_vec[coef_name], linetype = "dashed") +
-      labs(title = paste0("Coefficient: ", coef_name), x = "Model", y = "Estimated coefficient") +
+      labs(title = coef_labels[[coef_name]], x = NULL, y = "Estimated coefficient") +
       theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.title = element_text(size = 10, hjust = 0.5))
   }
 
   coef_plots <- lapply(c("t1", "t2", "t3", "x1", "x2"), plot_one_coef)
@@ -156,15 +158,19 @@ for (idx in seq_along(param_grid)) {
     ggplot(df, aes(x = model, y = se)) +
       geom_boxplot(outlier.alpha = 0.4) +
       geom_hline(yintercept = as.numeric(true_se_vec[coef_name]), linetype = "dashed") +
-      labs(title = paste0("SE: ", coef_name), x = "Model", y = "Estimated SE") +
+      labs(title = coef_labels[[coef_name]], x = NULL, y = "Estimated SE") +
       theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.title = element_text(size = 10, hjust = 0.5))
   }
 
   se_plots <- lapply(c("t1", "t2", "t3", "x1", "x2"), plot_one_se)
   names(se_plots) <- c("t1", "t2", "t3", "x1", "x2")
 
   #################### PLOTS: LOGLIK / AIC / BIC / VS2 / VS2_WT ####################
+
+  # Define consistent color palette across all model-selection plots
+  all_models <- levels(coef_draws_long$model)
+  model_colours <- setNames(scales::hue_pal()(length(all_models)), all_models)
 
   loglik_draws_long <- as.data.frame.table(outer$logliks, responseName = "value")
   names(loglik_draws_long) <- c("sim", "model", "stat", "value")
@@ -180,7 +186,8 @@ for (idx in seq_along(param_grid)) {
   )
 
   loglik_draws_long <- subset(loglik_draws_long, stat_index %in% c(1, 3, 4))
-  loglik_draws_long <- subset(loglik_draws_long, model != "GAMM")
+  loglik_draws_long <- subset(loglik_draws_long, model != "GAMM" & !is.na(model))
+  loglik_draws_long$model <- droplevels(loglik_draws_long$model)
   loglik_draws_long$stat_label <- factor(
     ifelse(loglik_draws_long$stat_index == 1, "LogLik",
       ifelse(loglik_draws_long$stat_index == 3, "AIC", "BIC")),
@@ -189,11 +196,19 @@ for (idx in seq_along(param_grid)) {
 
   plot_one_ll_stat <- function(stat_name) {
     df <- subset(loglik_draws_long, stat_label == stat_name)
-    ggplot(df, aes(x = model, y = value)) +
-      geom_boxplot(outlier.alpha = 0.4) +
-      labs(title = paste0(stat_name, " by model"), x = "Model", y = stat_name) +
+    summ <- do.call(rbind, lapply(split(df, df$model), function(d) {
+      data.frame(model = d$model[1],
+                 median = median(d$value, na.rm = TRUE),
+                 lo = quantile(d$value, 0.025, na.rm = TRUE),
+                 hi = quantile(d$value, 0.975, na.rm = TRUE))
+    }))
+    ggplot(summ, aes(x = model, y = median, colour = model)) +
+      geom_point(size = 3) +
+      geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.25) +
+      scale_colour_manual(values = model_colours) +
+      labs(title = paste0(stat_name), x = NULL, y = stat_name) +
       theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none", plot.title = element_text(size = 10, hjust = 0.5))
   }
 
   ll_plots <- list(
@@ -206,28 +221,43 @@ for (idx in seq_along(param_grid)) {
   vs2_long <- data.frame(
     sim = rep(seq_len(nrow(outer$vs2)), times = ncol(outer$vs2)),
     model = rep(colnames(outer$vs2), each = nrow(outer$vs2)),
-    value = as.vector(outer$vs2)
+    value = (as.vector(outer$vs2))
   )
   vs2_long$model <- factor(vs2_long$model, levels = colnames(outer$vs2))
 
   vs2_wt_long <- data.frame(
     sim = rep(seq_len(nrow(outer$vs2_wt)), times = ncol(outer$vs2_wt)),
     model = rep(colnames(outer$vs2_wt), each = nrow(outer$vs2_wt)),
-    value = as.vector(outer$vs2_wt)
+    value = (as.vector(outer$vs2_wt))
   )
   vs2_wt_long$model <- factor(vs2_wt_long$model, levels = colnames(outer$vs2_wt))
 
-  ll_plots$VS2 <- ggplot(vs2_long, aes(x = model, y = value)) +
-    geom_boxplot(outlier.alpha = 0.4) +
-    labs(title = "VS2 by model", x = "Model", y = "VS2") +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  make_pointrange <- function(df_long, title_text, y_label) {
+    summ <- do.call(rbind, lapply(split(df_long, df_long$model), function(d) {
+      data.frame(model = d$model[1],
+                 median = median(d$value, na.rm = TRUE),
+                 lo = quantile(d$value, 0.025, na.rm = TRUE),
+                 hi = quantile(d$value, 0.975, na.rm = TRUE))
+    }))
+    ggplot(summ, aes(x = model, y = median, colour = model)) +
+      geom_point(size = 3) +
+      geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.25) +
+      scale_colour_manual(values = model_colours) +
+      labs(title = title_text, x = NULL, y = y_label) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none", plot.title = element_text(size = 10, hjust = 0.5))
+  }
 
-  ll_plots$VS2_wt <- ggplot(vs2_wt_long, aes(x = model, y = value)) +
-    geom_boxplot(outlier.alpha = 0.4) +
-    labs(title = "VS2 Weighted by model", x = "Model", y = "VS2 Weighted") +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ll_plots$VS2 <- make_pointrange(vs2_long, "Variogram Score", "VS2")
+  ll_plots$VS2_wt <- make_pointrange(vs2_wt_long, "Variogram Score (Wt)", "VS2 Weighted")
+
+  var_plot=ggarrange(plotlist = ll_plots, ncol = 5, nrow = 1)
+
+  ggsave(
+    filename = file.path("Charts", paste0("trivariate_model_selection_", params_file_tag, ".png")),
+    plot = var_plot,
+    width = 11, height = 4, dpi = 300
+  )
 
   #################### PLOTS: MEDIAN ESTIMATE ± 95% CI VS TRUE ####################
 
@@ -261,14 +291,14 @@ for (idx in seq_along(param_grid)) {
 
     ggplot(df, aes(x = model, y = med_est)) +
       geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = true_lo, ymax = true_hi),
-                fill = "lightblue", alpha = 0.3, inherit.aes = FALSE) +
-      geom_hline(yintercept = true_val, linetype = "dashed", colour = "blue") +
+                fill = "grey85", alpha = 0.5, inherit.aes = FALSE) +
+      geom_hline(yintercept = true_val, linetype = "dashed", colour = "black") +
       geom_point(size = 3) +
       geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.25) +
       coord_cartesian(ylim = ylims) +
-      labs(title = coef_name, x = "Model", y = "Estimate") +
+      labs(title = coef_labels[[coef_name]], x = NULL, y = "Estimate") +
       theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.title = element_text(size = 10, hjust = 0.5))
   }
 
   median_ci_plots <- lapply(coef_names_for_median, plot_one_median_ci)
@@ -301,16 +331,17 @@ for (idx in seq_along(param_grid)) {
     max_dev  <- max(abs(all_vals - true_val))
     ylims    <- true_val + c(-1, 1) * max_dev * 1.05
 
-    ggplot(df, aes(x = model, y = mean_est)) +
+    ggplot(df, aes(x = model, y = mean_est, colour = model)) +
       geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = true_lo, ymax = true_hi),
-                fill = "lightblue", alpha = 0.3, inherit.aes = FALSE) +
-      geom_hline(yintercept = true_val, linetype = "dashed", colour = "blue") +
+                fill = "grey85", alpha = 0.5, inherit.aes = FALSE) +
+      geom_hline(yintercept = true_val, linetype = "dashed", colour = "black") +
       geom_point(size = 3) +
       geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.25) +
+      scale_colour_manual(values = model_colours) +
       coord_cartesian(ylim = ylims) +
-      labs(title = coef_name, x = "Model", y = "Estimate") +
+      labs(title = coef_labels[[coef_name]], x = NULL, y = "Estimate + 95% CI") +
       theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none", plot.title = element_text(size = 10, hjust = 0.5))
   }
 
   mean_ci_plots <- lapply(coef_names_for_median, plot_one_mean_ci)
@@ -319,18 +350,19 @@ for (idx in seq_along(param_grid)) {
   #################### SAVE MEAN CI PLOT ####################
 
   mean_ci_vs_true <- ggarrange(plotlist = mean_ci_plots, ncol = 5, nrow = 1)
-  mean_ci_vs_true <- ggpubr::annotate_figure(
-    mean_ci_vs_true,
-    top = ggpubr::text_grob(
-      paste0("Mean estimate +/- 95% CI vs true (blue dashed / blue band)\n", simulation_params_title),
-      size = 12, face = "bold"
-    )
-  )
+  #mean_ci_vs_true <- ggpubr::annotate_figure(
+  #  mean_ci_vs_true,
+  #  top = ggpubr::text_grob(
+  #    paste0("Mean estimate +/- 95% CI vs true (blue dashed / blue band)\n", simulation_params_title),
+  #    size = 12, face = "bold"
+  #  )
+  #)
+
 
   ggsave(
     filename = file.path("Charts", paste0("trivariate_mean_ci_vs_true_", params_file_tag, ".png")),
     plot = mean_ci_vs_true,
-    width = 18, height = 5, dpi = 300
+    width = 11, height = 4, dpi = 300
   )
 
   #################### COMBINED PLOT ####################
