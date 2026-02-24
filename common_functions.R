@@ -1440,10 +1440,10 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
 
 }
 
-sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALSE) {
+sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALSE, age=NULL, sex=NULL) {
 
-  sex <- c(rep(0,n/2),rep(1,n/2))
-  age <- rep(1:100,n/100)
+  if(is.null(age)) {age <- rep(1:100,n/100)
+  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}}
 
   #Calculate linear predictor
   lp_1=coefficients[model,1]+coefficients[model,3]*sex + coefficients[model,4]*age
@@ -1565,6 +1565,66 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALS
   }
   return(as.vector(rbind(t1, t2)))
 }
+
+
+sim_model_zis <- function(model,dist,n,coefficients,sigmas,nus,taus,correlations,bt_mode=FALSE, age=NULL, sex=NULL) {
+
+  if(is.null(age)) {age <- rep(1:100,n/100)
+  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}}
+
+  links<-ZISICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
+                tau.link = "logit")
+
+  #Calculate linear predictor
+  
+
+  if (model == "re_nosig") {
+    #model="re_nosig"
+    lp_1=coefficients[1]+coefficients[3]*sex + coefficients[4]*age
+  lp_2=coefficients[2]+coefficients[3]*sex + coefficients[4]*age
+
+    #Generate random effects
+    b_var=correlations[1]
+    re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
+
+    t1=rZISICHEL(n , mu=links$mu.linkinv(lp_1+re_val)
+                    , sigma=links$sigma.linkinv(sigmas[1])
+                    , nu=links$nu.linkinv(nus[1])
+                    , tau=links$tau.linkinv(taus[1]))
+    t2=rZISICHEL(n , mu=links$mu.linkinv(lp_2+re_val)
+                    , sigma=links$sigma.linkinv(sigmas[1])
+                    , nu=links$nu.linkinv(nus[1])
+                    , tau=links$tau.linkinv(taus[1]))
+
+  } else if (startsWith(model, "cop")) {
+    #model="cop"
+
+    lp_1=coefficients[1]+coefficients[2]*sex + coefficients[3]*age
+    lp_2=coefficients[4]+coefficients[5]*sex + coefficients[6]*age
+    library(VineCopula)
+    cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
+    vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
+    cop_vine=vine_cop_family[grep(paste("\\b",model,"\\b",sep=""),cop_model_names)]
+
+    if(is.na(cop_vine)) {
+      t1=rep(NA,n)
+      t2=rep(NA,n)
+    } else {
+        simCop=BiCopSim(N=n, family=cop_vine,par=correlations[1])
+
+          t1=qZISICHEL(simCop[,1], mu=links$mu.linkinv(lp_1)
+                    , sigma=links$sigma.linkinv(sigmas[1])
+                    , nu=links$nu.linkinv(nus[1])
+                    , tau=links$tau.linkinv(taus[1]))
+          t2=qZISICHEL(simCop[,2], mu=links$mu.linkinv(lp_2)
+                    , sigma=links$sigma.linkinv(sigmas[2])
+                    , nu=links$nu.linkinv(nus[2])
+                    , tau=links$tau.linkinv(taus[2]))
+    }
+  }
+  return(as.vector(rbind(t1, t2)))
+}
+
 
 
 simRVine=function(n,rho=0,data_in=NULL){
@@ -1808,7 +1868,6 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
 
   w_vs=matrix(1,ncol=length(y),nrow=length(y))
   w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
-  # Set values where row = col + n or col = row + n to 10
   # For every pair of adjacent observations
   for (i in seq(1, n*2, by=2)) {
     w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
@@ -2255,6 +2314,7 @@ simulate_trivariate <- function(
     seed = NULL,
     plot_copula = FALSE
 ) {
+
     if (!is.null(seed)) set.seed(seed)
 
     if (length(mu_intercept) != 3) stop("mu_intercept must be length 3")
