@@ -6,35 +6,14 @@
 *.sas7bdat
 *.sas
 *.zip
-Data/trk2020v1/trk2020TR_R.txt
-Data/trk2020v1/TRK2020TR_R.sps
-Data/trk2020v1/trk2020tr_r.sav
-Data/trk2020v1/trk2020tr_r.dta
-Data/trk2020v1/TRK2020TR_R.do
-Data/trk2020v1/TRK2020TR_R.dct
-Data/trk2020v1/TRK2020TR_R.da
 rand_doc_visits
 rand_doc_visits_SAMPLED
-Charts/simulation_AIC_GAIC_1000_2024-12-05.png
-Charts/simulation_bias_plus_error_B21000_2024-12-05.png
-Charts/simulation_bias_plus_error_Bt1000_2024-12-05.png
-Charts/simulation_bias_plus_error_Bt1000_2024-12-06.png
-Charts/simulation_bias_plus_error_Bt1000_2024-12-09.png
-Charts/simulation_bias_skew1000_2024-12-05.png
-Charts/simulation_loglik_BIC_1000_2024-12-05.png
-TEMP CHARTS - DONT SYNC
 .vscode/keybindings.json
 .vscode/r.code-snippets
 .vscode/settings.json
 .vscode/tasks.json
 Submission/
-Data/broad_sims_bt/
-Data/Archive/
 PhD Admin/
 input_params_list.RData
 Archive/
-Response to review.docx
-Data/rand_mvt.rds
-Data/random effects papers.xlsx
-Data/rand_mvt.rds
 Data/
