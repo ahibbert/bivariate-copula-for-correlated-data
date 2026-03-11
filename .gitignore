@@ -22,3 +22,4 @@ Charts/*
 !Charts/.gitkeep
 Cache/*
 !Cache/.gitkeep
+.vscode/
