@@ -35,7 +35,7 @@ library(latex2exp)
 cat("\n=== APPLYING OUTLIER REMOVAL FOR EVALUATION METRICS ===\n")
 
 # Function to remove outliers using aggressive 1.5*IQR method for evaluation metrics
-remove_outliers_eval <- function(matrix_data, matrix_name = "matrix", iqr_multiplier = 3, 
+remove_outliers_eval <- function(matrix_data, matrix_name = "matrix", iqr_multiplier = 10, 
                                  remove_global_outliers = TRUE, verbose = TRUE) {
   
   if(verbose) cat("Processing", matrix_name, "for outlier removal...\n")
@@ -140,6 +140,9 @@ remove_outliers_eval <- function(matrix_data, matrix_name = "matrix", iqr_multip
 
 # Apply outlier removal to evaluation matrices
 cat("Applying outlier removal to evaluation matrices...\n")
+
+temp_weight=((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+vs2_wt_matrix <- vs2_matrix + ((vs2_wt_matrix - vs2_matrix) / temp_weight) * (4 * 2000)
 
 # Clean VS2 (unweighted) matrix
 if(exists("vs2_matrix")) {
