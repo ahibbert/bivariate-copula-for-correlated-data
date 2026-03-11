@@ -2,10 +2,10 @@ source("common_functions.R"); source("link_functions.R");
 
 
 ##################### PARAMETERS ####################
-true_sims=100
-num_outer_sims=100
-n=1000;
-mu_intercept=c(-2,-1,0); mu_coefficients=c(1,0.01); cutoff=0.5; theta_intercept=c(.75^2,.75,.75); 
+true_sims=20
+num_outer_sims=20
+n=1000; copula_family=1
+mu_intercept=c(-2,-1,0); mu_coefficients=c(1,0.01); cutoff=0.5; theta_intercept=c(.9^2,.9,.9); 
 
 #TESTING
 #sim=simulate_trivariate(
@@ -25,11 +25,11 @@ mu_intercept=c(-2,-1,0); mu_coefficients=c(1,0.01); cutoff=0.5; theta_intercept=
 #    )
 #res=fit_trivariate_models(sim=sim, data_long=data_long, verbose=TRUE)
 
-variogram_call_args=list(
-  fits = res,
-  sim = sim
-)
-var= do.call(calc_variogram_score, variogram_call_args)
+#variogram_call_args=list(
+#  fits = res,
+#  sim = sim
+#)
+#var= do.call(calc_variogram_score, variogram_call_args)
 
 #################### CALCULATE TRUE VALUES VIA SIMULATION ####################
 
