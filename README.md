@@ -9,6 +9,7 @@ It includes R code for simulating, fitting, and comparing models for correlated 
 The following components of the paper map to the different sets of code:
 
 | Component | Script |
+|---|---|
 | Bivariate simulations (sections 3.1-3.3) | 1, 2 (run sequentially) |
 | Application (section 4) | 3 |
 | Trivariate simulations (section 3.4) | 6 |
