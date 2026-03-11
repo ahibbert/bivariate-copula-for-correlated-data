@@ -16,7 +16,9 @@ Submission/
 PhD Admin/
 input_params_list.RData
 Archive/
-Data/
-Charts/ChartData/
-Charts/
-Cache/
+Data/*
+!Data/.gitkeep
+Charts/*
+!Charts/.gitkeep
+Cache/*
+!Cache/.gitkeep
