@@ -1428,7 +1428,7 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
     , actuals=actuals
     , sigmas=sigmas
     , correlations=correlations
-    , y=dataset$random_variable
+    , y=c(dataset[dataset$time==0,]$random_variable,dataset[dataset$time==1,]$random_variable)
     , dist=dist
     , timer=timer
     , conv_check=conv_check
@@ -1442,8 +1442,8 @@ fitBivModels_Bt_withCov <-function(dataset,dist,include="ALL",a,b,c,mu1,mu2,calc
 
 sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALSE, age=NULL, sex=NULL) {
 
-  if(is.null(age)) {age <- rep(1:100,n/100)
-  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}}
+  if(is.null(age)) {age <- rep(1:100,n/100)}
+  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}
 
   #Calculate linear predictor
   lp_1=coefficients[model,1]+coefficients[model,3]*sex + coefficients[model,4]*age
@@ -1563,17 +1563,16 @@ sim_model <- function(model,dist,n,coefficients,sigmas,correlations,bt_mode=FALS
         }
     }
   }
-  return(as.vector(rbind(t1, t2)))
+  return(c(t1, t2))
 }
 
 
 sim_model_zis <- function(model,dist,n,coefficients,sigmas,nus,taus,correlations,bt_mode=FALSE, age=NULL, sex=NULL) {
 
-  if(is.null(age)) {age <- rep(1:100,n/100)
-  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}}
+  if(is.null(age)) {age <- rep(1:100,n/100)}
+  if(is.null(sex)) {sex <- c(rep(0,n/2),rep(1,n/2))}
 
-  links<-ZISICHEL(mu.link = "log", sigma.link = "log", nu.link = "identity", 
-                tau.link = "logit")
+  links<-ZISICHEL()
 
   #Calculate linear predictor
   
@@ -1581,48 +1580,78 @@ sim_model_zis <- function(model,dist,n,coefficients,sigmas,nus,taus,correlations
   if (model == "re_nosig") {
     #model="re_nosig"
     lp_1=coefficients[1]+coefficients[3]*sex + coefficients[4]*age
-  lp_2=coefficients[2]+coefficients[3]*sex + coefficients[4]*age
+    lp_2=coefficients[2]+coefficients[3]*sex + coefficients[4]*age
+
+    lp_tau_1=taus[1]
+    lp_tau_2=taus[1]
+
+    lp_sigma_1=sigmas[1]
+    lp_sigma_2=sigmas[1]
+
+    lp_nu_1=nus[1]
+    lp_nu_2=nus[1]
 
     #Generate random effects
     b_var=correlations[1]
     re_val=rnorm(n,mean=0,sd=((sqrt(b_var))))
 
     t1=rZISICHEL(n , mu=links$mu.linkinv(lp_1+re_val)
-                    , sigma=links$sigma.linkinv(sigmas[1])
-                    , nu=links$nu.linkinv(nus[1])
-                    , tau=links$tau.linkinv(taus[1]))
+                    , sigma=links$sigma.linkinv(lp_sigma_1)
+                    , nu=links$nu.linkinv(lp_nu_1)
+                    , tau=links$tau.linkinv(lp_tau_1))
     t2=rZISICHEL(n , mu=links$mu.linkinv(lp_2+re_val)
-                    , sigma=links$sigma.linkinv(sigmas[1])
-                    , nu=links$nu.linkinv(nus[1])
-                    , tau=links$tau.linkinv(taus[1]))
+                    , sigma=links$sigma.linkinv(lp_sigma_2)
+                    , nu=links$nu.linkinv(lp_nu_2)
+                    , tau=links$tau.linkinv(lp_tau_2))
 
   } else if (startsWith(model, "cop")) {
     #model="cop"
+    # Separate fit1/fit2 structure: 
+    # coefficients: fit1 has [intercept, sex, age], fit2 has [intercept, sex, age]
+    #   [1:3] = fit1 mu coefficients, [4:6] = fit2 mu coefficients
+    # sigmas: [1] = fit1 sigma intercept, [2] = fit2 sigma intercept
+    # nus: [1] = fit1 nu intercept, [2] = fit2 nu intercept
+    # taus: [1] = fit1 tau intercept, [2] = fit2 tau intercept
 
-    lp_1=coefficients[1]+coefficients[2]*sex + coefficients[3]*age
-    lp_2=coefficients[4]+coefficients[5]*sex + coefficients[6]*age
+      lp_1 = coefficients[1] + coefficients[2]*sex + coefficients[3]*age
+      lp_2 = coefficients[4] + coefficients[5]*sex + coefficients[6]*age
+    
+      lp_sigma_1 = sigmas[1]
+      lp_sigma_2 = sigmas[2]
+    
+      lp_nu_1 = nus[1]
+      lp_nu_2 = nus[2]
+    
+      lp_tau_1 = taus[1]
+      lp_tau_2 = taus[2]
+
     library(VineCopula)
     cop_model_names=c("cop","cop_n","cop_j","cop_g","cop_f","cop_amh","cop_fgm","cop_pl","cop_h","cop_t")
-    vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     NA)
+    vine_cop_family=c(3,    1,      6,      4,      5,      NA,       NA,       NA,      NA,     2)
     cop_vine=vine_cop_family[grep(paste("\\b",model,"\\b",sep=""),cop_model_names)]
 
     if(is.na(cop_vine)) {
       t1=rep(NA,n)
       t2=rep(NA,n)
     } else {
-        simCop=BiCopSim(N=n, family=cop_vine,par=correlations[1])
-
+        if(model=="cop_t") {
+          #For t copula we need to specify the degrees of freedom parameter, for simplicity we set it to 4
+          simCop=BiCopSim(N=n, family=cop_vine,par=correlations[1], par2=correlations[2])
+        } else {
+          simCop=BiCopSim(N=n, family=cop_vine,par=correlations[1])
+        }
           t1=qZISICHEL(simCop[,1], mu=links$mu.linkinv(lp_1)
-                    , sigma=links$sigma.linkinv(sigmas[1])
-                    , nu=links$nu.linkinv(nus[1])
-                    , tau=links$tau.linkinv(taus[1]))
+                    , sigma=(links$sigma.linkinv(lp_sigma_1))
+                    , nu=links$nu.linkinv(lp_nu_1)
+                    , tau=links$tau.linkinv(lp_tau_1))
           t2=qZISICHEL(simCop[,2], mu=links$mu.linkinv(lp_2)
-                    , sigma=links$sigma.linkinv(sigmas[2])
-                    , nu=links$nu.linkinv(nus[2])
-                    , tau=links$tau.linkinv(taus[2]))
+                    , sigma=(links$sigma.linkinv(lp_sigma_2))
+                    , nu=links$nu.linkinv(lp_nu_2)
+                    , tau=links$tau.linkinv(lp_tau_2))
+
     }
   }
-  return(as.vector(rbind(t1, t2)))
+  return(c(t1, t2))
 }
 
 
@@ -1869,12 +1898,22 @@ evaluateModels <- function(fits,model_list=rownames(fits$correlations),vg_sims=1
   w_vs=matrix(1,ncol=length(y),nrow=length(y))
   w_vs_0=matrix(0,ncol=length(y),nrow=length(y))
   # For every pair of adjacent observations
-  for (i in seq(1, n*2, by=2)) {
-    w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
-    w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
-    w_vs_0[i, i+1] <- 1
-    w_vs_0[i+1, i] <- 1
-  }
+
+  for (i in 1:nrow(w_vs)) {
+        for (j in 1:ncol(w_vs)) {
+          if (abs(i-j)==n) {
+            w_vs[i,j]=((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
+            w_vs_0[i,j]=1
+          }
+        }
+      }      
+
+  #for (i in seq(1, n*2, by=2)) {
+  #  w_vs[i, i+1] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+  #  w_vs[i+1, i] <- ((n^2-2*(n-1))/(2*(n-1)))^2
+  #  w_vs_0[i, i+1] <- 1
+  #  w_vs_0[i+1, i] <- 1
+  #}
 
   vs2_wt=vs2=es=vs2_wt_coronly=vs1=rep(NA,length(model_list_complete))
   names(vs2_wt)=names(vs2)=names(es)=names(vs1)=names(vs2_wt_coronly)=model_list_complete
@@ -2395,10 +2434,13 @@ empty_coef_se <- function() {
 fit_trivariate_models <- function(
   sim,
   data_long,
-  n = nrow(sim$y),
-  d = ncol(sim$y),
+  n = NULL,
+  d = NULL,
   verbose = TRUE
 ) {
+
+  if(is.null(n)) {n = nrow(sim$y)}
+  if(is.null(d)) {d = ncol(sim$y)}
 
   library(gamlss)
   library(glmtoolbox)
@@ -2621,7 +2663,7 @@ fit_trivariate_models <- function(
 
 simRVine <- function(n,rho){
 
-    #Generate data from a 5-dimensional R-vine copula with normal pair-copulas and AR1 dependence 
+    #Generate data from a d-dimensional R-vine copula with normal pair-copulas and AR1 dependence 
       d = 3
       dd = d*(d-1)/2
       order = 1:d
@@ -2670,16 +2712,19 @@ calc_variogram_score <- function(fits, sim, vg_sims=100,input_seed=123) {
       w_vs=matrix(1,ncol=n*d,nrow=n*d)
       w_vs_0=matrix(0,ncol=n*d,nrow=n*d)
 
-      # Set values where row = col + n or col = row + n to 10
-      # For every pair of adjacent observations
+
+      # OK so I want this weight to apply when the two points are exactly n apart
+      # i.e. i and i+n are different time points but the same ID, so I want to upweight 
+      # the variogram score for those pairs of points since they are correlated
+
       for (i in 1:nrow(w_vs)) {
-        if (i + 1 <= nrow(w_vs)) {
-          w_vs[i, i + 1] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
-          w_vs[i + 1, i] <- ((n^2 - 2 * (n - 1)) / (2 * (n - 1)))^2
-          w_vs_0[i, i + 1] <- 1
-          w_vs_0[i + 1, i] <- 1
+        for (j in 1:ncol(w_vs)) {
+          if (abs(i-j)==n) {
+            w_vs[i,j]=4*n*d
+            w_vs_0[i,j]=1
+          }
         }
-      }
+      }      
 
       for(model_name in names(correlations)) {
         
@@ -2754,7 +2799,8 @@ run_trivariate_outer_sims <- function(
       id = rep(1:nrow(sim$y), times = 3)
     )
 
-    fit_call_args <- fit_args
+    #fit_call_args <- fit_args
+    fit_call_args=list()
     fit_call_args$sim <- sim
     fit_call_args$data_long <- data_long
     if (is.null(fit_call_args$verbose)) fit_call_args$verbose <- FALSE
@@ -3005,10 +3051,18 @@ sim_model_tri <- function(model,dist="LO",n,coefficients,correlations,x1,x2) {
 
   } else if (model == "GEE") {
 
-    library(VineCopula)
     #model="GEE"
     #Generate basic correlation structure based on correlation parameter
 
+
+    # Cumulative distribution function of a trivariate gausssian
+
+      library(MASS)
+
+      #Generate multivariate normal
+
+
+      # Evaluate P(X1 ≤ x1, X2 ≤ x2, X3 ≤ x3)
       m=correlations[[model]]
       correlations_final=matrix(
               c( 0, m[3,1], m[2,1],
@@ -3017,10 +3071,12 @@ sim_model_tri <- function(model,dist="LO",n,coefficients,correlations,x1,x2) {
               )
         ,nrow=3,ncol=3,byrow = TRUE)
       
-      mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
-      rho_in=t(mf)[lower.tri(t(mf))]
-    
-    c0=simRVine(n, rho=sqrt(rho_in))[[1]]
+      c0=pnorm(mvrnorm(n=1000, mu=c(0,0,0), Sigma=m))
+
+      
+      #mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
+      #rho_in=t(mf)[lower.tri(t(mf))]
+      #c0=simRVine(n, rho=sqrt(rho_in))[[1]]
 
     t1=qBI(c0[,1], mu=logit_inv(lp_1))
     t2=qBI(c0[,2], mu=logit_inv(lp_2))
@@ -3060,7 +3116,29 @@ sim_model_tri <- function(model,dist="LO",n,coefficients,correlations,x1,x2) {
     m=(correlations[[model]])
     #m=m[ncol(m):1,ncol(m):1][lower.tri(m)]
     
-    c0=simRVine(n, rho=m)[[1]]
+    #c0=simRVine(n, rho=m)[[1]]
+
+
+      library(MASS)
+
+      #Generate multivariate normal
+
+
+      # Evaluate P(X1 ≤ x1, X2 ≤ x2, X3 ≤ x3)
+      correlations_final=matrix(
+              c( 1, m[1], m[3],
+                m[1], 1,   m[2],
+                m[3], m[2],      1
+              )
+        ,nrow=3,ncol=3,byrow = TRUE)
+      
+      c0=pnorm(mvrnorm(n=1000, mu=c(0,0,0), Sigma=correlations_final))
+
+      
+      #mf=t(correlations_final[,ncol(correlations_final):1])[,ncol(correlations_final):1]
+      #rho_in=t(mf)[lower.tri(t(mf))]
+      #c0=simRVine(n, rho=sqrt(rho_in))[[1]]
+
     t1=qBI(c0[,1], mu=logit_inv(lp_1))
     t2=qBI(c0[,2], mu=logit_inv(lp_2))
     t3=qBI(c0[,3], mu=logit_inv(lp_3))
