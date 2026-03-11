@@ -19,12 +19,12 @@ copula_family <- 1
 # Each row is one scenario: list(mu_intercept, mu_coefficients, cutoff, theta_intercept)
 
 param_grid <- list(
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.1^2, .1, .1)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.25^2, .25, .25)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.5^2, .5, .5)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.667^2, .667, .667)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.9^2, .9, .9)),
   list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.75^2, .75, .75)),
-  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.9^2, .9, .9))
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.667^2, .667, .667)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.5^2, .5, .5)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.25^2, .25, .25)),
+  list(mu_intercept = c(-2,-1,0), mu_coefficients = c(1,0.01), cutoff = 0.5,  theta_intercept = c(.1^2, .1, .1))
 )
 
 ##################### MAIN LOOP ####################
