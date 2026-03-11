@@ -14,12 +14,12 @@ cat(sprintf("Setting up parallel processing with %d cores\n", n_cores))
 plan(multisession, 
      workers = n_cores,
      # Set memory limits and timeouts
-     rscript_args = c("--max-ppsize=500000000")  # 500MB per process
+     #rscript_args = c("--max-ppsize=500000000")  # 500MB per process
 )
 
 # Configure future options for better error handling
-options(future.globals.maxSize = 1024 * 1024^2)  # 1GB max for globals
-options(future.rng.onMisuse = "ignore")
+#options(future.globals.maxSize = 1024 * 1024^2)  # 1GB max for globals
+#options(future.rng.onMisuse = "ignore")
 
 #For the broad mean simulations
 load("input_params_list.RData")
@@ -29,7 +29,7 @@ bt_mode=FALSE
 
 # Testing for a single run
 #params <- input_params_list[[1]]
-#test_result <- run_single_simulation(params, 1, 1, bt_mode=TRUE)
+#test_result <- run_single_simulation(params, 1, 1, bt_mode=FALSE)
 #str(test_result)
 
 # Define the list of input parameter sets as a list of lists
@@ -119,7 +119,7 @@ run_single_simulation <- function(params, sim_index, param_set_idx,bt_mode) {
           
           fits = fitBivModels_Bt_withCov(dataset=dataset, dist=dist, include="ALL",
                                          a=a, b=b, c=c, mu1=mu1, mu2=mu2,
-                                         calc_actuals=FALSE, cv=FALSE,bt_mode=bt_mode)
+                                         calc_actuals=FALSE, bt_mode=bt_mode)
           
           # Debug: Check fits structure
           if(is.null(fits)) {
